@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <glib.h>
 #include <timer.h>
+#include <sys/timerfd.h>
 
 static GThread *thread = NULL;
 
