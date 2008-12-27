@@ -28,8 +28,6 @@ void soft_map_ref(guint8 *out, guint8 *in, int w, int h, float x0, float y0)
 			y = 4*x*y + y0;
 			x = 2*(x*x - y2) + x0;
 			
-			//int xs = lrintf(fminf(fmaxf((x+1)/2, 0.0f), 1.0f)*w);
-			//int ys = lrintf(fminf(fmaxf((y+1)/2, 0.0f), 1.0f)*h);
 			int xs = MIN(MAX(lrintf((x+1)*0.5*w), 0), w);
 			int ys = MIN(MAX(lrintf((y+1)*0.5*h), 0), h);
 			out[yd*w + xd] = in[ys*w + xs];
@@ -52,7 +50,8 @@ void soft_map_ref2(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
 			
 			int xs = MIN(MAX(lrintf(x*w), 0), w);
 			int ys = MIN(MAX(lrintf(y*h), 0), h);
-			*out = (*out)/2 + in[ys*w + xs]/2;
+			//*out = (*out)/2 + in[ys*w + xs]/2;
+			*out = in[ys*w + xs];
 			out++;
 		}
 	}
@@ -65,12 +64,13 @@ void soft_map_bl(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
 	
 	x0 *= 0.5f; y0 *= 0.5f;
 	x0 += 1.0f; y0 += 1.0f;
+	x0 *= 0.5f; y0 *= 0.5f;
 	float yi = -1.0f;
 	for(int yd = 0; yd < h; yd++, yi+=ystep) {
 		float xi = - 1.0f;
 		for(int xd = 0; xd < w; xd++, xi+=xstep) {
-			float y = (4*xi*yi + y0)*0.5;
-			float x = (2*(xi*xi - yi*yi) + x0)*0.5;
+			float y = 2*xi*yi + y0;
+			float x = (xi*xi - yi*yi) + x0;
 			
 			int xs = MIN(MAX(lrintf(x*w*256), 0), w*256);
 			int ys = MIN(MAX(lrintf(y*h*256), 0), h*256);
