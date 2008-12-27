@@ -58,6 +58,8 @@ void soft_map_ref2(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
 }
 
 //TODO: make go fast
+//TODO: make version for 4x4 tiles (possibly 8x8 as well)
+//TODO: make fast sse/mmx version
 void soft_map_bl(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
 {
 	float xstep = 2.0f/w, ystep = 2.0f/h; 
@@ -72,10 +74,38 @@ void soft_map_bl(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
 			float y = 2*xi*yi + y0;
 			float x = (xi*xi - yi*yi) + x0;
 			
-			int xs = MIN(MAX(lrintf(x*w*256), 0), w*256);
-			int ys = MIN(MAX(lrintf(y*h*256), 0), h*256);
-			int x1 = xs>>8, x2 = MIN(x1+1,w), xf = xs&0xFF;
-			int y1 = ys>>8, y2 = MIN(y1+1,h), yf = ys&0xFF;
+			int xs = MIN(MAX(lrintf(x*w*256), 0), (w-1)*256);
+			int ys = MIN(MAX(lrintf(y*h*256), 0), (h-1)*256);
+			int x1 = xs>>8, x2 = x1+1, xf = xs&0xFF;
+			int y1 = ys>>8, y2 = y1+1, yf = ys&0xFF;
+			
+			guint w1 = (0xff - xf)*(0xff-yf), w2 = xf * (0xff-yf),
+			      w3 = (0xff - xf)*yf,        w4 = xf * yf;
+			
+			*(out++) = (in[y1*w + x1]*w1 + in[y1*w + x2]*w2 +
+						in[y2*w + x1]*w3 + in[y2*w + x2]*w4) >> 16;
+		}
+	}
+}
+
+void soft_map_sse(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
+{
+	float xstep = 2.0f/w, ystep = 2.0f/h; 
+	
+	x0 *= 0.5f; y0 *= 0.5f;
+	x0 += 1.0f; y0 += 1.0f;
+	x0 *= 0.5f; y0 *= 0.5f;
+	float yi = -1.0f;
+	for(int yd = 0; yd < h; yd++, yi+=ystep) {
+		float xi = - 1.0f;
+		for(int xd = 0; xd < w; xd++, xi+=xstep) {
+			float y = 2*xi*yi + y0;
+			float x = (xi*xi - yi*yi) + x0;
+			
+			int xs = MIN(MAX(lrintf(x*w*256), 0), (w-1)*256);
+			int ys = MIN(MAX(lrintf(y*h*256), 0), (h-1)*256);
+			int x1 = xs>>8, x2 = x1+1, xf = xs&0xFF;
+			int y1 = ys>>8, y2 = y1+1, yf = ys&0xFF;
 			
 			guint w1 = (0xff - xf)*(0xff-yf), w2 = xf * (0xff-yf),
 			      w3 = (0xff - xf)*yf,        w4 = xf * yf;

@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
+#include <malloc.h>
 
 //the global pixmap that will serve as our buffer
 static GdkPixmap *pixmap = NULL;
@@ -51,8 +53,9 @@ void soft_map_ref2(guint16 *out, guint16 *in, int w, int h, float x0, float y0);
 void soft_map_bl(guint16 *out, guint16 *in, int w, int h, float x0, float y0);
 void pallet_blit(void *dest, int dst_stride, uint16_t *src, int w, int h, uint32_t *pal);
 void pallet_blit_cairo(cairo_surface_t *dst, uint16_t *src, int w, int h, uint32_t *pal);
+void pallet_blit_cairo_unroll(cairo_surface_t *dst, uint16_t *src, int w, int h, uint32_t *pal);
 
-#define IM_SIZE 1024
+#define IM_SIZE 512
 #define IM_MID  (IM_SIZE/2)
 
 void *do_draw(void *ptr){
@@ -64,31 +67,36 @@ void *do_draw(void *ptr){
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGALRM);
 	
-	const int stride = cairo_format_stride_for_width (CAIRO_FORMAT_RGB24, IM_SIZE);
-	//const int stride = cairo_format_stride_for_width (CAIRO_FORMAT_A8, IM_SIZE);
-	
 	cairo_surface_t *static_surf = cairo_image_surface_create (CAIRO_FORMAT_A8, IM_SIZE, IM_SIZE);
 	guchar *source = cairo_image_surface_get_data(static_surf);
 	int src_strd = cairo_image_surface_get_stride(static_surf);
 	memset(source, 0, IM_SIZE * src_strd);
 	cairo_t *cr = cairo_create(static_surf);
-	cairo_pattern_t *pat = cairo_pattern_create_radial (IM_MID, IM_MID, 0, IM_MID,  IM_MID, 64.0);
+	cairo_pattern_t *pat = cairo_pattern_create_radial (IM_MID, IM_MID, 0, IM_MID,  IM_MID, IM_SIZE/8);
 	cairo_pattern_add_color_stop_rgba (pat, 0, 1, 1, 1, 1);
 	cairo_pattern_add_color_stop_rgba (pat, 1, 0, 0, 0, 0);
 	cairo_set_source (cr, pat);
 
-	cairo_arc(cr, IM_MID, IM_MID, 64, 0, 2*G_PI);
+	cairo_arc(cr, IM_MID, IM_MID, IM_SIZE/8, 0, 2*G_PI);
 	cairo_fill(cr);
 	cairo_pattern_destroy (pat);
 	cairo_destroy(cr);
 	
-	void *draw_surf = g_malloc0(stride * IM_SIZE);
+	cairo_surface_t *cst = cairo_image_surface_create (CAIRO_FORMAT_RGB24, IM_SIZE, IM_SIZE);
+	//const int stride = cairo_image_surface_get_stride(cst);
+	//void *draw_surf = cairo_image_surface_get_data(cst);
+	memset(cairo_image_surface_get_data(cst), 0, IM_SIZE * cairo_image_surface_get_stride(cst));
+	
 	guint16 *map_surf[2];
 	
-	map_surf[0] = g_malloc0(IM_SIZE * IM_SIZE * sizeof(guint16));
-	map_surf[1] = g_malloc0(IM_SIZE * IM_SIZE * sizeof(guint16));
+	//~ map_surf[0] = g_malloc0(IM_SIZE * IM_SIZE * sizeof(guint16));
+	//~ map_surf[1] = g_malloc0(IM_SIZE * IM_SIZE * sizeof(guint16));
+	map_surf[0] = valloc(IM_SIZE * IM_SIZE * sizeof(guint16));
+	memset(map_surf[0], 0, IM_SIZE * IM_SIZE * sizeof(guint16));
+	map_surf[1] = valloc(IM_SIZE * IM_SIZE * sizeof(guint16));
+	memset(map_surf[1], 0, IM_SIZE * IM_SIZE * sizeof(guint16));
 	
-	guint32 *pal = g_malloc0(257 * sizeof(guint32));
+	guint32 *pal = memalign(32, 257 * sizeof(guint32));
 	for(int i = 0; i < 256; i++) pal[i] = (((i+128)%256)<<16) | (i<<8) | ((255-i));
 	pal[256] = pal[255];
 
@@ -108,29 +116,23 @@ void *do_draw(void *ptr){
 			}
 			
 			soft_map_bl(map_surf[(m+1)&0x1], map_surf[m], IM_SIZE, IM_SIZE, sin(t0), sin(t1));
-			m = (m+1)&0x1; t0+=0.05; t1+=0.1;
+			m = (m+1)&0x1; t0+=0.01; t1+=0.07;
 
             //create a gtk-independant surface to draw on
-            cairo_surface_t *cst = cairo_image_surface_create_for_data(draw_surf, CAIRO_FORMAT_RGB24, IM_SIZE, IM_SIZE, stride);
-            pallet_blit_cairo(cst, map_surf[m], IM_SIZE, IM_SIZE, pal);
+            pallet_blit_cairo_unroll(cst, map_surf[m], IM_SIZE, IM_SIZE, pal);
 
             //When dealing with gdkPixmap's, we need to make sure not to
             //access them from outside gtk_main().
             gdk_threads_enter();
 
             cairo_t *cr_pixmap = gdk_cairo_create(pixmap);
-			//cairo_set_source_rgba(cr_pixmap, 1.0, 1.0, 1.0, 1.0);
-			//cairo_paint(cr_pixmap);
             cairo_set_source_surface (cr_pixmap, cst, 0, 0);
 			cairo_paint(cr_pixmap);
             cairo_destroy(cr_pixmap);
 
             gdk_threads_leave();
 
-            cairo_surface_destroy(cst);
-
             currently_drawing = 0;
-
         }
     }
 	return 0;
