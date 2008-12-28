@@ -85,7 +85,7 @@ void soft_map8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 					unsigned int xs = IMIN(IMAX(lrintf(x*w), 0), w);
 					unsigned int ys = IMIN(IMAX(lrintf(y*h), 0), h);
 					
-					*(out++) = in[(ys-ys%8)*w + (xs-xs%8)*8 + (ys%8)*8+(xs%8)];
+					*(out++) = in[(ys-ys%8)*w + (ys%8)*8+ (xs-xs%8)*8 + (xs%8)];
 				}
 			}
 		}
@@ -97,32 +97,29 @@ void soft_map_bl8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	x0  = x0*0.25 + 0.5;
 	y0  = y0*0.25 + 0.5;
-	for(int yd = 0; yd < h/8; yd++)
-	{
-		for(int xd = 0; xd < w/8; xd++)
-		{
+	for(int yd = 0; yd < h/8; yd++) {
+		for(int xd = 0; xd < w/8; xd++) {
 			float v = yd*8*ystep - 1.0f;
-			for(int yt=0; yt<8; yt++, v+=ystep)
-			{
+			for(int yt=0; yt<8; yt++, v+=ystep) {
 				float u = xd*8*xstep - 1.0f;
-				for(int xt=0; xt<8; xt++, u+=xstep)
-				{
+				for(int xt=0; xt<8; xt++, u+=xstep) {
 					float y = 2*u*v + y0;
 					float x = u*u - v*v + x0;
 					
 					unsigned int xf = IMIN(IMAX(lrintf(x*w*256), 0), w*256);
 					unsigned int yf = IMIN(IMAX(lrintf(y*h*256), 0), h*256);
 					unsigned int xs = xf/256;
-					unsigned int ys = xf/256;
+					unsigned int ys = yf/256;
 					xf = xf%256;
 					yf = yf%256;
 					
-					int xi1 = (xs-xs%8)*8 +(xs%8); 
+					int xi1 = (xs-xs%8)*8 + (xs%8); 
 					int yi1 = (ys-ys%8)*w + (ys%8)*8;
 					xs=IMIN(xs+1,w); ys=IMIN(ys+1,h);
-					int xi2 = (xs-xs%8)*8 +(xs%8);
+					int xi2 = (xs-xs%8)*8 + (xs%8);
 					int yi2 = (ys-ys%8)*w + (ys%8)*8;
 
+					//*(out++) = in[yi1 + xi1];
 					*(out++) = ((in[yi1 + xi1]*(0xff - xf) + in[yi1 + xi2]*xf)*(0xff-yf) +
 								(in[yi2 + xi1]*(0xff - xf) + in[yi2 + xi2]*xf)*yf) >> 16;
 				}
