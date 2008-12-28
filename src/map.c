@@ -106,12 +106,10 @@ void soft_map_bl8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y
 					float y = 2*u*v + y0;
 					float x = u*u - v*v + x0;
 					
-					unsigned int xf = IMIN(IMAX(lrintf(x*w*256), 0), w*256);
-					unsigned int yf = IMIN(IMAX(lrintf(y*h*256), 0), h*256);
-					unsigned int xs = xf/256;
-					unsigned int ys = yf/256;
-					xf = xf%256;
-					yf = yf%256;
+					unsigned int xs = IMIN(IMAX(lrintf(x*w), 0), w);
+					unsigned int ys = IMIN(IMAX(lrintf(y*h), 0), h);
+					unsigned int xf = IMIN(IMAX(lrintf((x*w-xs)*256), 0), 255);
+					unsigned int yf = IMIN(IMAX(lrintf((y*h-ys)*256), 0), 255);
 					
 					int xi1 = (xs-xs%8)*8 + (xs%8); 
 					int yi1 = (ys-ys%8)*w + (ys%8)*8;
@@ -120,8 +118,8 @@ void soft_map_bl8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y
 					int yi2 = (ys-ys%8)*w + (ys%8)*8;
 
 					//*(out++) = in[yi1 + xi1];
-					*(out++) = ((in[yi1 + xi1]*(0xff - xf) + in[yi1 + xi2]*xf)*(0xff-yf) +
-								(in[yi2 + xi1]*(0xff - xf) + in[yi2 + xi2]*xf)*yf) >> 16;
+					*(out++) = ((in[yi1 + xi1]*(256 - xf) + in[yi1 + xi2]*xf)*(256-yf) +
+								(in[yi2 + xi1]*(256 - xf) + in[yi2 + xi2]*xf)*yf) >> 16;
 				}
 			}
 		}
