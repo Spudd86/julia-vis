@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <malloc.h>
 
+#include "pallet.h"
+#include "map.h"
+
 //the global pixmap that will serve as our buffer
 static GdkPixmap *pixmap = NULL;
 
@@ -48,14 +51,7 @@ static int currently_drawing = 0;
 //do_draw will be executed in a separate thread whenever we would like to update
 //our animation
 
-void soft_map_ref(guint8 *out, guint8 *in, int w, int h, float x0, float y0);
-void soft_map_ref2(guint16 *out, guint16 *in, int w, int h, float x0, float y0);
-void soft_map_bl(guint16 *out, guint16 *in, int w, int h, float x0, float y0);
-void pallet_blit(void *dest, int dst_stride, uint16_t *src, int w, int h, uint32_t *pal);
-void pallet_blit_cairo(cairo_surface_t *dst, uint16_t *src, int w, int h, uint32_t *pal);
-void pallet_blit_cairo_unroll(cairo_surface_t *dst, uint16_t *src, int w, int h, uint32_t *pal);
-
-#define IM_SIZE 512
+#define IM_SIZE (512)
 #define IM_MID  (IM_SIZE/2)
 
 void *do_draw(void *ptr){
@@ -82,22 +78,32 @@ void *do_draw(void *ptr){
 	cairo_pattern_destroy (pat);
 	cairo_destroy(cr);
 	
+	guchar *max_src = valloc(IM_SIZE * IM_SIZE * sizeof(guint8));
+	for(int y=0; y < IM_SIZE; y++) 
+		for(int x=0; x < IM_SIZE; x++) 
+			max_src[y*IM_SIZE + x] = source[y*src_strd + x];
+	
+	//~ for(int y=0; y < IM_SIZE/8; y++) {
+		//~ for(int x=0; x < IM_SIZE/8; x++) {
+			//~ for(int yt=0; yt<8; yt++) 
+				//~ for(int xt=0; xt<8; xt++) 
+					//~ max_src[y*IM_SIZE*64/8 + x*64 + yt*8+xt] = source[(y*8+yt)*src_strd + (x*8+xt)];
+		//~ }
+	//~ }
+	
+	cairo_surface_destroy(static_surf);
+	
 	cairo_surface_t *cst = cairo_image_surface_create (CAIRO_FORMAT_RGB24, IM_SIZE, IM_SIZE);
-	//const int stride = cairo_image_surface_get_stride(cst);
-	//void *draw_surf = cairo_image_surface_get_data(cst);
 	memset(cairo_image_surface_get_data(cst), 0, IM_SIZE * cairo_image_surface_get_stride(cst));
 	
 	guint16 *map_surf[2];
-	
-	//~ map_surf[0] = g_malloc0(IM_SIZE * IM_SIZE * sizeof(guint16));
-	//~ map_surf[1] = g_malloc0(IM_SIZE * IM_SIZE * sizeof(guint16));
 	map_surf[0] = valloc(IM_SIZE * IM_SIZE * sizeof(guint16));
 	memset(map_surf[0], 0, IM_SIZE * IM_SIZE * sizeof(guint16));
 	map_surf[1] = valloc(IM_SIZE * IM_SIZE * sizeof(guint16));
 	memset(map_surf[1], 0, IM_SIZE * IM_SIZE * sizeof(guint16));
 	
 	guint32 *pal = memalign(32, 257 * sizeof(guint32));
-	for(int i = 0; i < 256; i++) pal[i] = (((i+128)%256)<<16) | (i<<8) | ((255-i));
+	for(int i = 0; i < 256; i++) pal[i] = 0xFF000000|((2*abs(i-127))<<16) | (i<<8) | ((255-i));
 	pal[256] = pal[255];
 
 	int m = 0; // current map surf
@@ -109,10 +115,8 @@ void *do_draw(void *ptr){
 		{
             currently_drawing = 1;
 
-            for(int y=0; y < IM_SIZE; y++) {
-				for(int x=0; x < IM_SIZE; x++) {
-					map_surf[m][y*IM_SIZE + x] = MAX(map_surf[m][y*IM_SIZE + x], source[y*src_strd + x]<<8);
-				}
+            for(int i=0; i< IM_SIZE*IM_SIZE; i++) {
+				map_surf[m][i] = MAX(map_surf[m][i], max_src[i]*256);
 			}
 			
 			soft_map_bl(map_surf[(m+1)&0x1], map_surf[m], IM_SIZE, IM_SIZE, sin(t0), sin(t1));
