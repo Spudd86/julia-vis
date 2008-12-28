@@ -17,7 +17,7 @@
 
 #define TILED false
 #if TILED
-#define MAP soft_map8x8
+#define MAP soft_map_bl8x8
 #define PALLET_BLIT pallet_blit_SDL8x8
 #else
 #define MAP soft_map_bl
@@ -56,7 +56,7 @@ int main() {
     printf("Initializing SDL.\n");
     
     /* Initialize defaults, Video and Audio subsystems */
-    if((SDL_Init(SDL_INIT_VIDEO)==-1)) { 
+    if((SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTTHREAD | SDL_INIT_TIMER)==-1)) { 
         printf("Could not initialize SDL: %s.\n", SDL_GetError());
         exit(-1);
     }
