@@ -1,5 +1,5 @@
 #include <unistd.h>
-#include <glib.h>
+#include <stdint.h>
 #include <math.h>
 
 #include <mmintrin.h>
@@ -20,7 +20,7 @@
  * @param w width of image (needs power of 2)
  * @param h height of image (needs divisable by ?)
  */
-void soft_map_ref(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
+void soft_map(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 {
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	x0  = x0*0.25 + 0.5;
@@ -44,7 +44,7 @@ void soft_map_ref(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
 //TODO: make go fast
 //TODO: make version for 4x4 tiles (possibly 8x8 as well)
 //TODO: make fast sse/mmx version
-void soft_map_bl(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
+void soft_map_bl(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 {
 	float xstep = 2.0f/w, ystep = 2.0f/h; 
 	x0  = x0*0.25 + 0.5;
@@ -61,17 +61,38 @@ void soft_map_bl(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
 			int x1 = xs>>8, x2 = x1+1, xf = xs&0xFF;
 			int y1 = ys>>8, y2 = y1+1, yf = ys&0xFF;
 			
-			guint w1 = (0xff - xf)*(0xff-yf), w2 = xf * (0xff-yf),
-			      w3 = (0xff - xf)*yf,        w4 = xf * yf;
-			
-			*(out++) = (in[y1*w + x1]*w1 + in[y1*w + x2]*w2 +
-						in[y2*w + x1]*w3 + in[y2*w + x2]*w4) >> 16;
+			*(out++) = ((in[y1*w + x1]*(0xff - xf) + in[y1*w + x2]*xf)*(0xff-yf) +
+						(in[y2*w + x1]*(0xff - xf) + in[y2*w + x2]*xf)*yf) >> 16;
 		}
 	}
 }
 
 
-void soft_map8x8(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
+void soft_map8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
+{
+	float xstep = 2.0f/w, ystep = 2.0f/h;
+	x0  = x0*0.25 + 0.5;
+	y0  = y0*0.25 + 0.5;
+	for(int yd = 0; yd < h/8; yd++) {
+		for(int xd = 0; xd < w/8; xd++) {
+			float v = yd*8*ystep - 1.0f;
+			for(int yt=0; yt<8; yt++, v+=ystep) {
+				float u = xd*8*xstep - 1.0f;
+				for(int xt=0; xt<8; xt++, u+=xstep) {
+					float y = 2*u*v + y0;
+					float x = u*u - v*v + x0;
+					
+					unsigned int xs = IMIN(IMAX(lrintf(x*w), 0), w);
+					unsigned int ys = IMIN(IMAX(lrintf(y*h), 0), h);
+					
+					*(out++) = in[(ys-ys%8)*w + (xs-xs%8)*8 + (ys%8)*8+(xs%8)];
+				}
+			}
+		}
+	}
+}
+
+void soft_map_bl8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 {
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	x0  = x0*0.25 + 0.5;
@@ -84,29 +105,34 @@ void soft_map8x8(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
 			for(int yt=0; yt<8; yt++, v+=ystep)
 			{
 				float u = xd*8*xstep - 1.0f;
-				//float v = ((float)((yd*8 + yt)*2 - h))/h;
-				//float v = (yd*8+yt)*ystep - 1.0f;
 				for(int xt=0; xt<8; xt++, u+=xstep)
 				{
-					//float u = ((float)((xd*8 + xt)*2 - w))/w;
-					//float u = (xd*8+xt)*xstep - 1.0f;
 					float y = 2*u*v + y0;
 					float x = u*u - v*v + x0;
 					
-					unsigned int xs = IMIN(IMAX(lrintf(x*w), 0), w);
-					unsigned int ys = IMIN(IMAX(lrintf(y*h), 0), h);
+					unsigned int xf = IMIN(IMAX(lrintf(x*w*256), 0), w*256);
+					unsigned int yf = IMIN(IMAX(lrintf(y*h*256), 0), h*256);
+					unsigned int xs = xf/256;
+					unsigned int ys = xf/256;
+					xf = xf%256;
+					yf = yf%256;
 					
-					// y*w*64/8 + x*64 + yt*8+xt
-					//(y*8+yt)*w + (x*8+xt)
-					*(out++) = in[(ys-ys%8)*w + (xs-xs%8)*8 + (ys%8)*8+(xs%8)];
+					int xi1 = (xs-xs%8)*8 +(xs%8); 
+					int yi1 = (ys-ys%8)*w + (ys%8)*8;
+					xs=IMIN(xs+1,w); ys=IMIN(ys+1,h);
+					int xi2 = (xs-xs%8)*8 +(xs%8);
+					int yi2 = (ys-ys%8)*w + (ys%8)*8;
+
+					*(out++) = ((in[yi1 + xi1]*(0xff - xf) + in[yi1 + xi2]*xf)*(0xff-yf) +
+								(in[yi2 + xi1]*(0xff - xf) + in[yi2 + xi2]*xf)*yf) >> 16;
 				}
 			}
 		}
 	}
 }
 
-
-void soft_map_bl8x8(guint16 *out, guint16 *in, int w, int h, float x0, float y0)
+// FIXME: this doesn't work
+void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 {
 	const float xstep = 16.0f/w, ystep = 16.0f/h; 
 	
