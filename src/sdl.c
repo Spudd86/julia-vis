@@ -7,17 +7,14 @@
 
 #include <SDL.h>
 
-#include "pallet.h"
+#include "pixmisc.h"
 #include "map.h"
 
 #include "common.h"
 
-#define IM_SIZE (512)
-#define IM_MID  (IM_SIZE/2)
-
 #define TILED false
 #if TILED
-#define MAP soft_map_bl8x8
+#define MAP soft_map_interp8x8
 #define PALLET_BLIT pallet_blit_SDL8x8
 #else
 #define MAP soft_map_bl
@@ -39,11 +36,11 @@ static uint16_t *setup_maxsrc(int w, int h, bool tile)
 			for(int x=0; x < w; x++) 
 				max_src[y*w + x] = col(x,y);
 	} else {
-		for(int y=0; y < IM_SIZE/8; y++) {
-			for(int x=0; x < IM_SIZE/8; x++) {
+		for(int y=0; y < h/8; y++) {
+			for(int x=0; x < w/8; x++) {
 				for(int yt=0; yt<8; yt++) 
 					for(int xt=0; xt<8; xt++) 
-						max_src[y*IM_SIZE*64/8 + x*64 + yt*8+xt] = col(x*8+xt, y*8+yt);
+						max_src[y*w*64/8 + x*64 + yt*8+xt] = col(x*8+xt, y*8+yt);
 			}
 		}
 	}
@@ -51,12 +48,13 @@ static uint16_t *setup_maxsrc(int w, int h, bool tile)
 	return max_src;
 }
 
+#define IM_SIZE (512)
+
 int main() {
     
     printf("Initializing SDL.\n");
     
-    /* Initialize defaults, Video and Audio subsystems */
-    if((SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTTHREAD | SDL_INIT_TIMER)==-1)) { 
+    if((SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTTHREAD | SDL_INIT_TIMER | SDL_INIT_NOPARACHUTE)==-1)) { 
         printf("Could not initialize SDL: %s.\n", SDL_GetError());
         exit(-1);
     }
@@ -64,9 +62,11 @@ int main() {
 
     printf("SDL initialized.\n");
     
+	//SDL_VideoInfo *vid_info = SDL_GetVideoInfo();
+	
 	SDL_Surface *screen;
 
-    screen = SDL_SetVideoMode(IM_SIZE, IM_SIZE, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
+    screen = SDL_SetVideoMode(IM_SIZE, IM_SIZE, 32, SDL_SWSURFACE | SDL_DOUBLEBUF | SDL_FULLSCREEN);
     if ( screen == NULL ) {
         fprintf(stderr, "Unable to set video: %s\n", SDL_GetError());
         exit(1);
@@ -78,47 +78,55 @@ int main() {
 	
 	uint16_t *map_surf[2];
 	map_surf[0] = valloc(IM_SIZE * IM_SIZE * sizeof(uint16_t));
-	memset(map_surf[0], 0, IM_SIZE * IM_SIZE * sizeof(uint16_t));
 	map_surf[1] = valloc(IM_SIZE * IM_SIZE * sizeof(uint16_t));
-	memset(map_surf[1], 0, IM_SIZE * IM_SIZE * sizeof(uint16_t));
+	for(int i=0; i < IM_SIZE*IM_SIZE; i++) {
+		map_surf[0][i] = max_src[i];
+		map_surf[1][i] = max_src[i];
+	}
 	
 	uint32_t *pal = memalign(32, 257 * sizeof(uint32_t));
 	for(int i = 0; i < 256; i++) pal[i] = 0xFF000000|((2*abs(i-127))<<16) | (i<<8) | ((255-i));
 	pal[256] = pal[255];
 
+	
 	int m = 0;
 	float t0 = 0, t1 = 0;
 	SDL_Event	event;
 	long		tick1, tick2;
 	tick1 = SDL_GetTicks();
 	
-	for(int i=0; i< IM_SIZE*IM_SIZE; i++) {
-		map_surf[m][i] = IMAX(map_surf[m][i], max_src[i]);
-	}
+	Uint32 fps_lasttime = SDL_GetTicks(); //the last recorded time.
+	Uint32 fps_current; //the current FPS.
+	Uint32 fps_frames = 0;
 	
-	while (SDL_PollEvent(&event) >= 0)
+	while(SDL_PollEvent(&event) >= 0)
 	{
-		tick2 = SDL_GetTicks();
-		float dt = (tick2 - tick1) * 0.001f;
-		tick1 = tick2;
-		/* Click to exit */
-		if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_QUIT)
+		if(event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_QUIT 
+			|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE))
 			break;
 		
+		MAP(map_surf[(m+1)&0x1], map_surf[m], IM_SIZE, IM_SIZE, sin(t0)*0.75, sin(t1)*0.75);
+		m = (m+1)&0x1; 
 		
-		MAP(map_surf[(m+1)&0x1], map_surf[m], IM_SIZE, IM_SIZE, sin(t0), sin(t1));
-		m = (m+1)&0x1; t0+=0.05*dt; t1+=0.35*dt;
-		
-		for(int i=0; i< IM_SIZE*IM_SIZE; i++) {
-			map_surf[m][i] = IMAX(map_surf[m][i], max_src[i]);
-		}
+		maxblend(map_surf[m], max_src, IM_SIZE, IM_SIZE); 
 		
 		PALLET_BLIT(screen, map_surf[m], IM_SIZE, IM_SIZE, pal);
 		
+		//SDL_UpdateRect(screen, 0, 0, IM_SIZE, IM_SIZE);
 		SDL_Flip(screen);
 
-		/* let operating system breath */
-		//SDL_Delay(1);
+		tick2 = SDL_GetTicks();
+		float dt = (tick2 - tick1) * 0.001f;
+		tick1 = tick2;
+		t0+=0.05*dt; t1+=0.35*dt;
+		fps_frames++;
+		if (fps_lasttime+1000 < SDL_GetTicks()) {
+			printf("FPS: %i\n", fps_frames);
+			fps_lasttime = SDL_GetTicks();
+			fps_current = fps_frames;
+			fps_frames = 0;
+		}
+
 	}
 
 
