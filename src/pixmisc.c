@@ -5,6 +5,9 @@
 
 #include "pixmisc.h"
 
+typedef int v4hi __attribute__ ((vector_size (8)));
+
+
 void maxblend(void *dest, void *src, int w, int h)
 {
 	__m64 *mbdst = dest, *mbsrc = src;

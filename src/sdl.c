@@ -84,7 +84,7 @@ int main() {
 		map_surf[1][i] = max_src[i];
 	}
 	
-	uint32_t *pal = memalign(32, 257 * sizeof(uint32_t));
+	uint32_t *pal = memalign(64, 257 * sizeof(uint32_t));
 	for(int i = 0; i < 256; i++) pal[i] = 0xFF000000|((2*abs(i-127))<<16) | (i<<8) | ((255-i));
 	pal[256] = pal[255];
 

@@ -14,7 +14,7 @@
 
 #include "common.h"
 
-#define IM_SIZE (768)
+#define IM_SIZE (512)
 
 #define TILED true
 #if TILED
@@ -126,7 +126,7 @@ int main()
 		map_surf[2][i] = max_src[i];
 	}
 	
-	uint32_t *pal = memalign(16, 257 * sizeof(uint32_t));
+	uint32_t *pal = memalign(64, 257 * sizeof(uint32_t)); // p4 has 64 byte cache line
 	for(int i = 0; i < 256; i++) pal[i] = 0xFF000000|((2*abs(i-127))<<16) | (i<<8) | ((255-i));
 	pal[256] = pal[255];
 
@@ -143,17 +143,18 @@ int main()
 
 	Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
 	
-	SDL_AddTimer(1000*2, &timercallback, NULL);
+	SDL_AddTimer(1000/30, &timercallback, NULL);
 	
 	SDL_Event	event;
 	while(SDL_WaitEvent(&event) >= 0)
 	{
 		if(event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_QUIT 
-			|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE))
+				|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
 			break;
-		
-		PALLET_BLIT(screen, tribuf_get_read(map_tb), IM_SIZE, IM_SIZE, pal);
-		SDL_Flip(screen);
+		} else if(event.type == SDL_USEREVENT) {
+			PALLET_BLIT(screen, tribuf_get_read(map_tb), IM_SIZE, IM_SIZE, pal);
+			SDL_Flip(screen);
+		}
 	}
 	running = false;
 	

@@ -127,23 +127,25 @@ void soft_map_bl8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y
 
 void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 {
-	const float xstep = 2.0f/w, ystep = 2.0f/h;
+	const float xstep = 16.0f/w, ystep = 16.0f/h;
 	x0  = x0*0.25 + 0.5;
 	y0  = y0*0.25 + 0.5;
 	float v0 = -1.0f;
 	for(int yd = 0; yd < h/8; yd++) {
-		float v1 = v0+8*ystep;
+		float v1 = v0+ystep;
 		float u0 = -1.0;
+		
+		float y00 = 2*u0*v0 + y0;
+		float y10 = 2*u0*v1 + y0;
+		float x00 = u0*u0 - v0*v0 + x0;
+		float x10 = u0*u0 - v1*v1 + x0;
+		float u1 = u0;
 		for(int xd = 0; xd < w/8; xd++) {
-			float u1 = u0+8*xstep;
+			u1 = u1+xstep;
 			
-			float y00 = 2*u0*v0 + y0;
 			float y01 = 2*u1*v0 + y0;
-			float y10 = 2*u0*v1 + y0;
 			float y11 = 2*u1*v1 + y0;
-			float x00 = u0*u0 - v0*v0 + x0;
 			float x01 = u1*u1 - v0*v0 + x0;
-			float x10 = u0*u0 - v1*v1 + x0;
 			float x11 = u1*u1 - v1*v1 + x0;
 			
 			int x0 = IMIN(IMAX(lrintf(x00*w*256), 0), w*256);
@@ -167,18 +169,21 @@ void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, flo
 					int xs=x/256, ys=y/256;
 					int xf=x&0xFF, yf=y&0xFF;
 					
-					int xi1 = (xs-xs%8)*8 + (xs%8); 
-					int yi1 = (ys-ys%8)*w + (ys%8)*8;
+					int xi1 = (xs&~7)*8 + (xs&7); 
+					int yi1 = (ys&~7)*w + (ys&7)*8;
 					xs=IMIN(xs+1,w); ys=IMIN(ys+1,h);
-					int xi2 = (xs-xs%8)*8 + (xs%8);
-					int yi2 = (ys-ys%8)*w + (ys%8)*8;
+					int xi2 = (xs&~7)*8 + (xs&7);
+					int yi2 = (ys&~7)*w + (ys&7)*8;
 
 					*(out++) = ((in[yi1 + xi1]*(255 - xf) + in[yi1 + xi2]*xf)*(255-yf) +
 								(in[yi2 + xi1]*(255 - xf) + in[yi2 + xi2]*xf)*yf) >> 16;
 
 				}
 			}
-			u0=u1;
+			y00 = y01; y10 = y11;
+			x00 = x01; x10 = x11;
+			
+			//u0=u1;
 		}
 		v0=v1;
 	}
