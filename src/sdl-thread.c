@@ -59,11 +59,12 @@ static int run_map_thread(tribuf *tb)
 {
 	float t0 = 0, t1 = 0;
 	
-	Uint32 fps_lasttime = SDL_GetTicks(); //the last recorded time.
-	Uint32 fps_current; //the current FPS.
-	Uint32 fps_frames = 0;
+	
 	Uint32 tick1, tick2;
-	tick1 = SDL_GetTicks();
+	Uint32 fps_lasttime;
+	Uint32 fps_delta;
+	Uint32 fps_oldtime = fps_lasttime = tick1 = SDL_GetTicks();
+	float frametime = 100;
 	
 	uint16_t *map_src = tribuf_get_read(tb);
     while(running) 
@@ -75,20 +76,17 @@ static int run_map_thread(tribuf *tb)
 		
 		tribuf_finish_write(tb);
 		map_src=map_dest;
-		
+
 		tick2 = SDL_GetTicks();
-		float dt = (tick2 - tick1) * 0.001f;
-		tick1 = tick2;
-		
-		t0+=0.05*dt; t1+=0.35*dt;
-        
-		fps_frames++;
-		if (fps_lasttime+1000 < tick1) {
-			printf("FPS: %i\n", fps_frames);
-			fps_lasttime = SDL_GetTicks();
-			fps_current = fps_frames;
-			fps_frames = 0;
+		fps_delta = tick2 - fps_oldtime;
+		fps_oldtime = tick2;
+		frametime = 0.2f * fps_delta + (1.0f - 0.2f) * frametime;
+		if (fps_lasttime+1000 < tick2) {
+			printf("FPS: %3.1f\n", 1000.0f / frametime);
+			fps_lasttime = tick2;
 		}
+		float dt = (tick2 - tick1) * 0.001f;
+		t0=0.05*dt; t1=0.35*dt;
     }
 	
 	return 0;
@@ -143,7 +141,7 @@ int main()
 
 	Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
 	
-	SDL_AddTimer(1000/30, &timercallback, NULL);
+	SDL_AddTimer(1000*2, &timercallback, NULL);
 	
 	SDL_Event	event;
 	while(SDL_WaitEvent(&event) >= 0)

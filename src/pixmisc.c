@@ -13,7 +13,8 @@ void maxblend(void *dest, void *src, int w, int h)
 	__m64 *mbdst = dest, *mbsrc = src;
 	const __m64 off = _mm_set1_pi16(0x8000);
 	for(unsigned int i=0; i < 2*w*h/sizeof(__m64); i++) { // TODO see if the prefeting is helping 
-		_mm_prefetch(mbsrc+i+4, _MM_HINT_NTA); _mm_prefetch(mbdst+i+4, _MM_HINT_NTA);
+		//_mm_prefetch(mbsrc+i+4, _MM_HINT_NTA); _mm_prefetch(mbdst+i+4, _MM_HINT_NTA);
+		__builtin_prefetch(mbsrc+i+4, 0, 0); __builtin_prefetch(mbdst+i+4, 1, 0);
 		__m64 v = mbdst[i], t = mbsrc[i]; 
 		v = _mm_add_pi16(v, off); t = _mm_add_pi16(t, off);
 		v = _mm_max_pi16(v, t);

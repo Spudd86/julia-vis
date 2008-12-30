@@ -133,13 +133,13 @@ void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, flo
 	float v0 = -1.0f;
 	for(int yd = 0; yd < h/8; yd++) {
 		float v1 = v0+ystep;
-		float u0 = -1.0;
 		
-		float y00 = 2*u0*v0 + y0;
-		float y10 = 2*u0*v1 + y0;
-		float x00 = u0*u0 - v0*v0 + x0;
-		float x10 = u0*u0 - v1*v1 + x0;
-		float u1 = u0;
+		
+		float y00 = -2.0f*v0 + y0;
+		float y10 = -2.0f*v1 + y0;
+		float x00 = 1.0f - v0*v0 + x0;
+		float x10 = 1.0f - v1*v1 + x0;
+		float u1 = -1.0f;
 		for(int xd = 0; xd < w/8; xd++) {
 			u1 = u1+xstep;
 			
@@ -182,8 +182,6 @@ void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, flo
 			}
 			y00 = y01; y10 = y11;
 			x00 = x01; x10 = x11;
-			
-			//u0=u1;
 		}
 		v0=v1;
 	}

@@ -1,12 +1,18 @@
 
 CFLAGS = --std=gnu99 -mmmx -msse -mfpmath=sse -Wall -Wextra \
-	-fstrict-aliasing -fsingle-precision-constant 
+	-fstrict-aliasing -fsingle-precision-constant -Wunsafe-loop-optimizations
 	
 #CFLAGS += -Wpointer-arith -Wmissing-prototypes -Wmissing-field-initializers \
 #	-Wunreachable-code
 
-CFLAGS += -march=native -O2 -ffast-math -finline-functions -fprefetch-loop-arrays
-CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops
+CFLAGS += -march=native -O2 -ffast-math -finline-functions 
+#CFLAGS += -pg
+#CFLAGS += -fprofile-generate
+#CFLAGS += -fprofile-use 
+# -fprefetch-loop-arrays
+CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller -fdelete-null-pointer-checks 
+CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear -funsafe-loop-optimizations -fgcse-las -fgcse-sm -fmodulo-sched
+CFLAGS += -fmerge-all-constants
 CFLAGS += `pkg-config --cflags --libs sdl` -lm
 
 #CFLAGS += -ggdb

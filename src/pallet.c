@@ -4,7 +4,12 @@
 #include <SDL.h>
 
 #include <mmintrin.h>
+#ifdef __SSE__
 #include <xmmintrin.h>
+#endif
+#ifdef __3dNOW__
+#include <mm3dnow.h>
+#endif
 
 #include "pixmisc.h"
 #include "common.h"
@@ -54,7 +59,7 @@ void pallet_blit_SDL(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pa
 		{
 			const int v = src[y*src_stride + x];
 			const int v2 = src[y*src_stride + x + 1];
-			_mm_prefetch(pal+v2/256, _MM_HINT_T0);
+			//__builtin_prefetch(pal+v2/256);
 			
 			__m64 col1 = (__m64)*(int64_t *)(pal+(v/256));
 			__m64 col2 = col1;
@@ -104,7 +109,7 @@ void pallet_blit_SDL8x8(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t 
 				for(int xt=0; xt<8; xt+=2) {
 					int v = *(src++); //FIXME: need to calculate address properly (if dst smaller than src this is wrong)
 					int v2 = *(src++);
-					_mm_prefetch(pal+v2/256, _MM_HINT_T0);
+					__builtin_prefetch(pal+v2/256,1,0);
 
 					__m64 col1 = (__m64)*(int64_t *)(pal+(v/256));
 					__m64 col2 = col1;

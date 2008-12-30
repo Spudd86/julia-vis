@@ -12,7 +12,7 @@
 
 #include "common.h"
 
-#define TILED false
+#define TILED true
 #if TILED
 #define MAP soft_map_interp8x8
 #define PALLET_BLIT pallet_blit_SDL8x8
