@@ -6,6 +6,7 @@
 #include <SDL.h>
 
 void pallet_blit(void *dest, int dst_stride, uint16_t *src, int w, int h, uint32_t *pal);
+void pallet_blit16_SDL(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pal);
 void pallet_blit_SDL(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pal);
 void pallet_blit_SDL8x8(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pal);
 

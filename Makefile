@@ -5,8 +5,8 @@ CFLAGS = --std=gnu99 -mmmx -msse -mfpmath=sse -Wall -Wextra \
 #CFLAGS += -Wpointer-arith -Wmissing-prototypes -Wmissing-field-initializers \
 #	-Wunreachable-code
 
-CFLAGS += -march=native -O2 -ffast-math -finline-functions 
-#CFLAGS += -pg
+CFLAGS += -march=native -O2 -ffast-math -finline-functions -maccumulate-outgoing-args
+CFLAGS += -pg
 #CFLAGS += -fprofile-generate
 #CFLAGS += -fprofile-use 
 # -fprefetch-loop-arrays

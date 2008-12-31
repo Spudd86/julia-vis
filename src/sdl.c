@@ -12,12 +12,11 @@
 
 #include "common.h"
 
-#define TILED true
 #if TILED
 #define MAP soft_map_interp8x8
 #define PALLET_BLIT pallet_blit_SDL8x8
 #else
-#define MAP soft_map_bl
+#define MAP soft_map_interp8x8
 #define PALLET_BLIT pallet_blit_SDL
 #endif
 
@@ -66,7 +65,7 @@ int main() {
 	
 	SDL_Surface *screen;
 
-    screen = SDL_SetVideoMode(IM_SIZE, IM_SIZE, 32, SDL_SWSURFACE | SDL_DOUBLEBUF | SDL_FULLSCREEN);
+    screen = SDL_SetVideoMode(IM_SIZE, IM_SIZE, 32, SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_FULLSCREEN);
     if ( screen == NULL ) {
         fprintf(stderr, "Unable to set video: %s\n", SDL_GetError());
         exit(1);
@@ -92,12 +91,11 @@ int main() {
 	int m = 0;
 	float t0 = 0, t1 = 0;
 	SDL_Event	event;
-	long		tick1, tick2;
-	tick1 = SDL_GetTicks();
-	
-	Uint32 fps_lasttime = SDL_GetTicks(); //the last recorded time.
-	Uint32 fps_current; //the current FPS.
-	Uint32 fps_frames = 0;
+	Uint32 tick1, tick2;
+	Uint32 fps_lasttime;
+	Uint32 fps_delta;
+	Uint32 fps_oldtime = fps_lasttime = tick1 = SDL_GetTicks();
+	float frametime = 100/3.0f;
 	
 	while(SDL_PollEvent(&event) >= 0)
 	{
@@ -112,21 +110,18 @@ int main() {
 		
 		PALLET_BLIT(screen, map_surf[m], IM_SIZE, IM_SIZE, pal);
 		
-		//SDL_UpdateRect(screen, 0, 0, IM_SIZE, IM_SIZE);
 		SDL_Flip(screen);
 
 		tick2 = SDL_GetTicks();
-		float dt = (tick2 - tick1) * 0.001f;
-		tick1 = tick2;
-		t0+=0.05*dt; t1+=0.35*dt;
-		fps_frames++;
-		if (fps_lasttime+1000 < SDL_GetTicks()) {
-			printf("FPS: %i\n", fps_frames);
-			fps_lasttime = SDL_GetTicks();
-			fps_current = fps_frames;
-			fps_frames = 0;
+		fps_delta = tick2 - fps_oldtime;
+		fps_oldtime = tick2;
+		frametime = 0.1f * fps_delta + (1.0f - 0.1f) * frametime;
+		if (fps_lasttime+1000 < tick2) {
+			printf("FPS: %3.1f\n", 1000.0f / frametime);
+			fps_lasttime = tick2;
 		}
-
+		float dt = (tick2 - tick1) * 0.001f;
+		t0=0.05f*dt; t1=0.35f*dt;
 	}
 
 

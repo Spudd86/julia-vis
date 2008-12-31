@@ -5,6 +5,8 @@
 #include <math.h>
 #include <malloc.h>
 
+#include <mm_malloc.h>
+
 #include <SDL.h>
 #include <SDL_thread.h>
 
@@ -16,12 +18,11 @@
 
 #define IM_SIZE (512)
 
-#define TILED true
 #if TILED
 #define MAP soft_map_interp8x8
 #define PALLET_BLIT pallet_blit_SDL8x8
 #else
-#define MAP soft_map_bl
+#define MAP soft_map_interp8x8
 #define PALLET_BLIT pallet_blit_SDL
 #endif
 
@@ -80,13 +81,13 @@ static int run_map_thread(tribuf *tb)
 		tick2 = SDL_GetTicks();
 		fps_delta = tick2 - fps_oldtime;
 		fps_oldtime = tick2;
-		frametime = 0.2f * fps_delta + (1.0f - 0.2f) * frametime;
+		frametime = 0.1f * fps_delta + (1.0f - 0.1f) * frametime;
 		if (fps_lasttime+1000 < tick2) {
 			printf("FPS: %3.1f\n", 1000.0f / frametime);
 			fps_lasttime = tick2;
 		}
 		float dt = (tick2 - tick1) * 0.001f;
-		t0=0.05*dt; t1=0.35*dt;
+		t0=0.05f*dt; t1=0.35f*dt;
     }
 	
 	return 0;
@@ -124,7 +125,7 @@ int main()
 		map_surf[2][i] = max_src[i];
 	}
 	
-	uint32_t *pal = memalign(64, 257 * sizeof(uint32_t)); // p4 has 64 byte cache line
+	uint32_t *pal = _mm_malloc(257 * sizeof(uint32_t), 64); // p4 has 64 byte cache line
 	for(int i = 0; i < 256; i++) pal[i] = 0xFF000000|((2*abs(i-127))<<16) | (i<<8) | ((255-i));
 	pal[256] = pal[255];
 
@@ -141,7 +142,7 @@ int main()
 
 	Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
 	
-	SDL_AddTimer(1000*2, &timercallback, NULL);
+	SDL_AddTimer(1000/30, &timercallback, NULL);
 	
 	SDL_Event	event;
 	while(SDL_WaitEvent(&event) >= 0)

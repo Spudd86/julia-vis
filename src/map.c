@@ -20,7 +20,7 @@
  * @param w width of image (needs power of 2)
  * @param h height of image (needs divisable by ?)
  */
-void soft_map(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
+MAP_FUNC_ATTR void soft_map(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 {
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	x0  = x0*0.25 + 0.5;
@@ -44,7 +44,7 @@ void soft_map(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 //TODO: make go fast
 //TODO: make version for 4x4 tiles (possibly 8x8 as well)
 //TODO: make fast sse/mmx version
-void soft_map_bl(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
+MAP_FUNC_ATTR void soft_map_bl(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 {
 	float xstep = 2.0f/w, ystep = 2.0f/h; 
 	x0  = x0*0.25 + 0.5;
@@ -68,7 +68,7 @@ void soft_map_bl(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 }
 
 
-void soft_map8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
+MAP_FUNC_ATTR void soft_map8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 {
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	x0  = x0*0.25 + 0.5;
@@ -92,7 +92,7 @@ void soft_map8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 	}
 }
 
-void soft_map_bl8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
+MAP_FUNC_ATTR void soft_map_bl8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 {
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	x0  = x0*0.25 + 0.5;
@@ -125,13 +125,15 @@ void soft_map_bl8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y
 	}
 }
 
-void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
+#define BLOCK_SIZE 8
+
+MAP_FUNC_ATTR void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 {
-	const float xstep = 16.0f/w, ystep = 16.0f/h;
+	const float xstep = BLOCK_SIZE*2.0f/w, ystep = BLOCK_SIZE*2.0f/h;
 	x0  = x0*0.25 + 0.5;
 	y0  = y0*0.25 + 0.5;
 	float v0 = -1.0f;
-	for(int yd = 0; yd < h/8; yd++) {
+	for(int yd = 0; yd < h/BLOCK_SIZE; yd++) {
 		float v1 = v0+ystep;
 		
 		
@@ -140,7 +142,7 @@ void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, flo
 		float x00 = 1.0f - v0*v0 + x0;
 		float x10 = 1.0f - v1*v1 + x0;
 		float u1 = -1.0f;
-		for(int xd = 0; xd < w/8; xd++) {
+		for(int xd = 0; xd < w/BLOCK_SIZE; xd++) {
 			u1 = u1+xstep;
 			
 			float y01 = 2*u1*v0 + y0;
@@ -151,33 +153,40 @@ void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, flo
 			int x0 = IMIN(IMAX(lrintf(x00*w*256), 0), w*256);
 			int x1 = IMIN(IMAX(lrintf(x01*w*256), 0), w*256);
 			
-			int x0s = (IMIN(IMAX(lrintf(x10*w*256), 0), w*256) - x0)/8;
-			int x1s = (IMIN(IMAX(lrintf(x11*w*256), 0), w*256) - x1)/8;
+			int x0s = (IMIN(IMAX(lrintf(x10*w*256), 0), w*256) - x0)/BLOCK_SIZE;
+			int x1s = (IMIN(IMAX(lrintf(x11*w*256), 0), w*256) - x1)/BLOCK_SIZE;
 			
 			int y0 = IMIN(IMAX(lrintf(y00*h*256), 0), h*256);
 			int y1 = IMIN(IMAX(lrintf(y01*h*256), 0), h*256);
 			
-			int y0s = (IMIN(IMAX(lrintf(y10*h*256), 0), h*256) - y0)/8;
-			int y1s = (IMIN(IMAX(lrintf(y11*h*256), 0), h*256) - y1)/8;
+			int y0s = (IMIN(IMAX(lrintf(y10*h*256), 0), h*256) - y0)/BLOCK_SIZE;
+			int y1s = (IMIN(IMAX(lrintf(y11*h*256), 0), h*256) - y1)/BLOCK_SIZE;
 			
-			for(int yt=0; yt<8; yt++, x0+=x0s, y0+=y0s, x1+=x1s, y1+=y1s) {
+			for(int yt=0; yt<BLOCK_SIZE; yt++, x0+=x0s, y0+=y0s, x1+=x1s, y1+=y1s) {
 				int x = x0;
 				int y = y0;
-				int xst = (x1 - x0)/8;
-				int yst = (y1 - y0)/8;
-				for(int xt=0; xt<8; xt++, x+=xst, y+=yst) {
+				int xst = (x1 - x0)/BLOCK_SIZE;
+				int yst = (y1 - y0)/BLOCK_SIZE;
+				for(int xt=0; xt<BLOCK_SIZE; xt++, x+=xst, y+=yst) {
 					int xs=x/256, ys=y/256;
 					int xf=x&0xFF, yf=y&0xFF;
-					
+					#if TILED
 					int xi1 = (xs&~7)*8 + (xs&7); 
 					int yi1 = (ys&~7)*w + (ys&7)*8;
 					xs=IMIN(xs+1,w); ys=IMIN(ys+1,h);
 					int xi2 = (xs&~7)*8 + (xs&7);
 					int yi2 = (ys&~7)*w + (ys&7)*8;
-
 					*(out++) = ((in[yi1 + xi1]*(255 - xf) + in[yi1 + xi2]*xf)*(255-yf) +
 								(in[yi2 + xi1]*(255 - xf) + in[yi2 + xi2]*xf)*yf) >> 16;
-
+					#else
+					int xi1 = xs; 
+					int yi1 = ys*w;
+					int xi2 = IMIN(xi1+1,w);
+					int yi2 = IMIN(yi1+w,h*w);
+					
+					out[(yd*BLOCK_SIZE+yt)*w+xd*BLOCK_SIZE+xt] = ((in[yi1 + xi1]*(255 - xf) + in[yi1 + xi2]*xf)*(255-yf) +
+								(in[yi2 + xi1]*(255 - xf) + in[yi2 + xi2]*xf)*yf) >> 16;
+					#endif
 				}
 			}
 			y00 = y01; y10 = y11;
