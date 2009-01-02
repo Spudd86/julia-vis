@@ -5,8 +5,10 @@ CFLAGS = --std=gnu99 -mmmx -msse -mfpmath=sse -Wall -Wextra \
 #CFLAGS += -Wpointer-arith -Wmissing-prototypes -Wmissing-field-initializers \
 #	-Wunreachable-code
 
-CFLAGS += -march=native -O2 -ffast-math -finline-functions -maccumulate-outgoing-args
-CFLAGS += -pg
+#CFLAGS += -march=native 
+CFLAGS += -march=pentium3
+CFLAGS += -O2 -ffast-math -finline-functions -maccumulate-outgoing-args
+#CFLAGS += -pg
 #CFLAGS += -fprofile-generate
 #CFLAGS += -fprofile-use 
 # -fprefetch-loop-arrays
@@ -17,7 +19,8 @@ CFLAGS += `pkg-config --cflags --libs sdl` -lm
 
 #CFLAGS += -ggdb
 
-all:
+all: sdlthread-test
+	./sdlthread-test
 
 sdl-test: src/sdl.c src/map.c src/pallet.c src/pixmisc.c Makefile
 	gcc src/sdl.c src/map.c src/pallet.c src/pixmisc.c  $(CFLAGS) -o sdl-test 
