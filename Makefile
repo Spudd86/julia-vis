@@ -14,7 +14,7 @@ CFLAGS += -fsched-stalled-insns=2 -fsched-stalled-insns-dep=2
 CFLAGS += -fvect-cost-model -ftracer -fassociative-math -freciprocal-math -fno-signed-zeros
 #CFLAGS += -fsection-anchors
 
-CFLAGS += `pkg-config --cflags --libs sdl` -lm
+CFLAGS += `pkg-config --cflags --libs sdl` -lSDL_ttf -lm
 
 #CFLAGS += -DTILED
 

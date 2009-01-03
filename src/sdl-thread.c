@@ -9,7 +9,7 @@
 
 #include <SDL.h>
 #include <SDL_thread.h>
-
+#include <SDL_ttf.h>
 
 #include "tribuf.h"
 #include "common.h"
@@ -18,7 +18,7 @@
 
 #include "map.h"
 
-#define IM_SIZE (512)
+#define IM_SIZE (256)
 
 #define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL
@@ -41,15 +41,16 @@ static uint16_t *setup_maxsrc(int w, int h)
 static volatile bool running = true;
 static uint16_t *max_src;
 
+static float map_fps=0;
+
 static int run_map_thread(tribuf *tb) 
 {
 	float t0 = 0, t1 = 0;
 	
 	
 	Uint32 tick1, tick2;
-	Uint32 fps_lasttime;
 	Uint32 fps_delta;
-	Uint32 fps_oldtime = fps_lasttime = tick1 = SDL_GetTicks();
+	Uint32 fps_oldtime = tick1 = SDL_GetTicks();
 	float frametime = 100;
 	
 	uint16_t *map_src = tribuf_get_read(tb);
@@ -66,11 +67,8 @@ static int run_map_thread(tribuf *tb)
 		tick2 = SDL_GetTicks();
 		fps_delta = tick2 - fps_oldtime;
 		fps_oldtime = tick2;
-		frametime = 0.1f * fps_delta + (1.0f - 0.1f) * frametime;
-		if (fps_lasttime+1000 < tick2) {
-			printf("FPS: %3.1f\n", 1000.0f / frametime);
-			fps_lasttime = tick2;
-		}
+		frametime = 0.02f * fps_delta + (1.0f - 0.02f) * frametime;
+		map_fps = 1000.0f / frametime;
 		float dt = (tick2 - tick1) * 0.001f;
 		t0=0.05f*dt; t1=0.35f*dt;
     }
@@ -116,6 +114,15 @@ static SDL_Surface *sdl_setup()
 }
 
 
+static void DrawText(SDL_Surface* screen, TTF_Font* font, const char* text)
+{
+    SDL_Surface *text_surface = TTF_RenderText_Solid(font, text, (SDL_Color){255,255,255});
+    if (text_surface == NULL) return;
+    
+	SDL_BlitSurface(text_surface, NULL, screen, NULL);
+	SDL_FreeSurface(text_surface);
+}
+
 static SDL_Event user_event;
 static Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
 int main() 
@@ -126,6 +133,12 @@ int main()
         exit(-1);
     }
 	atexit(SDL_Quit);
+	if(TTF_Init()==-1) {
+		printf("TTF_Init: %s\n", TTF_GetError());
+		exit(2);
+	}
+	TTF_Font *font = TTF_OpenFont("font.ttf", 16);
+	
     printf("SDL initialized.\n");
 
 	SDL_Surface *screen = sdl_setup();
@@ -150,15 +163,11 @@ int main()
 	
 	SDL_Thread *map_thread = SDL_CreateThread(&run_map_thread, map_tb);
 	
-	
-
 	user_event.type=SDL_USEREVENT;
 	user_event.user.code=2;
 	user_event.user.data1=NULL;
 	user_event.user.data2=NULL;
 
-	
-	
 	SDL_AddTimer(1000/30, &timercallback, NULL);
 	
 	SDL_Event	event;
@@ -169,6 +178,9 @@ int main()
 			break;
 		} else if(event.type == SDL_USEREVENT) {
 			PALLET_BLIT(screen, tribuf_get_read(map_tb), IM_SIZE, IM_SIZE, pal);
+			char buf[32];
+			sprintf(buf,"%6.1f FPS", map_fps);
+			DrawText(screen, font, buf);
 			SDL_Flip(screen);
 		}
 	}

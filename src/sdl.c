@@ -6,6 +6,7 @@
 #include <malloc.h>
 
 #include <SDL.h>
+#include <SDL_ttf.h>
 
 #include "map.h"
 
@@ -71,6 +72,15 @@ static SDL_Surface *sdl_setup()
 	return screen;
 }
 
+static void DrawText(SDL_Surface* screen, TTF_Font* font, const char* text)
+{
+    SDL_Surface *text_surface = TTF_RenderText_Solid(font, text, (SDL_Color){255,255,255});
+    if (text_surface == NULL) return;
+    
+	SDL_BlitSurface(text_surface, NULL, screen, NULL);
+	SDL_FreeSurface(text_surface);
+}
+
 int main() {
     
     printf("Initializing SDL.\n");
@@ -80,6 +90,11 @@ int main() {
         exit(-1);
     }
 	atexit(SDL_Quit);
+	if(TTF_Init()==-1) {
+		printf("TTF_Init: %s\n", TTF_GetError());
+		exit(2);
+	}
+	TTF_Font *font = TTF_OpenFont("font.ttf", 16);
 
     printf("SDL initialized.\n");
 
@@ -104,9 +119,8 @@ int main() {
 	float t0 = 0, t1 = 0;
 	SDL_Event	event;
 	Uint32 tick1, tick2;
-	Uint32 fps_lasttime;
 	Uint32 fps_delta;
-	Uint32 fps_oldtime = fps_lasttime = tick1 = SDL_GetTicks();
+	Uint32 fps_oldtime = tick1 = SDL_GetTicks();
 	float frametime = 100/3.0f;
 	
 	while(SDL_PollEvent(&event) >= 0)
@@ -122,16 +136,16 @@ int main() {
 		
 		PALLET_BLIT(screen, map_surf[m], IM_SIZE, IM_SIZE, pal);
 		
+		char buf[32];
+		sprintf(buf,"%6.1f FPS", 1000.0f / frametime);
+		DrawText(screen, font, buf);
+		
 		SDL_Flip(screen);
 
 		tick2 = SDL_GetTicks();
 		fps_delta = tick2 - fps_oldtime;
 		fps_oldtime = tick2;
-		frametime = 0.1f * fps_delta + (1.0f - 0.1f) * frametime;
-		if (fps_lasttime+1000 < tick2) {
-			printf("FPS: %3.1f\n", 1000.0f / frametime);
-			fps_lasttime = tick2;
-		}
+		frametime = 0.05f * fps_delta + (1.0f - 0.05f) * frametime;
 		float dt = (tick2 - tick1) * 0.001f;
 		t0=0.05f*dt; t1=0.35f*dt;
 	}
