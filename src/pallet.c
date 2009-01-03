@@ -10,22 +10,19 @@
 
 // pallet must have 257 entries
 
-static void pallet_blit_SDL32(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pal)
+static void pallet_blit_SDL32(SDL_Surface *dst, uint16_t *restrict src, int w, int h, uint32_t *restrict pal)
 {
-	if((SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) || w < 0 || h < 0) return;
-	
-	const __m64 zero = _mm_set1_pi16(0);
-	const __m64 mask = _mm_set1_pi16(0x00ff);
+	static const __m64 zero = (__m64)(0ll);
+	static const __m64 mask = (__m64)(0x00ff00ff00ff);
 	const unsigned int dst_stride = dst->pitch/4;
 	const unsigned int src_stride = w;
 	
-	const uint32_t *dest = dst->pixels;
+	const uint32_t * restrict dest = dst->pixels;
 	w = IMIN(w, dst->w);
 	h = IMIN(h, dst->h);
 	
 	for(unsigned int y = 0; y < h; y++) {
-		for(unsigned int x = 0; x < w; x+=4) 
-		{
+		for(unsigned int x = 0; x < w; x+=4) {
 			int v = src[y*src_stride + x];
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
 			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
@@ -97,57 +94,55 @@ static void pallet_blit_SDL32(SDL_Surface *dst, uint16_t *src, int w, int h, uin
 			*(__m64 *)(dest + y*dst_stride + x + 2) = tmp;
 		}
 	}
-
-	_mm_empty();
-	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
 }
 
-static void pallet_blit_SDL565(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pal)
-{
-	if((SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) || w < 0 || h < 0) return;
-	
+static void pallet_blit_SDL565(SDL_Surface *dst, uint16_t *restrict src, int w, int h, uint32_t *restrict pal)
+{	
 	const unsigned int src_stride = w;
 	
-	uint8_t  *dest = dst->pixels;
+	uint8_t  * restrict dest = dst->pixels;
 	w = IMIN(w, dst->w);
 	h = IMIN(h, dst->h);
 	
 	for(unsigned int y = 0; y < h; y++) {
-		for(unsigned int x = 0; x < w; x+=4) 
-		{
+		for(unsigned int x = 0; x < w; x+=4) {
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
 			__builtin_prefetch(dest + y*dst->pitch + x + 4, 1, 0);
 			
-			__m64 r1, r2, g1, g2, b1, b2, col1;
-			col1 = _mm_cvtsi32_si64(pal[src[y*src_stride + x]/256]);
-			r1 = _mm_shuffle_pi16(col1, 0xfd);
-			g1 = _mm_shuffle_pi16(col1, 0xfc);			
-			col1 = _mm_slli_pi32(col1, 8);
-			b1 = _mm_shuffle_pi16(col1, 0xfc);
+			__m64 r1, r2, g1, g2, b1, b2, c;
+			int v = src[y*src_stride + x];
+			c  = _mm_cvtsi32_si64(pal[v/256]);
+			r1 = _mm_shuffle_pi16(c, 0xfd);
+			g1 = _mm_shuffle_pi16(c, 0xfc);			
+			c  = _mm_slli_pi32(c, 8);
+			b1 = _mm_shuffle_pi16(c, 0xfc);
 			
-			col1 = _mm_cvtsi32_si64(pal[src[y*src_stride + x+1]/256]);
-			r2 = _mm_shuffle_pi16(col1, 0xf7);
-			g2 = _mm_shuffle_pi16(col1, 0xf3);
-			col1 = _mm_slli_pi32(col1, 8);
-			b2 = _mm_shuffle_pi16(col1, 0xf3);
-			r1 = _mm_or_si64(r1, r2);
-			g1 = _mm_or_si64(g1, g2);
-			b1 = _mm_or_si64(b1, b2);
-						
-			col1 = _mm_cvtsi32_si64(pal[src[y*src_stride + x+2]/256]);
-			r2 = _mm_shuffle_pi16(col1, 0xdf);
-			g2 = _mm_shuffle_pi16(col1, 0xcf);
-			col1 = _mm_slli_pi32(col1, 8);
-			b2 = _mm_shuffle_pi16(col1, 0xcf);
+			v=src[y*src_stride + x+1];
+			c  = _mm_cvtsi32_si64(pal[v/256]);
+			r2 = _mm_shuffle_pi16(c, 0xf7);
+			g2 = _mm_shuffle_pi16(c, 0xf3);
+			c  = _mm_slli_pi32(c, 8);
+			b2 = _mm_shuffle_pi16(c, 0xf3);
 			r1 = _mm_or_si64(r1, r2);
 			g1 = _mm_or_si64(g1, g2);
 			b1 = _mm_or_si64(b1, b2);
 			
-			col1 = _mm_cvtsi32_si64(pal[src[y*src_stride + x+3]/256]);
-			r2 = _mm_shuffle_pi16(col1, 0x7f);
-			g2 = _mm_shuffle_pi16(col1, 0x3f);
-			col1 = _mm_slli_pi32(col1, 8);
-			b2 = _mm_shuffle_pi16(col1, 0x3f);
+			v=src[y*src_stride + x+2];
+			c  = _mm_cvtsi32_si64(pal[v/256]);
+			r2 = _mm_shuffle_pi16(c, 0xdf);
+			g2 = _mm_shuffle_pi16(c, 0xcf);
+			c  = _mm_slli_pi32(c, 8);
+			b2 = _mm_shuffle_pi16(c, 0xcf);
+			r1 = _mm_or_si64(r1, r2);
+			g1 = _mm_or_si64(g1, g2);
+			b1 = _mm_or_si64(b1, b2);
+			
+			v=src[y*src_stride + x+3];
+			c  = _mm_cvtsi32_si64(pal[v/256]);
+			r2 = _mm_shuffle_pi16(c, 0x7f);
+			g2 = _mm_shuffle_pi16(c, 0x3f);
+			c  = _mm_slli_pi32(c, 8);
+			b2 = _mm_shuffle_pi16(c, 0x3f);
 			r1 = _mm_or_si64(r1, r2);
 			g1 = _mm_or_si64(g1, g2);
 			b1 = _mm_or_si64(b1, b2);
@@ -165,56 +160,56 @@ static void pallet_blit_SDL565(SDL_Surface *dst, uint16_t *src, int w, int h, ui
 			*(__m64 *)(dest + y*dst->pitch + x*2) = r1;
 		}
 	}
-
-	_mm_empty();
-	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
 }
 
-static void pallet_blit_SDL555(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pal)
+static void pallet_blit_SDL555(SDL_Surface *dst, uint16_t *restrict src, int w, int h, uint32_t *restrict pal)
 {
-	if((SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) || w < 0 || h < 0) return;
 	const unsigned int src_stride = w;
 	
-	uint8_t  *dest = dst->pixels;
+	uint8_t  * restrict dest = dst->pixels;
 	w = IMIN(w, dst->w);
 	h = IMIN(h, dst->h);
 	
 	for(unsigned int y = 0; y < h; y++) {
-		for(unsigned int x = 0; x < w; x+=4) 
-		{
+		for(unsigned int x = 0; x < w; x+=4) {
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
 			__builtin_prefetch(dest + y*dst->pitch + x + 4, 1, 0);
+			int v;
+			__m64 r1, r2, g1, g2, b1, b2, c;
 			
-			__m64 r1, r2, g1, g2, b1, b2, col1;
-			col1 = _mm_cvtsi32_si64(pal[src[y*src_stride + x]/256]);
-			r1 = _mm_shuffle_pi16(col1, 0xfd);
-			g1 = _mm_shuffle_pi16(col1, 0xfc);			
-			col1 = _mm_slli_pi32(col1, 8);
-			b1 = _mm_shuffle_pi16(col1, 0xfc);
+			v  = src[y*src_stride + x];
+			c  = _mm_cvtsi32_si64(pal[v/256]);
+			r1 = _mm_shuffle_pi16(c, 0xfd);
+			g1 = _mm_shuffle_pi16(c, 0xfc);			
+			c  = _mm_slli_pi32(c, 8);
+			b1 = _mm_shuffle_pi16(c, 0xfc);
 			
-			col1 = _mm_cvtsi32_si64(pal[src[y*src_stride + x+1]/256]);
-			r2 = _mm_shuffle_pi16(col1, 0xf7);
-			g2 = _mm_shuffle_pi16(col1, 0xf3);
-			col1 = _mm_slli_pi32(col1, 8);
-			b2 = _mm_shuffle_pi16(col1, 0xf3);
-			r1 = _mm_or_si64(r1, r2);
-			g1 = _mm_or_si64(g1, g2);
-			b1 = _mm_or_si64(b1, b2);
-						
-			col1 = _mm_cvtsi32_si64(pal[src[y*src_stride + x+2]/256]);
-			r2 = _mm_shuffle_pi16(col1, 0xdf);
-			g2 = _mm_shuffle_pi16(col1, 0xcf);
-			col1 = _mm_slli_pi32(col1, 8);
-			b2 = _mm_shuffle_pi16(col1, 0xcf);
+			v  = src[y*src_stride + x+1];
+			c  = _mm_cvtsi32_si64(pal[v/256]);
+			r2 = _mm_shuffle_pi16(c, 0xf7);
+			g2 = _mm_shuffle_pi16(c, 0xf3);
+			c  = _mm_slli_pi32(c, 8);
+			b2 = _mm_shuffle_pi16(c, 0xf3);
 			r1 = _mm_or_si64(r1, r2);
 			g1 = _mm_or_si64(g1, g2);
 			b1 = _mm_or_si64(b1, b2);
 			
-			col1 = _mm_cvtsi32_si64(pal[src[y*src_stride + x+3]/256]);
-			r2 = _mm_shuffle_pi16(col1, 0x7f);
-			g2 = _mm_shuffle_pi16(col1, 0x3f);
-			col1 = _mm_slli_pi32(col1, 8);
-			b2 = _mm_shuffle_pi16(col1, 0x3f);
+			v  = src[y*src_stride + x+2];
+			c  = _mm_cvtsi32_si64(pal[v/256]);
+			r2 = _mm_shuffle_pi16(c, 0xdf);
+			g2 = _mm_shuffle_pi16(c, 0xcf);
+			c  = _mm_slli_pi32(c, 8);
+			b2 = _mm_shuffle_pi16(c, 0xcf);
+			r1 = _mm_or_si64(r1, r2);
+			g1 = _mm_or_si64(g1, g2);
+			b1 = _mm_or_si64(b1, b2);
+			
+			v  = src[y*src_stride + x+3];
+			c  = _mm_cvtsi32_si64(pal[v/256]);
+			r2 = _mm_shuffle_pi16(c, 0x7f);
+			g2 = _mm_shuffle_pi16(c, 0x3f);
+			c  = _mm_slli_pi32(c, 8);
+			b2 = _mm_shuffle_pi16(c, 0x3f);
 			r1 = _mm_or_si64(r1, r2);
 			g1 = _mm_or_si64(g1, g2);
 			b1 = _mm_or_si64(b1, b2);
@@ -232,9 +227,6 @@ static void pallet_blit_SDL555(SDL_Surface *dst, uint16_t *src, int w, int h, ui
 			*(__m64 *)(dest + y*dst->pitch + x*2) = r1;
 		}
 	}
-
-	_mm_empty();
-	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
 }
 
 //~ __m64 vt = *(__m64*)(src+y*src_stride + x);
@@ -252,11 +244,14 @@ static void pallet_blit_SDL555(SDL_Surface *dst, uint16_t *src, int w, int h, ui
 			//~ b1 = _mm_add_pi16(b1, b2);
 
 
-void pallet_blit_SDL(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pal)
+void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal)
 {
+	if((SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) || w < 0 || h < 0) return;
 	if(dst->format->BitsPerPixel == 32) pallet_blit_SDL32(dst, src, w, h, pal);
 	else if(dst->format->BitsPerPixel == 16) pallet_blit_SDL565(dst, src, w, h, pal);
 	else if(dst->format->BitsPerPixel == 15) pallet_blit_SDL555(dst, src, w, h, pal);
+	_mm_empty();
+	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
 }
 
 // stride is for dest
@@ -283,16 +278,15 @@ void pallet_blit_SDL(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pa
 		//~ for(int x = 0; x < w; x+=2) {
 			//~ int v = src[y*src_stride + x];
 			//~ int v2 = src[y*src_stride + x+1];
-			//~ __m64 tmp1 = (__m64)*(uint64_t *)(pal+(v>>8));
-			//~ __m64 tmp2 = (__m64)*(uint64_t *)(pal+(v2>>8));
-			//~ __m64 col1 = _mm_unpacklo_pi32(tmp1, tmp2);
-			//~ __m64 col2 = _mm_unpackhi_pi32(tmp1, tmp2);
-			
-			//~ tmp1 = _mm_unpacklo_pi32(_mm_set1_pi8(v & 0xff), _mm_set1_pi8(v2 & 0xff));
-			//~ tmp2 = _mm_sub_pi8(_mm_set1_pi8(0xff), tmp1);
-		    //~ //col1 = (col1*v + col2*(0xff-v))/256;
-    		//~ col1 = _mm_mulhi_pi8(col1, tmp1);
-    		//~ col2 = _mm_mulhi_pi8(col2, tmp2);
+			//~ __m64 col1, col2;
+			//~ col1 = col2 = (__m64)*(uint64_t *)(pal+(v>>8));
+			//~ __m64 tmp   = (__m64)*(uint64_t *)(pal+(v2>>8));
+			//~ col1 = _mm_unpacklo_pi32(col1, tmp);
+			//~ col2 = _mm_unpackhi_pi32(col2, tmp);
+			//~ tmp = _mm_unpacklo_pi32(_mm_set1_pi8(v & 0xff), _mm_set1_pi8(v2 & 0xff));
+			//~ col1 = _mm_mulhi_pi8(col1, tmp);
+			//~ tmp = _mm_andnot_si64(tmp, mask)
+			//~ col2 = _mm_mulhi_pi8(col2, tmp);
     		//~ col1 = _mm_add_pi8(col1, col2);
 			
 			//~ _mm_stream_pi((__m64 *)(dest + y*dst_stride + x), tmp);

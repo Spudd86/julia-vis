@@ -18,7 +18,7 @@
 
 #include "map.h"
 
-#define IM_SIZE (256)
+#define IM_SIZE (512)
 
 #define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL

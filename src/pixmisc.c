@@ -5,7 +5,7 @@
 
 #include "mymm.h"
 
-void maxblend(void *dest, void *src, int w, int h)
+void maxblend(void *restrict dest, void *restrict src, int w, int h)
 {
 	__m64 *mbdst = dest, *mbsrc = src;
 	const __m64 off = _mm_set1_pi16(0x8000);

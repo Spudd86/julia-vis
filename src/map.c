@@ -68,7 +68,7 @@ MAP_FUNC_ATTR void soft_map_bl(uint16_t *out, uint16_t *in, int w, int h, float 
 
 #define BLOCK_SIZE 8
 
-MAP_FUNC_ATTR void soft_map_interp(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
+MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float x0, float y0)
 {
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
 	x0  = x0*0.25f + 0.5f;

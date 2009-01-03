@@ -1,12 +1,13 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
-#include <glib.h>
 #include <jack/jack.h>
 
 #include "audio.h"
 
+#include "../tribuf.h"
 
 static jack_port_t *in_port;
 
