@@ -7,14 +7,17 @@
 
 #include <SDL.h>
 
-#include "pixmisc.h"
 #include "map.h"
 
 #include "common.h"
 
-#define MAP soft_map_interp8x8
+#include "pixmisc.h"
+
+#define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL
 
+
+#define IM_SIZE (768)
 
 // set up source for maxblending
 static uint16_t *setup_maxsrc(int w, int h) 
@@ -30,8 +33,6 @@ static uint16_t *setup_maxsrc(int w, int h)
 	}
 	return max_src;
 }
-
-#define IM_SIZE (512)
 
 int main() {
     
@@ -49,7 +50,7 @@ int main() {
 	
 	SDL_Surface *screen;
 
-    screen = SDL_SetVideoMode(IM_SIZE, IM_SIZE, 32, SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_FULLSCREEN);
+    screen = SDL_SetVideoMode(IM_SIZE, IM_SIZE, 32, SDL_HWSURFACE | SDL_HWACCEL | SDL_DOUBLEBUF | SDL_FULLSCREEN);
     if ( screen == NULL ) {
         fprintf(stderr, "Unable to set video: %s\n", SDL_GetError());
         exit(1);

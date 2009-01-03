@@ -68,23 +68,22 @@ MAP_FUNC_ATTR void soft_map_bl(uint16_t *out, uint16_t *in, int w, int h, float 
 
 #define BLOCK_SIZE 8
 
-MAP_FUNC_ATTR void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
+MAP_FUNC_ATTR void soft_map_interp(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
 {
-	const float xstep = BLOCK_SIZE*2.0f/w, ystep = BLOCK_SIZE*2.0f/h;
+	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
 	x0  = x0*0.25f + 0.5f;
 	y0  = y0*0.25f + 0.5f;
 	float v0 = -1.0f;
-	for(int yd = 0; yd < h/BLOCK_SIZE; yd++) {
-		float v1 = v0+ystep;
-		
+	for(int yd = 0; yd < h; yd+=BLOCK_SIZE) {
+		float v1 = v0+vstep;
 		
 		float y00 = -2.0f*v0 + y0;
 		float y10 = -2.0f*v1 + y0;
 		float x00 = 1.0f - v0*v0 + x0;
 		float x10 = 1.0f - v1*v1 + x0;
 		float u1 = -1.0f;
-		for(int xd = 0; xd < w/BLOCK_SIZE; xd++) {
-			u1 = u1+xstep;
+		for(int xd = 0; xd < w; xd+=BLOCK_SIZE) {
+			u1 = u1+ustep;
 			
 			float y01 = 2*u1*v0 + y0;
 			float y11 = 2*u1*v1 + y0;
@@ -92,14 +91,13 @@ MAP_FUNC_ATTR void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h,
 			float x11 = u1*u1 - v1*v1 + x0;
 			
 			int x0 = IMIN(IMAX(lrintf(x00*w*256), 0), w*256);
+			int y0 = IMIN(IMAX(lrintf(y00*h*256), 0), h*256);
+			
 			int x1 = IMIN(IMAX(lrintf(x01*w*256), 0), w*256);
+			int y1 = IMIN(IMAX(lrintf(y01*h*256), 0), h*256);
 			
 			int x0s = (IMIN(IMAX(lrintf(x10*w*256), 0), w*256) - x0)/BLOCK_SIZE;
 			int x1s = (IMIN(IMAX(lrintf(x11*w*256), 0), w*256) - x1)/BLOCK_SIZE;
-			
-			int y0 = IMIN(IMAX(lrintf(y00*h*256), 0), h*256);
-			int y1 = IMIN(IMAX(lrintf(y01*h*256), 0), h*256);
-			
 			int y0s = (IMIN(IMAX(lrintf(y10*h*256), 0), h*256) - y0)/BLOCK_SIZE;
 			int y1s = (IMIN(IMAX(lrintf(y11*h*256), 0), h*256) - y1)/BLOCK_SIZE;
 			
@@ -117,7 +115,7 @@ MAP_FUNC_ATTR void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h,
 					int xi2 = IMIN(xi1+1,w);
 					int yi2 = IMIN(yi1+w,h*w);
 					
-					out[(yd*BLOCK_SIZE+yt)*w+xd*BLOCK_SIZE+xt] = ((in[yi1 + xi1]*(255 - xf) + in[yi1 + xi2]*xf)*(255-yf) +
+					out[(yd+yt)*w+xd+xt] = ((in[yi1 + xi1]*(255 - xf) + in[yi1 + xi2]*xf)*(255-yf) +
 								(in[yi2 + xi1]*(255 - xf) + in[yi2 + xi2]*xf)*yf) >> 16;
 
 				}
@@ -129,38 +127,4 @@ MAP_FUNC_ATTR void soft_map_interp8x8(uint16_t *out, uint16_t *in, int w, int h,
 	}
 }
 
-// FIXME: this doesn't work
-//~ void soft_map_sse(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
-//~ {
-	//~ const float xstep = 2.0f/w, ystep = 2.0f/h; 
-	
-	//~ x0  = x0*0.25 + 0.5;
-	//~ y0  = y0*0.25 + 0.5;
-	
-	//~ const __v4sf 
-	
-	//~ for(int yd = 0; yd < h; yd++) 
-	//~ {
-		//~ __v4sf v = { -1.0f + ystep*yd, -1.0f + ystep*yd, -1.0f + ystep*(yd+1), -1.0f + ystep*(yd+1)};
-		//~ __v4sf u = {-1.0f, -1.0f + xstep, -1.0f, -1.0f + xstep};
-		
-		//~ for(int xd = 0; xd < w; xd++, u+=(__v4sf)_mm_load1_ps(&xstep)) 
-		//~ {
-			//~ __v4sf xv = u*u - v*v + (__v4sf)_mm_load1_ps(&x0);
-			//~ __v4sf yv = u*v + u*v + (__v4sf)_mm_load1_ps(&y0);
-			//~ float *x = (float *)&xv;
-			//~ float *y = (float *)&yv;
-			
-			//~ __builtin_ia32_maxps
-			//~ for(int i=1; i<4; i++) { x[i]=x[i]-x[0]; y[i]=y[i]-y[0]; }
-			
-			//~ int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
-			//~ int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
-			//~ int x1 = xs>>8, x2 = x1+1, xf = xs&0xFF;
-			//~ int y1 = ys>>8, y2 = y1+1, yf = ys&0xFF;
-			
-			//~ *(out++) = ((in[y1*w + x1]*(0xff - xf) + in[y1*w + x2]*xf)*(0xff-yf) +
-						//~ (in[y2*w + x1]*(0xff - xf) + in[y2*w + x2]*xf)*yf) >> 16;
-		//~ }
-	//~ }
-//~ }
+

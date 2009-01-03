@@ -10,15 +10,17 @@
 #include <SDL.h>
 #include <SDL_thread.h>
 
-#include "pixmisc.h"
-#include "map.h"
-#include "tribuf.h"
 
+#include "tribuf.h"
 #include "common.h"
 
-#define IM_SIZE (512)
+#include "pixmisc.h"
 
-#define MAP soft_map_interp8x8
+#include "map.h"
+
+#define IM_SIZE (768)
+
+#define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL
 
 // set up source for maxblending
@@ -76,7 +78,6 @@ static int run_map_thread(tribuf *tb)
 	return 0;
 }
 
-#define TICK_INTERVAL    30
 static SDL_Event user_event;
 static Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
 int main() 
@@ -91,7 +92,7 @@ int main()
     printf("SDL initialized.\n");
 	
 	SDL_Surface *screen;
-	screen = SDL_SetVideoMode(IM_SIZE, IM_SIZE, 32, SDL_HWSURFACE | SDL_DOUBLEBUF | SDL_FULLSCREEN);
+	screen = SDL_SetVideoMode(IM_SIZE, IM_SIZE, 32, SDL_HWSURFACE | SDL_HWACCEL | SDL_DOUBLEBUF | SDL_FULLSCREEN);
     if ( screen == NULL ) {
         fprintf(stderr, "Unable to set video: %s\n", SDL_GetError());
         exit(1);

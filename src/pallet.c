@@ -24,7 +24,7 @@ void pallet_blit_SDL(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pa
 	h = IMIN(h, dst->h);
 	
 	for(unsigned int y = 0; y < h; y++) {
-		for(unsigned int x = 0; x < w; x+=2) 
+		for(unsigned int x = 0; x < w; x+=4) 
 		{
 			int v = src[y*src_stride + x];
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
@@ -34,8 +34,6 @@ void pallet_blit_SDL(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pa
 			__m64 col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
-			//col1 = (__m64) __builtin_ia32_punpcklbw ((__v8qi)col1, (__v8qi)zero);
-    		//col2 = (__m64) __builtin_ia32_punpckhbw ((__v8qi)col2, (__v8qi)zero);
 			
 		    //col1 = (col1*v + col2*(0xff-v))/256;
 			__m64 vt = _mm_set1_pi16(v);
@@ -103,6 +101,7 @@ void pallet_blit_SDL(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pa
 	_mm_empty();
 	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
 }
+
 
 // stride is for dest
 //~ void pallet_blit(void *dest, int dst_stride, uint16_t *src, int w, int h, uint32_t *pal)
