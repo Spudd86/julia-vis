@@ -18,7 +18,7 @@
 
 #include "map.h"
 
-#define IM_SIZE (768)
+#define IM_SIZE (512)
 
 #define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL
@@ -78,6 +78,44 @@ static int run_map_thread(tribuf *tb)
 	return 0;
 }
 
+static SDL_Surface *sdl_setup() 
+{
+	SDL_VideoInfo *vid_info = SDL_GetVideoInfo();
+	SDL_Rect **modes = SDL_ListModes(vid_info->vfmt, SDL_HWSURFACE|SDL_DOUBLEBUF);
+	if (modes == (SDL_Rect**)0) {
+		printf("No modes available!\n");
+		exit(-1);
+	}
+	
+	int vidflags = SDL_HWSURFACE | SDL_HWACCEL | SDL_DOUBLEBUF | SDL_FULLSCREEN;
+	SDL_Surface *screen;
+	if (modes == (SDL_Rect**)-1) {
+		screen = SDL_SetVideoMode(IM_SIZE, IM_SIZE, vid_info->vfmt->BitsPerPixel, vidflags);
+	} else {
+		int mode=0;
+		for (int i=0; modes[i]; i++) {
+			printf("  %d x %d\n", modes[i]->w, modes[i]->h);
+			if(modes[i]->w >= IM_SIZE && modes[i]->h >= IM_SIZE && modes[i]->h <= modes[mode]->h) 
+				mode = i;
+		}
+		if(modes[mode]->w < IM_SIZE && modes[mode]->h < IM_SIZE) {
+			printf("No usable modes available!\n");
+			exit(-1);
+		}
+		printf("\nusing %d x %d\n", modes[mode]->w, modes[mode]->h);
+		screen = SDL_SetVideoMode(modes[mode]->w, modes[mode]->h, vid_info->vfmt->BitsPerPixel, vidflags);
+	}
+
+    if ( screen == NULL ) {
+        fprintf(stderr, "Unable to set video: %s\n", SDL_GetError());
+        exit(1);
+    }
+	SDL_WM_SetCaption("SDL test for fractal map", "sdl-test");
+	
+	return screen;
+}
+
+
 static SDL_Event user_event;
 static Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
 int main() 
@@ -88,16 +126,9 @@ int main()
         exit(-1);
     }
 	atexit(SDL_Quit);
-
     printf("SDL initialized.\n");
-	
-	SDL_Surface *screen;
-	screen = SDL_SetVideoMode(IM_SIZE, IM_SIZE, 32, SDL_HWSURFACE | SDL_HWACCEL | SDL_DOUBLEBUF | SDL_FULLSCREEN);
-    if ( screen == NULL ) {
-        fprintf(stderr, "Unable to set video: %s\n", SDL_GetError());
-        exit(1);
-    }
-	SDL_WM_SetCaption("SDL test for fractal map", "sdl-test");
+
+	SDL_Surface *screen = sdl_setup();
 	
 	max_src = setup_maxsrc(IM_SIZE, IM_SIZE);
 	
@@ -112,7 +143,7 @@ int main()
 	}
 	
 	uint32_t *pal = _mm_malloc(257 * sizeof(uint32_t), 64); // p4 has 64 byte cache line
-	for(int i = 0; i < 256; i++) pal[i] = 0xFF000000|((2*abs(i-127))<<16) | (i<<8) | ((255-i));
+	for(int i = 0; i < 256; i++) pal[i] = ((2*abs(i-127))<<16) | (i<<8) | ((255-i));
 	pal[256] = pal[255];
 
 	tribuf *map_tb = tribuf_new((void **)map_surf);
