@@ -18,38 +18,21 @@
 
 #define IM_SIZE (512)
 
-#if TILED
-#define MAP soft_map_interp8x8
-#define PALLET_BLIT pallet_blit_SDL8x8
-#else
 #define MAP soft_map_interp8x8
 #define PALLET_BLIT pallet_blit_SDL
-#endif
 
 // set up source for maxblending
-static uint16_t *setup_maxsrc(int w, int h, bool tile) 
+static uint16_t *setup_maxsrc(int w, int h) 
 {
-	uint16_t col(int x, int y) {
-		float u = 2*(float)x/w - 1; float v = 2*(float)y/h - 1;
-		float d = sqrtf(u*u + v*v);
-		
-		return (uint16_t)((1.0f - fminf(d, 0.25)*4)*UINT16_MAX);
-	}
 	uint16_t *max_src = valloc(w * h * sizeof(uint16_t));
-	if(!tile) {
-		for(int y=0; y < h; y++) 
-			for(int x=0; x < w; x++) 
-				max_src[y*w + x] = col(x,y);
-	} else {
-		for(int y=0; y < h/8; y++) {
-			for(int x=0; x < w/8; x++) {
-				for(int yt=0; yt<8; yt++) 
-					for(int xt=0; xt<8; xt++) 
-						max_src[y*w*64/8 + x*64 + yt*8+xt] = col(x*8+xt, y*8+yt);
-			}
+
+	for(int y=0; y < h; y++)  {
+		for(int x=0; x < w; x++) {
+			float u = 2*(float)x/w - 1; float v = 2*(float)y/h - 1;
+			float d = sqrtf(u*u + v*v);
+			max_src[y*w + x] = (uint16_t)((1.0f - fminf(d, 0.25)*4)*UINT16_MAX);
 		}
 	}
-	
 	return max_src;
 }
 
@@ -94,6 +77,8 @@ static int run_map_thread(tribuf *tb)
 }
 
 #define TICK_INTERVAL    30
+static SDL_Event user_event;
+static Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
 int main() 
 {    
     printf("Initializing SDL.\n");
@@ -113,7 +98,7 @@ int main()
     }
 	SDL_WM_SetCaption("SDL test for fractal map", "sdl-test");
 	
-	max_src = setup_maxsrc(IM_SIZE, IM_SIZE, TILED);
+	max_src = setup_maxsrc(IM_SIZE, IM_SIZE);
 	
 	uint16_t *map_surf[3];
 	map_surf[0] = valloc(IM_SIZE * IM_SIZE * sizeof(uint16_t));
@@ -133,14 +118,14 @@ int main()
 	
 	SDL_Thread *map_thread = SDL_CreateThread(&run_map_thread, map_tb);
 	
-	SDL_Event user_event;
+	
 
 	user_event.type=SDL_USEREVENT;
 	user_event.user.code=2;
 	user_event.user.data1=NULL;
 	user_event.user.data2=NULL;
 
-	Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
+	
 	
 	SDL_AddTimer(1000/30, &timercallback, NULL);
 	
