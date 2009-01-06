@@ -1,6 +1,6 @@
 #include <unistd.h>
 #include <stdio.h>
-#include <stdlib.h> /* for exit() */
+#include <stdlib.h>
 #include <stdbool.h>
 #include <math.h>
 #include <malloc.h>
@@ -18,7 +18,7 @@
 
 #include "map.h"
 
-#define IM_SIZE (512)
+#define IM_SIZE (1024)
 
 #define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL
@@ -38,19 +38,17 @@ static uint16_t *setup_maxsrc(int w, int h)
 	return max_src;
 }
 
+static int im_w = 0, im_h = 0;
 static volatile bool running = true;
 static uint16_t *max_src;
-
 static float map_fps=0;
 
 static int run_map_thread(tribuf *tb) 
 {
 	float t0 = 0, t1 = 0;
 	
-	
-	Uint32 tick1, tick2;
-	Uint32 fps_delta;
-	Uint32 fps_oldtime = tick1 = SDL_GetTicks();
+	Uint32 tick0, fps_oldtime;
+	fps_oldtime = tick0 = SDL_GetTicks();
 	float frametime = 100;
 	
 	uint16_t *map_src = tribuf_get_read(tb);
@@ -58,98 +56,41 @@ static int run_map_thread(tribuf *tb)
 	{
 		uint16_t *map_dest = tribuf_get_write(tb);
 
-		MAP(map_dest, map_src, IM_SIZE, IM_SIZE, sin(t0), sin(t1));
-		maxblend(map_dest, max_src, IM_SIZE, IM_SIZE);
+		MAP(map_dest, map_src, im_w, im_h, sin(t0), sin(t1));
+		maxblend(map_dest, max_src, im_w, im_h);
 		
 		tribuf_finish_write(tb);
 		map_src=map_dest;
 
-		tick2 = SDL_GetTicks();
-		fps_delta = tick2 - fps_oldtime;
-		fps_oldtime = tick2;
-		frametime = 0.02f * fps_delta + (1.0f - 0.02f) * frametime;
+		Uint32 now = SDL_GetTicks();
+
+		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		map_fps = 1000.0f / frametime;
-		float dt = (tick2 - tick1) * 0.001f;
+		float dt = (now - tick0) * 0.001f;
 		t0=0.05f*dt; t1=0.35f*dt;
+
+		fps_oldtime = now;
     }
-	
 	return 0;
 }
 
-static SDL_Surface *sdl_setup() 
-{
-	SDL_VideoInfo *vid_info = SDL_GetVideoInfo();
-	SDL_Rect **modes = SDL_ListModes(vid_info->vfmt, SDL_HWSURFACE|SDL_DOUBLEBUF);
-	if (modes == (SDL_Rect**)0) {
-		printf("No modes available!\n");
-		exit(-1);
-	}
-	
-	int vidflags = SDL_HWSURFACE | SDL_HWACCEL | SDL_DOUBLEBUF | SDL_FULLSCREEN;
-	SDL_Surface *screen;
-	if (modes == (SDL_Rect**)-1) {
-		screen = SDL_SetVideoMode(IM_SIZE, IM_SIZE, vid_info->vfmt->BitsPerPixel, vidflags);
-	} else {
-		int mode=0;
-		for (int i=0; modes[i]; i++) {
-			printf("  %d x %d\n", modes[i]->w, modes[i]->h);
-			if(modes[i]->w >= IM_SIZE && modes[i]->h >= IM_SIZE && modes[i]->h <= modes[mode]->h) 
-				mode = i;
-		}
-		if(modes[mode]->w < IM_SIZE && modes[mode]->h < IM_SIZE) {
-			printf("No usable modes available!\n");
-			exit(-1);
-		}
-		printf("\nusing %d x %d\n", modes[mode]->w, modes[mode]->h);
-		screen = SDL_SetVideoMode(modes[mode]->w, modes[mode]->h, vid_info->vfmt->BitsPerPixel, vidflags);
-	}
-
-    if ( screen == NULL ) {
-        fprintf(stderr, "Unable to set video: %s\n", SDL_GetError());
-        exit(1);
-    }
-	SDL_WM_SetCaption("SDL test for fractal map", "sdl-test");
-	
-	return screen;
-}
-
-
-static void DrawText(SDL_Surface* screen, TTF_Font* font, const char* text)
-{
-    SDL_Surface *text_surface = TTF_RenderText_Solid(font, text, (SDL_Color){255,255,255});
-    if (text_surface == NULL) return;
-    
-	SDL_BlitSurface(text_surface, NULL, screen, NULL);
-	SDL_FreeSurface(text_surface);
-}
+SDL_Surface *sdl_setup(int im_size);
+void DrawText(SDL_Surface* screen, const char* text);
 
 static SDL_Event user_event;
 static Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
 int main() 
 {    
-    printf("Initializing SDL.\n");
-    if((SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTTHREAD | SDL_INIT_TIMER)==-1)) { 
-        printf("Could not initialize SDL: %s.\n", SDL_GetError());
-        exit(-1);
-    }
-	atexit(SDL_Quit);
-	if(TTF_Init()==-1) {
-		printf("TTF_Init: %s\n", TTF_GetError());
-		exit(2);
-	}
-	TTF_Font *font = TTF_OpenFont("font.ttf", 16);
+	SDL_Surface *screen = sdl_setup(IM_SIZE);
+	im_w = screen->w - screen->w%8; im_h = screen->h - screen->h%8;
 	
-    printf("SDL initialized.\n");
-
-	SDL_Surface *screen = sdl_setup();
-	
-	max_src = setup_maxsrc(IM_SIZE, IM_SIZE);
+	max_src = setup_maxsrc(im_w, im_h);
 	
 	uint16_t *map_surf[3];
-	map_surf[0] = valloc(IM_SIZE * IM_SIZE * sizeof(uint16_t));
-	map_surf[1] = valloc(IM_SIZE * IM_SIZE * sizeof(uint16_t));
-	map_surf[2] = valloc(IM_SIZE * IM_SIZE * sizeof(uint16_t));
-	for(int i=0; i< IM_SIZE*IM_SIZE; i++) {
+	map_surf[0] = valloc(im_w * im_h * sizeof(uint16_t));
+	map_surf[1] = valloc(im_w * im_h * sizeof(uint16_t));
+	map_surf[2] = valloc(im_w * im_h * sizeof(uint16_t));
+	for(int i=0; i< im_w*im_h; i++) {
 		map_surf[0][i] = max_src[i];
 		map_surf[1][i] = max_src[i];
 		map_surf[2][i] = max_src[i];
@@ -168,7 +109,7 @@ int main()
 	user_event.user.data1=NULL;
 	user_event.user.data2=NULL;
 
-	SDL_AddTimer(1000/30, &timercallback, NULL);
+	SDL_AddTimer(1000/60, &timercallback, NULL);
 	
 	SDL_Event	event;
 	while(SDL_WaitEvent(&event) >= 0)
@@ -177,10 +118,10 @@ int main()
 				|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
 			break;
 		} else if(event.type == SDL_USEREVENT) {
-			PALLET_BLIT(screen, tribuf_get_read(map_tb), IM_SIZE, IM_SIZE, pal);
+			PALLET_BLIT(screen, tribuf_get_read(map_tb), im_w, im_h, pal);
 			char buf[32];
 			sprintf(buf,"%6.1f FPS", map_fps);
-			DrawText(screen, font, buf);
+			DrawText(screen, buf);
 			SDL_Flip(screen);
 		}
 	}
@@ -189,13 +130,6 @@ int main()
 	int status;
 	SDL_WaitThread(map_thread, &status);
 
-    printf("Quitting SDL.\n");
-    
-    /* Shutdown all subsystems */
-    SDL_Quit();
-    
-    printf("Quitting...\n");
-
-    exit(0);
+    return 0;
 }
 
