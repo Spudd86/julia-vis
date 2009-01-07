@@ -70,8 +70,6 @@ MAP_FUNC_ATTR void soft_map_bl(uint16_t *out, uint16_t *in, int w, int h, float 
 
 MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float x0, float y0)
 {
-	//printf("%dx%d\n", w, h);
-	
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
 	x0  = x0*0.25f + 0.5f;
 	y0  = y0*0.25f + 0.5f;
@@ -115,10 +113,8 @@ MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in
 					int xi1 = xs; 
 					int yi1 = ys*w;
 					int xi2 = IMIN(xi1+1,w-1);
-					int yi2 = IMIN(yi1+w,h*(w-1));
+					int yi2 = IMIN(yi1+w,(h-1)*w);
 					
-					//if(yd+yt>h || xd+xt > w || xd+xt < 0 || yd+yt < 0) 
-					//	{ printf("out of bounds (%d,%d)+(%d,%d) \n",yd,xd,yt,xt); exit(1); }
 					out[(yd+yt)*w+xd+xt] = ((in[yi1 + xi1]*(255 - xf) + in[yi1 + xi2]*xf)*(255-yf) +
 								(in[yi2 + xi1]*(255 - xf) + in[yi2 + xi2]*xf)*yf) >> 16;
 
