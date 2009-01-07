@@ -2,14 +2,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 #include <SDL.h>
 #include <SDL_thread.h>
 #include <SDL_ttf.h>
 
+#include "common.h"
+#include "sdl-misc.h"
+
 static TTF_Font *font = NULL;
 
-SDL_Surface *sdl_setup(int im_size)
+SDL_Surface *sdl_setup(opt_data *opts, int im_size)
 {
 	printf("Initializing SDL.\n");
     if((SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTTHREAD | SDL_INIT_TIMER)==-1)) {
@@ -26,7 +28,7 @@ SDL_Surface *sdl_setup(int im_size)
     printf("SDL initialized.\n");
 
 
-	const int vidflags = SDL_HWSURFACE | SDL_HWACCEL | SDL_DOUBLEBUF | SDL_FULLSCREEN;
+	const int vidflags = SDL_HWSURFACE | SDL_HWACCEL | SDL_DOUBLEBUF;
 	const SDL_VideoInfo *vid_info = SDL_GetVideoInfo();
 	SDL_Rect **modes = SDL_ListModes(vid_info->vfmt, vidflags);
 	if (modes == (SDL_Rect**)0) {
@@ -36,13 +38,17 @@ SDL_Surface *sdl_setup(int im_size)
 
 	SDL_Surface *screen;
 	if (modes == (SDL_Rect**)-1) {
-		screen = SDL_SetVideoMode(im_size, im_size, vid_info->vfmt->BitsPerPixel, vidflags);
+		if(opts->w < 0 && opts->h < 0) opts->w = opts->h = im_size;
+		else if(opts->w < 0) opts->w = opts->h;
+		else if(opts->h < 0) opts->h = opts->w;
+		screen = SDL_SetVideoMode(opts->w, opts->h, vid_info->vfmt->BitsPerPixel, vidflags | ((opts->fullscreen)?SDL_FULLSCREEN:0));
 
 	} else {
+		if(opts->w < 0 && opts->h < 0) opts->h = im_size;
 		int mode=0;
 		for (int i=0; modes[i]; i++) {
 			printf("  %d x %d\n", modes[i]->w, modes[i]->h);
-			if(modes[i]->w >= im_size && modes[i]->h >= im_size && modes[i]->h <= modes[mode]->h)
+			if(modes[i]->w >= opts->w && modes[i]->h >= opts->h && modes[i]->h <= modes[mode]->h)
 				mode = i;
 		}
 		if(modes[mode]->w < im_size && modes[mode]->h < im_size) {

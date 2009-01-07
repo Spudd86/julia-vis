@@ -11,7 +11,7 @@
 #include "map.h"
 
 #include "common.h"
-
+#include "sdl-misc.h"
 #include "pixmisc.h"
 
 #define MAP soft_map_interp
@@ -35,12 +35,12 @@ static uint16_t *setup_maxsrc(int w, int h)
 	return max_src;
 }
 
-SDL_Surface *sdl_setup(int im_size);
-void DrawText(SDL_Surface* screen, const char* text);
+static opt_data opts;
 
-int main()
-{
-    SDL_Surface *screen = sdl_setup(IM_SIZE);
+int main(int argc, char **argv) 
+{    
+	optproc(argc, argv, &opts);
+	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	int im_w = screen->w - screen->w%8, im_h = screen->h - screen->h%8;
 	
 	uint16_t *max_src = setup_maxsrc(im_w, im_h);
@@ -61,7 +61,7 @@ int main()
 	int m = 0;
 	float t0 = 0, t1 = 0;
 	
-	Uint32 tick0, fps_delta;
+	Uint32 tick0;
 	Uint32 fps_oldtime = tick0 = SDL_GetTicks();
 	float frametime = 100;
 

@@ -6,4 +6,12 @@
 #define IMIN(x,y) (((x)<(y))?(x):(y))
 #define IMAX(x,y) (((x)>(y))?(x):(y))
 
+typedef struct {
+	int w, h;
+	int fullscreen;
+	
+}opt_data;
+
+void optproc(int argc, char **argv, opt_data *res);
+
 #endif

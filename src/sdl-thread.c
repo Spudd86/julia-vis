@@ -15,10 +15,10 @@
 #include "common.h"
 
 #include "pixmisc.h"
-
+#include "sdl-misc.h"
 #include "map.h"
 
-#define IM_SIZE (1024)
+#define IM_SIZE (512)
 
 #define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL
@@ -38,6 +38,7 @@ static uint16_t *setup_maxsrc(int w, int h)
 	return max_src;
 }
 
+static opt_data opts;
 static int im_w = 0, im_h = 0;
 static volatile bool running = true;
 static uint16_t *max_src;
@@ -74,14 +75,12 @@ static int run_map_thread(tribuf *tb)
 	return 0;
 }
 
-SDL_Surface *sdl_setup(int im_size);
-void DrawText(SDL_Surface* screen, const char* text);
-
 static SDL_Event user_event;
 static Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
-int main() 
+int main(int argc, char **argv) 
 {    
-	SDL_Surface *screen = sdl_setup(IM_SIZE);
+	optproc(argc, argv, &opts);
+	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	im_w = screen->w - screen->w%8; im_h = screen->h - screen->h%8;
 	
 	max_src = setup_maxsrc(im_w, im_h);
@@ -102,13 +101,14 @@ int main()
 
 	tribuf *map_tb = tribuf_new((void **)map_surf);
 	
-	SDL_Thread *map_thread = SDL_CreateThread(&run_map_thread, map_tb);
-	
 	user_event.type=SDL_USEREVENT;
 	user_event.user.code=2;
 	user_event.user.data1=NULL;
 	user_event.user.data2=NULL;
 
+	printf("running with %dx%d bufs\n", im_w, im_h);
+	
+	SDL_Thread *map_thread = SDL_CreateThread(&run_map_thread, map_tb);
 	SDL_AddTimer(1000/60, &timercallback, NULL);
 	
 	SDL_Event	event;
