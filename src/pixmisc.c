@@ -4,6 +4,7 @@
 #include "pixmisc.h"
 
 #include "mymm.h"
+//TODO: sse2 version of this (8 pixels at once!)
 
 void maxblend(void *restrict dest, void *restrict src, int w, int h)
 {

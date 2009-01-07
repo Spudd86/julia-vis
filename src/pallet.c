@@ -1,8 +1,6 @@
 #include <unistd.h>
 #include <stdint.h>
 
-#include <SDL.h>
-
 #include "mymm.h"
 
 #include "pixmisc.h"
@@ -20,7 +18,7 @@ static void pallet_blit_SDL32(uint32_t  * restrict dest, unsigned int dst_stride
 		for(unsigned int x = 0; x < w; x+=4) {
 			int v = src[y*src_stride + x];
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
-			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
+			//__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
 			
 			__m64 col1 = *(__m64 *)(pal+(v/256));
 			__m64 col2 = col1;
@@ -96,7 +94,7 @@ static void pallet_blit_SDL565(uint8_t  * restrict dest, unsigned int dst_stride
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
-			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
+			//__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
 			
 			__m64 r1, r2, g1, g2, b1, b2, c;
 			int v = src[y*src_stride + x];
@@ -156,7 +154,7 @@ static void pallet_blit_SDL555(uint8_t  * restrict dest, unsigned int dst_stride
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
-			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
+			//__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
 			int v;
 			__m64 r1, r2, g1, g2, b1, b2, c;
 			
@@ -212,6 +210,10 @@ static void pallet_blit_SDL555(uint8_t  * restrict dest, unsigned int dst_stride
 	}
 }
 
+#ifdef USE_SDL
+
+#include <SDL.h>
+
 void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal)
 {
 	const int src_stride = w;
@@ -225,6 +227,33 @@ void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, ui
 	_mm_empty();
 	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
 }
+
+#endif
+
+#ifdef USE_DIRECTFB
+
+#include <directfb.h>
+
+void pallet_blit_dfb(IDirectFBSurface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal)
+{
+	const int src_stride = w;
+	DFBSurfacePixelFormat dst_format;
+	void *dst_pixels = NULL;
+	int dst_pitch, dst_w, dst_h;
+	
+	GetSize(dst, &dst_w, &dst_h);
+	GetPixelFormat(dst, &dst_format);
+	
+	w = IMIN(w, dst_w);
+	h = IMIN(h, dst_h);
+	Lock(dst, , &dst_pixels, &dst_pitch); // TODO: error check
+	if(dst_format == DSPF_RGB32) pallet_blit_SDL32(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
+	else if(dst_format == DSPF_RGB16) pallet_blit_SDL565(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
+	else if(dst_format == DSPF_RGB555) pallet_blit_SDL555(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
+	_mm_empty();
+	Unlock(dst);
+}
+#endif
 
 // stride is for dest
 //~ void pallet_blit(void *dest, int dst_stride, uint16_t *src, int w, int h, uint32_t *pal)

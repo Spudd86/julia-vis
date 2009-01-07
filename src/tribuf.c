@@ -15,6 +15,8 @@ struct tribuf_s {
 	void **data;
 };
 
+// does this really need a mutex or would a storage fence in write be enough? (do we even need that?)
+
 tribuf* tribuf_new(void **data)
 {
 	tribuf *tb = malloc(sizeof(tribuf));
@@ -34,14 +36,10 @@ void tribuf_destroy(tribuf *tb)
 }
 
 void* tribuf_get_write(tribuf *tb)
-{	
-	//SDL_LockMutex(tb->mutex);
-	
+{
 	int min = (tb->frms[1] < tb->frms[0])? 1 : 0;
 	min = (tb->frms[2] < tb->frms[min])? 2 : min;
 	tb->lastmin = min;
-	//printf("next buf: %i framenum: %i\n", min, tb->frms[min]);
-	//SDL_UnlockMutex(tb->mutex);
 	
 	return tb->data[min];
 }
