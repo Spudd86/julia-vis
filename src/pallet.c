@@ -234,24 +234,24 @@ void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, ui
 
 #include <directfb.h>
 
-void pallet_blit_dfb(IDirectFBSurface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal)
+void pallet_blit_DFB(IDirectFBSurface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal)
 {
 	const int src_stride = w;
 	DFBSurfacePixelFormat dst_format;
 	void *dst_pixels = NULL;
 	int dst_pitch, dst_w, dst_h;
 	
-	GetSize(dst, &dst_w, &dst_h);
-	GetPixelFormat(dst, &dst_format);
+	dst->GetSize(dst, &dst_w, &dst_h);
+	dst->GetPixelFormat(dst, &dst_format);
 	
 	w = IMIN(w, dst_w);
 	h = IMIN(h, dst_h);
-	Lock(dst, , &dst_pixels, &dst_pitch); // TODO: error check
+	dst->Lock(dst, DSLF_WRITE, &dst_pixels, &dst_pitch); // TODO: error check
 	if(dst_format == DSPF_RGB32) pallet_blit_SDL32(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
 	else if(dst_format == DSPF_RGB16) pallet_blit_SDL565(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
 	else if(dst_format == DSPF_RGB555) pallet_blit_SDL555(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
 	_mm_empty();
-	Unlock(dst);
+	dst->Unlock(dst);
 }
 #endif
 
