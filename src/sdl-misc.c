@@ -78,3 +78,4 @@ void DrawText(SDL_Surface* screen, const char* text)
 	SDL_BlitSurface(text_surface, NULL, screen, NULL);
 	SDL_FreeSurface(text_surface);
 }
+

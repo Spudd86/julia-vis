@@ -10,8 +10,8 @@
 
 static void pallet_blit_SDL32(uint32_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
 {
-	static const __m64 zero = (__m64)(0ll);
-	static const __m64 mask = (__m64)(0x00ff00ff00ff);
+	__m64 zero = _mm_cvtsi32_si64(0ll);
+	__m64 mask = (__m64)(0x00ff00ff00ff);
 	dst_stride /= 4;
 	
 	for(unsigned int y = 0; y < h; y++) {

@@ -15,7 +15,6 @@ CFLAGS += -fmodulo-sched-allow-regmoves -fgcse-after-reload -fsee -fipa-cp
 
 CFLAGS += -fsched-stalled-insns=2 -fsched-stalled-insns-dep=2
 CFLAGS += -fvect-cost-model -ftracer -fassociative-math -freciprocal-math -fno-signed-zeros
-#CFLAGS += -fsection-anchors
 
 CFLAGS += -Wl,--as-needed
 
@@ -28,7 +27,7 @@ DFB_FLAGS = `pkg-config --cflags --libs directfb`
 #CFLAGS += -Wpointer-arith -Wmissing-prototypes -Wmissing-field-initializers \
 #	-Wunreachable-code
 
-all: bin/sdl-test bin/sdlthread-test
+all: bin/sdl-test bin/sdlthread-test bin/audio-test
 
 dfb: bin/dfb-test
 
@@ -48,13 +47,18 @@ config.mk:
 	touch config.mk
 
 bin/sdl-test: src/sdl.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/common.h Makefile config.mk
-	$(CC) src/sdl.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) -o bin/sdl-test
+	$(CC) src/sdl.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) -o $@
 
 bin/sdlthread-test: src/sdl-thread.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
 	$(CC) src/sdl-thread.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) -o $@
 	
 bin/dfb-test: src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
 	$(CC) src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c -DUSE_DIRECTFB $(CFLAGS) $(DFB_FLAGS) -o $@
+
+AUDIO_SRCS = src/audio/sdl-test.c src/audio/audio.c src/audio/beat.c src/audio/portaudio.c src/sdl-misc.c src/optproc.c src/tribuf.c
+PA_FLAGS = -lrt -lasound -ljack -lpthread -lfftw3f -lportaudio
+bin/audio-test: $(AUDIO_SRCS)
+	$(CC) $(AUDIO_SRCS)  -iquote $(shell pwd)/src -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) $(PA_FLAGS) -o $@
 
 %.s: %.c src/*.h Makefile config.mk
 	$(CC) $< $(CFLAGS) -S -o $@

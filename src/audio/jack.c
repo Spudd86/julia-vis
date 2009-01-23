@@ -7,8 +7,6 @@
 
 #include "audio.h"
 
-#include "../tribuf.h"
-
 static jack_port_t *in_port;
 
 
@@ -16,12 +14,9 @@ static jack_port_t *in_port;
 static int process (jack_nframes_t nframes, void *arg)
 {
 	static int pos = 0;
+	float *in = (float *) jack_port_get_buffer (in_port, nframes);
 	
-	jack_default_audio_sample_t *in = (jack_default_audio_sample_t *) jack_port_get_buffer (in_port, nframes);
-	
-	//FIXME:
 	audio_update(in, nframes);
-	// process samplses?
 
 	return 0;
 }

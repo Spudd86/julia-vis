@@ -22,6 +22,18 @@ int beat_band_get_count(int b) {
 
 static inline float sqr(float x) { return x*x; }
 
+// numerically stable, one pass
+static float std_dev(float a[], int n)
+{
+    float M = a[0];
+    float Q = 0.0f;
+    for(int i = 1; i < n; ++i) {
+       Q += Q + i*sqr(a[i]-M)/(i+1);
+       M += (a[i] - M)/(i+1);
+    }
+    return sqrt(Q/n);
+}
+
 /**
  * take 1024 frames of audio and do update beat detection
  * http://www.gamedev.net/reference/programming/features/beatdetection/

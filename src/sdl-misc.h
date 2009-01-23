@@ -7,3 +7,4 @@ SDL_Surface *sdl_setup(opt_data *opts, int im_size);
 void DrawText(SDL_Surface* screen, const char* text);
 
 #endif
+
