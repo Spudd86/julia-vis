@@ -14,21 +14,6 @@
 
 #define IM_SIZE (512)
 
-// set up source for maxblending
-static uint16_t *setup_maxsrc(int w, int h) 
-{
-	uint16_t *max_src = valloc(w * h * sizeof(uint16_t));
-
-	for(int y=0; y < h; y++)  {
-		for(int x=0; x < w; x++) {
-			float u = 2*(float)x/w - 1; float v = 2*(float)y/h - 1;
-			float d = sqrtf(u*u + v*v);
-			max_src[y*w + x] = (uint16_t)((1.0f - d)*UINT16_MAX);
-		}
-	}
-	return max_src;
-}
-
 static opt_data opts;
 
 static inline int inrange(int c, int a, int b) { return (unsigned)(c-a) <= (unsigned)(b-a); }

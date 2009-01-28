@@ -1,5 +1,8 @@
+# want to make automake/autoconf based thing to replace this (it sucks)
+
 
 CFLAGS = --std=gnu99 -D_GNU_SOURCE=1 -mmmx -Wall -fstrict-aliasing -fsingle-precision-constant
+CFLGAS +=  -iquote $(shell pwd)/src 
 #	-Wunsafe-loop-optimizations
 
 #CFLAGS += -ggdb
@@ -55,10 +58,11 @@ bin/sdlthread-test: src/sdl-thread.c src/sdl-misc.c src/map.c src/pallet.c src/p
 bin/dfb-test: src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
 	$(CC) src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c -DUSE_DIRECTFB $(CFLAGS) $(DFB_FLAGS) -o $@
 
+#TODO: figure out a better way to find the libraries for portaudio
 AUDIO_SRCS = src/audio/sdl-test.c src/audio/audio.c src/audio/beat.c src/audio/portaudio.c src/sdl-misc.c src/optproc.c src/tribuf.c
 PA_FLAGS = -lrt -lasound -ljack -lpthread -lfftw3f -lportaudio
 bin/audio-test: $(AUDIO_SRCS)
-	$(CC) $(AUDIO_SRCS)  -iquote $(shell pwd)/src -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) $(PA_FLAGS) -o $@
+	$(CC) $(AUDIO_SRCS) -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) $(PA_FLAGS) -o $@
 
 %.s: %.c src/*.h Makefile config.mk
 	$(CC) $< $(CFLAGS) -S -o $@

@@ -4,8 +4,6 @@
 #include <unistd.h>
 #include <stdint.h>
 
-
-void pallet_blit(void *dest, int dst_stride, uint16_t *src, int w, int h, uint32_t *pal);
 #ifdef USE_SDL
 #include <SDL.h>
 void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal);
@@ -16,6 +14,10 @@ void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, ui
 void pallet_blit_DFB(IDirectFBSurface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal);
 #endif
 
-void maxblend(void *restrict dest, void *restrict src, int w, int h);
+// require w%8 == 0
+void maxblend_stride(void *restrict dest, int dest_stride, void *restrict src, int w, int h);
 
+// require w%16 == 0
+void maxblend(void *restrict dest, void *restrict src, int w, int h);
+void fade_pix(void *restrict dest, void *restrict src, int w, int h, uint8_t fade);
 #endif

@@ -42,7 +42,9 @@ void audio_update(float *in, int n)
 	float *samps = tribuf_get_write(samp_tb);
 	memcpy(samps, in, sizeof(float)*IMIN(n,nr_samp));
 	tribuf_finish_write(samp_tb);
+#ifdef DO_BEAT
 	beat_update(do_fft(samps), nr_samp/2);
+#endif
 }
 
 int audio_get_samples(audio_data *d) {
