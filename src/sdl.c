@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 {    
 	optproc(argc, argv, &opts);
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
-	int im_w = screen->w - screen->w%8, im_h = screen->h - screen->h%8;
+	int im_w = screen->w - screen->w%16, im_h = screen->h - screen->h%8;
 	
 	uint16_t *max_src = setup_maxsrc(im_w, im_h);
 
