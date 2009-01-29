@@ -1,2 +1,4 @@
-Hello world
-testing 1234
+
+
+- Fix the FIXMEs in autoconf.ac
+- Make Makefile.in smarter

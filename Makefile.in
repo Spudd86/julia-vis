@@ -1,4 +1,28 @@
-# want to make automake/autoconf based thing to replace this (it sucks)
+
+# autoconf tutorial: 
+# http://www.galassi.org/mark//mydocs/autoconf_tutorial_2.html
+
+
+SHELL = /bin/sh
+VPATH = @srcdir@
+
+subdirs = @subdirs@
+top_srcdir = @top_srcdir@
+srcdir = @srcdir@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = $(exec_prefix)/bin
+infodir = $(prefix)/info
+libdir = $(prefix)/lib/gnudl
+mandir = $(prefix)/man/man1
+
+CC = @CC@
+CPPFLAGS = @CPPFLAGS@
+CFLAGS = $(CPPFLAGS) @CFLAGS@
+LDFLAGS = @LDFLAGS@
+LIBS = @LIBS@
+INSTALL = @INSTALL@
+
 
 
 CFLAGS = --std=gnu99 -D_GNU_SOURCE=1 -mmmx -Wall -fstrict-aliasing -fsingle-precision-constant
@@ -44,6 +68,9 @@ clean:
 	rm -f src/*.o
 	rm -f bin/dfb-test bin/sdl-test bin/sdlthread-test
 
+distclean: clean
+	rm -f Makefile config.h config.status config.cache config.log configure stamp-h
+
 .PHONY: all dfb dfb-run run clean
 
 config.mk:
@@ -67,3 +94,21 @@ bin/audio-test: $(AUDIO_SRCS)
 %.s: %.c src/*.h Makefile config.mk
 	$(CC) $< $(CFLAGS) -S -o $@
 
+
+# automatic re-running of configure if the ocnfigure.in file has changed
+configure: configure.ac
+	autoconf
+
+# autoheader might not change config.h.in, so touch a stamp file
+config.h.in: stamp-h.in
+stamp-h.in: configure.ac
+		autoheader
+		echo timestamp > stamp-h.in
+
+config.h: stamp-h
+stamp-h: config.h.in config.status
+	./config.status
+Makefile: Makefile.in config.status
+	./config.status
+config.status: configure
+	./config.status --recheck
