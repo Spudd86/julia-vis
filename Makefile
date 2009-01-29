@@ -39,7 +39,7 @@ dfb-run: bin/dfb-test
 
 run: bin/sdlthread-test
 	bin/sdlthread-test
-	
+
 clean:
 	rm -f src/*.o
 	rm -f bin/dfb-test bin/sdl-test bin/sdlthread-test
@@ -54,7 +54,7 @@ bin/sdl-test: src/sdl.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/
 
 bin/sdlthread-test: src/sdl-thread.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
 	$(CC) src/sdl-thread.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) -o $@
-	
+
 bin/dfb-test: src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
 	$(CC) src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c -DUSE_DIRECTFB $(CFLAGS) $(DFB_FLAGS) -o $@
 
