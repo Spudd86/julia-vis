@@ -4,8 +4,8 @@
 #include <string.h>
 #include <malloc.h>
 
-#include "tribuf.h"
-#include "common.h"
+#include "../tribuf.h"
+#include "../common.h"
 #include "audio.h"
 
 static int nr_samp = 0;

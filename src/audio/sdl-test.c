@@ -7,8 +7,8 @@
 
 #include <SDL.h>
 
-#include "common.h"
-#include "sdl-misc.h"
+#include "../common.h"
+#include "../sdl-misc.h"
 #include "audio.h"
 
 
