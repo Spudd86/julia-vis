@@ -2,3 +2,4 @@
 *.gcno
 *.o
 bin/*
+config.mk
