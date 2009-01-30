@@ -55,6 +55,9 @@ AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/portaudio.c
 #CFLAGS += -Wpointer-arith -Wmissing-prototypes -Wmissing-field-initializers \
 #	-Wunreachable-code
 
+
+CFLAGS := $(shell CC=$(CC) ./gcc-optioncheck $(CFLAGS))
+
 all: bin/sdl-test bin/sdlthread-test bin/audio-test dfb
 
 ifneq ($(DFB_FLAGS), )

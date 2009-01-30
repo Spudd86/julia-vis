@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# takes a list of options for gcc and tries them
+# outputs all the ones that work
+
+[ -z "$CC" ] && CC=gcc
+
+try_gcc_options() {
+    $CC $* -S -o /dev/null -xc /dev/null >/dev/null 2>&1
+}
+goodopts=''
+for opt in $@; do
+	if try_gcc_options "$opt"; then 
+	    goodopts="$goodopts $opt";
+	fi
+done
+
+echo $goodopts
