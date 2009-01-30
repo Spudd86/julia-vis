@@ -64,15 +64,25 @@ static float sigmoid(float x) {
 
 static float tx=0, ty=0, tz=0;
 
+static inline float getsamp(audio_data *d, int i, int w) {
+	float res = 0;
+	int l = IMAX(i-w, 0);
+	int u = IMIN(i+w, d->len);
+	for(int i = l; i < u; i++) {
+		res += d->data[i];
+	}
+	return res / (2*w);
+}
+
 void maxsrc_update(void)
 {
 	uint16_t *dst = tribuf_get_write(max_tb);
 	
-	fade_pix(dst, prev_src, iw, ih, 255*95/100);
+	fade_pix(dst, prev_src, iw, ih, 255*92/100);
 	
 	audio_data ad;
 	audio_get_samples(&ad);
-	int samp = iw/8;
+	int samp = iw/2;
 	
 	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz); 
 	float sx=sinf(tx), sy=sinf(ty), sz=sinf(tz); 
@@ -85,12 +95,11 @@ void maxsrc_update(void)
 	//maxblend_stride(dst + ih*iw/2 + iw/2, iw, point_src, pnt_w, pnt_h);
 	
 	for(int i=0; i<samp; i++) {
-		float s = 0;
-		for(int j=0; j<ad.len/samp; j++) s+=ad.data[i*ad.len/samp+j];
-		s = s*samp/ad.len;
+		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
+		s=copysignf(expm1f(fabsf(s)+1)-expm1(1), s)/(expm1(2)-expm1(1));//)*2.0f - 1.0f; 
 		
-		float xt = 1.0f*(i - samp/2)/samp;
-		float yt = 0.5f*(sigmoid(s)-0.5f);
+		float xt = (i - samp/2)*1.0f/samp;
+		float yt = 0.1f*s;
 		float zt = 0.0f;
 		
 		float x = R[0][0]*xt + R[0][1]*yt + R[0][2]*zt;
@@ -98,17 +107,10 @@ void maxsrc_update(void)
 		float z = R[2][0]*xt + R[2][1]*yt + R[2][2]*zt;
 		float zvd = 1/(z+2);
 		
-		int xi = (x*zvd+1.0f)*iw/2 - pnt_w/2;
-		int yi = (y*zvd+1.0f)*ih/2 - pnt_h/2;
+		int xi = x*zvd*iw*3/4+iw/2 - pnt_w/2;
+		int yi = y*zvd*ih*3/4+ih/2 - pnt_h/2;
 		maxblend_stride(dst + yi*iw + xi, iw, point_src, pnt_w, pnt_h);
 	}
-	//~ for(int i=0; i<ad.len; i++) {
-		//~ float s = ad.data[i];
-		//~ int x = i*iw/(ad.len*4)+iw*3/8;
-		//~ int y = (sigmoid(s)-0.5f)*0.25f*ih + ih/2;
-		//~ //int y = ih/2;
-		//~ maxblend_stride(dst + y*iw + x, iw, point_src, pnt_w, pnt_h);
-	//~ }
 	
 	tribuf_finish_write(max_tb);
 	prev_src = dst;

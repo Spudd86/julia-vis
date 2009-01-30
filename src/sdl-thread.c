@@ -112,7 +112,8 @@ int main(int argc, char **argv)
 			sprintf(buf,"%6.1f FPS", map_fps);
 			DrawText(screen, buf);
 			SDL_Flip(screen);
-			if(tribuf_get_frmnum(map_tb) != prevfrm && !(cnt%2)) {
+			//if(tribuf_get_frmnum(map_tb) != prevfrm && !(cnt%2)) {
+			if(!(cnt%2)) {
 				maxsrc_update();
 			}
 			cnt++;

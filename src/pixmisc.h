@@ -14,7 +14,6 @@ void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, ui
 void pallet_blit_DFB(IDirectFBSurface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal);
 #endif
 
-// require w%8 == 0
 void maxblend_stride(void *restrict dest, int dest_stride, void *restrict src, int w, int h);
 
 // require w%16 == 0
