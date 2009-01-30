@@ -60,3 +60,7 @@ void* tribuf_get_read(tribuf *tb)
 	//SDL_UnlockMutex(tb->mutex);
 	return tb->data[max];
 }
+
+int tribuf_get_frmnum(tribuf *tb) {
+	return tb->frame;
+}

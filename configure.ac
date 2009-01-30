@@ -3,46 +3,53 @@
 
 AC_PREREQ([2.63])
 AC_INIT([julia-opengl], [0.1], [BUG-REPORT-ADDRESS])
+AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_SRCDIR([src/optproc.c])
-AC_CONFIG_HEADERS([config.h])
+#INCLUDES = `AC_INCLUDES_DEFAULT'
+
+USE_LANGUAGES=gnu99
 
 # Checks for programs.
 AC_PROG_CC
+AC_PROG_CC_C99
 
-# Checks for libraries.
-# FIXME: Replace `main' with a function in `-lSDL_ttf':
-AC_CHECK_LIB([SDL_ttf], [main])
-# FIXME: Replace `main' with a function in `-lasound':
-AC_CHECK_LIB([asound], [main])
-# FIXME: Replace `main' with a function in `-lfftw3f':
-AC_CHECK_LIB([fftw3f], [main])
-# FIXME: Replace `main' with a function in `-ljack':
-AC_CHECK_LIB([jack], [main])
-# FIXME: Replace `main' with a function in `-lm':
-AC_CHECK_LIB([m], [main])
-# FIXME: Replace `main' with a function in `-lportaudio':
-AC_CHECK_LIB([portaudio], [main])
-# FIXME: Replace `main' with a function in `-lpthread':
-AC_CHECK_LIB([pthread], [main])
-# FIXME: Replace `main' with a function in `-lrt':
-AC_CHECK_LIB([rt], [main])
+AC_C_CONST
+AC_TYPE_SIZE_T
+AC_EXEEXT
 
-# Checks for header files.
-AC_CHECK_HEADERS([malloc.h stdint.h stdlib.h string.h unistd.h])
+PKG_CHECK_MODULES([SDL], [sdl])
+AC_SUBST(SDL_CFLAGS)
+AC_SUBST(SDL_LIBS)
+
+PKG_CHECK_MODULES([FFTW], [fftw3f])
+AC_SUBST(FFTW_CFLAGS)
+AC_SUBST(FFTW_LIBS)
+
+PKG_CHECK_MODULES([PORTAUDIO], [portaudio-2.0])
+AC_SUBST(PORTAUDIO_CFLAGS)
+AC_SUBST(PORTAUDIO_LIBS)
+
+AC_CHECK_LIB([m], [sqrt])
+AC_CHECK_LIB([SDL_ttf], [TTF_Init])
 
 # Checks for typedefs, structures, and compiler characteristics.
-AC_HEADER_STDBOOL
+#AC_HEADER_STDBOOL
 AC_C_INLINE
-AC_TYPE_INT32_T
 AC_C_RESTRICT
-AC_TYPE_UINT16_T
-AC_TYPE_UINT32_T
+AC_TYPE_INT64_T
+AC_TYPE_INT32_T
+AC_TYPE_INT16_T
+AC_TYPE_INT8_T
 AC_TYPE_UINT64_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT16_T
 AC_TYPE_UINT8_T
 
 # Checks for library functions.
 AC_FUNC_MALLOC
-AC_CHECK_FUNCS([atexit memset sqrt])
+AC_CHECK_FUNCS([atexit])
 
+#AH_BOTTOM(echo 'AC_INCLUDES_DEFAULT')
 AC_CONFIG_FILES(Makefile, echo timestamp > stamp-h)
+
 AC_OUTPUT

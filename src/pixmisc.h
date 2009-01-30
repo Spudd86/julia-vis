@@ -20,4 +20,9 @@ void maxblend_stride(void *restrict dest, int dest_stride, void *restrict src, i
 // require w%16 == 0
 void maxblend(void *restrict dest, void *restrict src, int w, int h);
 void fade_pix(void *restrict dest, void *restrict src, int w, int h, uint8_t fade);
+
+
+uint16_t *maxsrc_get(void);
+void maxsrc_setup(int w, int h);
+void maxsrc_update(void);
 #endif

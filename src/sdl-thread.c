@@ -18,30 +18,16 @@
 #include "sdl-misc.h"
 #include "map.h"
 
+#include "audio/audio.h"
+
 #define IM_SIZE (512)
 
 #define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL
 
-// set up source for maxblending
-static uint16_t *setup_maxsrc(int w, int h) 
-{
-	uint16_t *max_src = valloc(w * h * sizeof(uint16_t));
-
-	for(int y=0; y < h; y++)  {
-		for(int x=0; x < w; x++) {
-			float u = 2*(float)x/w - 1; float v = 2*(float)y/h - 1;
-			float d = sqrtf(u*u + v*v);
-			max_src[y*w + x] = (uint16_t)((1.0f - fminf(d, 0.25)*4)*UINT16_MAX);
-		}
-	}
-	return max_src;
-}
-
 static opt_data opts;
 static int im_w = 0, im_h = 0;
 static volatile bool running = true;
-static uint16_t *max_src;
 static float map_fps=0;
 
 static int run_map_thread(tribuf *tb) 
@@ -58,7 +44,7 @@ static int run_map_thread(tribuf *tb)
 		uint16_t *map_dest = tribuf_get_write(tb);
 
 		MAP(map_dest, map_src, im_w, im_h, sin(t0), sin(t1));
-		maxblend(map_dest, max_src, im_w, im_h);
+		maxblend(map_dest, maxsrc_get(), im_w, im_h);
 		
 		tribuf_finish_write(tb);
 		map_src=map_dest;
@@ -75,6 +61,8 @@ static int run_map_thread(tribuf *tb)
 	return 0;
 }
 
+int audio_setup_pa();
+
 static SDL_Event user_event;
 static Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
 int main(int argc, char **argv) 
@@ -83,16 +71,17 @@ int main(int argc, char **argv)
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	im_w = screen->w - screen->w%16; im_h = screen->h - screen->h%8;
 	
-	max_src = setup_maxsrc(im_w, im_h);
+	audio_setup_pa();
+	maxsrc_setup(im_w, im_h);
 	
 	uint16_t *map_surf[3];
 	map_surf[0] = valloc(im_w * im_h * sizeof(uint16_t));
 	map_surf[1] = valloc(im_w * im_h * sizeof(uint16_t));
 	map_surf[2] = valloc(im_w * im_h * sizeof(uint16_t));
 	for(int i=0; i< im_w*im_h; i++) {
-		map_surf[0][i] = max_src[i];
-		map_surf[1][i] = max_src[i];
-		map_surf[2][i] = max_src[i];
+		map_surf[0][i] = 0;//max_src[i];
+		map_surf[1][i] = 0;//max_src[i];
+		map_surf[2][i] = 0;//max_src[i];
 	}
 	
 	uint32_t *pal = _mm_malloc(257 * sizeof(uint32_t), 64); // p4 has 64 byte cache line
@@ -108,10 +97,13 @@ int main(int argc, char **argv)
 
 	printf("running with %dx%d bufs\n", im_w, im_h);
 	
+	usleep(1000);
+	
 	SDL_Thread *map_thread = SDL_CreateThread(&run_map_thread, map_tb);
 	SDL_AddTimer(1000/60, &timercallback, NULL);
 	
 	SDL_Event	event;
+	int prevfrm = 0, cnt = 0;
 	while(SDL_WaitEvent(&event) >= 0)
 	{
 		if(event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_QUIT 
@@ -119,10 +111,15 @@ int main(int argc, char **argv)
 			break;
 		} else if(event.type == SDL_USEREVENT) {
 			PALLET_BLIT(screen, tribuf_get_read(map_tb), im_w, im_h, pal);
+			//PALLET_BLIT(screen, maxsrc_get(), im_w, im_h, pal);
 			char buf[32];
 			sprintf(buf,"%6.1f FPS", map_fps);
 			DrawText(screen, buf);
 			SDL_Flip(screen);
+			if(tribuf_get_frmnum(map_tb) != prevfrm && !(cnt%2)) {
+				maxsrc_update();
+			}
+			cnt++;
 		}
 	}
 	running = false;

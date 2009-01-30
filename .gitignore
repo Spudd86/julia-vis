@@ -3,3 +3,10 @@
 *.o
 bin/*
 config.mk
+Makefile
+autom4te.cache/*
+config.log
+config.status
+configure
+stamp-h
+src/config.h

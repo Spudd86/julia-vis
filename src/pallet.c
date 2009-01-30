@@ -18,7 +18,7 @@ static void pallet_blit_SDL32(uint32_t  * restrict dest, unsigned int dst_stride
 		for(unsigned int x = 0; x < w; x+=4) {
 			int v = src[y*src_stride + x];
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
-			//__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
+			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
 			
 			__m64 col1 = *(__m64 *)(pal+(v/256));
 			__m64 col2 = col1;
@@ -94,7 +94,7 @@ static void pallet_blit_SDL565(uint8_t  * restrict dest, unsigned int dst_stride
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
-			//__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
+			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
 			
 			__m64 r1, r2, g1, g2, b1, b2, c;
 			int v = src[y*src_stride + x];
@@ -154,7 +154,7 @@ static void pallet_blit_SDL555(uint8_t  * restrict dest, unsigned int dst_stride
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
-			//__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
+			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
 			int v;
 			__m64 r1, r2, g1, g2, b1, b2, c;
 			
