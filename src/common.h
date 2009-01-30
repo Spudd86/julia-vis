@@ -9,7 +9,7 @@
 typedef struct {
 	int w, h;
 	int fullscreen;
-	
+	int draw_rate;
 }opt_data;
 
 void optproc(int argc, char **argv, opt_data *res);

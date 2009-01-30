@@ -44,8 +44,8 @@ void maxsrc_setup(int w, int h)
 	
 	for(int i=0; i<3; i++) {
 		max_src[i] = valloc(w * h * sizeof(uint16_t));
-		initbuf(max_src[i]+(h*w/2 + w/2) - (h*w/4 + w/4), w, w/2, h/2);
-		//memset(max_src[i] = valloc(w * h * sizeof(uint16_t)), 0, w*h*sizeof(uint16_t));
+		//initbuf(max_src[i]+(h*w/2 + w/2) - (h*w/4 + w/4), w, w/2, h/2);
+		memset(max_src[i], 0, w*h*sizeof(uint16_t));
 	}
 	
 	max_tb = tribuf_new((void **)max_src);

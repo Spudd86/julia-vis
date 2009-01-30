@@ -21,7 +21,7 @@ CPPFLAGS = @CPPFLAGS@
 CFLAGS = $(CPPFLAGS) @CFLAGS@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@
-INSTALL = @INSTALL@
+#INSTALL = @INSTALL@
 
 
 
@@ -29,7 +29,6 @@ CFLAGS = --std=gnu99 -D_GNU_SOURCE=1 -mmmx -Wall -fno-strict-aliasing -fsingle-p
 CFLGAS +=  -iquote $(shell pwd)/src 
 #	-Wunsafe-loop-optimizations
 
-#CFLAGS += -ggdb
 CFLAGS += -O3 -ffast-math -finline-functions -maccumulate-outgoing-args
 CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller -fdelete-null-pointer-checks 
 CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear -funsafe-loop-optimizations 
@@ -47,18 +46,22 @@ CFLAGS += -Wl,--as-needed
 
 PA_FLAGS = @PORTAUDIO_CFLAGS@ @PORTAUDIO_LIBS@ @FFTW_CFLAGS@ @FFTW_LIBS@
 SDL_FLAGS = @SDL_CFLAGS@ @SDL_LIBS@ -lSDL_ttf -lm
-DFB_FLAGS = `pkg-config --cflags --libs directfb`
+DFB_FLAGS = @DIRECTFB_CFLAGS@ @DIRECTFB_LIBS@
 
-AUDIO_SRCS = src/audio/sdl-test.c src/audio/audio.c src/audio/beat.c src/audio/portaudio.c src/sdl-misc.c src/optproc.c src/tribuf.c
+AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/portaudio.c 
 
 -include config.mk
 
 #CFLAGS += -Wpointer-arith -Wmissing-prototypes -Wmissing-field-initializers \
 #	-Wunreachable-code
 
-all: bin/sdl-test bin/sdlthread-test bin/audio-test
+all: bin/sdl-test bin/sdlthread-test bin/audio-test dfb
 
+ifneq ($(DFB_FLAGS), )
 dfb: bin/dfb-test
+else
+dfb:
+endif
 
 dfb-run: bin/dfb-test
 	bin/dfb-test
@@ -81,14 +84,14 @@ config.mk:
 bin/sdl-test: src/sdl.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/common.h Makefile config.mk
 	$(CC) src/sdl.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) -o $@
 
-bin/sdlthread-test: src/sdl-thread.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
-	$(CC) src/sdl-thread.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) -o $@
+bin/sdlthread-test: src/sdl-thread.c src/sdl-misc.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
+	$(CC) src/sdl-thread.c src/sdl-misc.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) $(PA_FLAGS) -o $@
 
 bin/dfb-test: src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
-	$(CC) src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c -DUSE_DIRECTFB $(CFLAGS) $(DFB_FLAGS) -o $@
+	$(CC) src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c -DUSE_DIRECTFB $(CFLAGS) $(DFB_FLAGS) $(PA_FLAGS) -o $@
 
 bin/audio-test: $(AUDIO_SRCS)
-	$(CC) $(AUDIO_SRCS) -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) $(PA_FLAGS) -o $@
+	$(CC) src/audio/sdl-test.c $(AUDIO_SRCS) src/sdl-misc.c src/optproc.c src/tribuf.c -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) $(PA_FLAGS) -o $@
 
 %.s: %.c src/*.h Makefile config.mk
 	$(CC) $< $(CFLAGS) -S -o $@

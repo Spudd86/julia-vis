@@ -29,6 +29,21 @@ PKG_CHECK_MODULES([PORTAUDIO], [portaudio-2.0])
 AC_SUBST(PORTAUDIO_CFLAGS)
 AC_SUBST(PORTAUDIO_LIBS)
 
+AC_ARG_ENABLE([directfb], 
+		[AS_HELP_STRING([--enable-directfb], [build test-directfb])],
+		[], [enable_directfb=no])
+AS_IF([test "x$enable_directfb" != xno],
+	[
+		PKG_CHECK_MODULES([DIRECTFB], [directfb],
+			[AC_DEFINE([HAVE_DIRECTFB], [1], [Define if you have libreadline])
+			 AC_SUBST(DIRECTFB_CFLAGS)
+			 AC_SUBST(DIRECTFB_LIBS)
+			],
+			[AC_MSG_FAILURE([--enable-directfb was given, but test for directfb failed])]
+		)
+	])
+
+
 AC_CHECK_LIB([m], [sqrt])
 AC_CHECK_LIB([SDL_ttf], [TTF_Init])
 

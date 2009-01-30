@@ -75,13 +75,9 @@ int main(int argc, char **argv)
 	maxsrc_setup(im_w, im_h);
 	
 	uint16_t *map_surf[3];
-	map_surf[0] = valloc(im_w * im_h * sizeof(uint16_t));
-	map_surf[1] = valloc(im_w * im_h * sizeof(uint16_t));
-	map_surf[2] = valloc(im_w * im_h * sizeof(uint16_t));
-	for(int i=0; i< im_w*im_h; i++) {
-		map_surf[0][i] = 0;//max_src[i];
-		map_surf[1][i] = 0;//max_src[i];
-		map_surf[2][i] = 0;//max_src[i];
+	for(int i=0; i<3; i++) {
+		map_surf[i] = valloc(im_w * im_h * sizeof(uint16_t));
+		memset(map_surf[i], 0, im_w * im_h * sizeof(uint16_t));
 	}
 	
 	uint32_t *pal = _mm_malloc(257 * sizeof(uint32_t), 64); // p4 has 64 byte cache line
@@ -100,7 +96,7 @@ int main(int argc, char **argv)
 	usleep(1000);
 	
 	SDL_Thread *map_thread = SDL_CreateThread(&run_map_thread, map_tb);
-	SDL_AddTimer(1000/60, &timercallback, NULL);
+	SDL_AddTimer(1000/opts.draw_rate, &timercallback, NULL);
 	
 	SDL_Event	event;
 	int prevfrm = 0, cnt = 0;

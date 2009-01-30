@@ -12,8 +12,9 @@ void optproc(int argc, char **argv, opt_data *res)
 	
 	res->w = res->h = -1;
 	res->fullscreen = 0;
+	res->draw_rate = 30;
 	
-	while((opt = getopt(argc, argv, "w:h:ft")) != -1) {
+	while((opt = getopt(argc, argv, "w:h:s:ft")) != -1) {
 		switch(opt) {
 			case 'w':
 				res->w = atoi(optarg);
@@ -24,10 +25,13 @@ void optproc(int argc, char **argv, opt_data *res)
 			case 'f':
 				res->fullscreen = 1;
 				break;
+			case 's':
+				res->draw_rate = atoi(optarg);
+				break;
 			case 't': // will be threads on/off
 				//break;
 			default:
-				fprintf(stderr, "Usage: %s [-w width] [-h height] [-f]\n", argv[0]);
+				fprintf(stderr, "Usage: %s [-w width] [-h height] [-s screen updates/second] [-f]\n", argv[0]);
 				exit(EXIT_FAILURE);
 		}
 	}
