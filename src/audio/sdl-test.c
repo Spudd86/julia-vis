@@ -1,7 +1,6 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h> /* for exit() */
-#include <stdbool.h>
 #include <math.h>
 #include <malloc.h>
 

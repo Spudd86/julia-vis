@@ -1,7 +1,6 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <math.h>
 #include <malloc.h>
 
@@ -27,7 +26,6 @@
 
 static opt_data opts;
 static int im_w = 0, im_h = 0;
-static volatile bool running = true;
 static float map_fps=0;
 
 static int run_map_thread(tribuf *tb) 

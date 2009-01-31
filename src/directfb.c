@@ -1,7 +1,6 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <math.h>
 #include <malloc.h>
 
@@ -44,7 +43,6 @@ static opt_data opts;
 static IDirectFB *dfb = NULL;
 static IDirectFBSurface *primary = NULL;
 static int im_w = 0, im_h = 0;
-static volatile bool running = true;
 static uint16_t *max_src;
 static float map_fps=0;
 
