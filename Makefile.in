@@ -25,7 +25,7 @@ LIBS = @LIBS@
 
 
 
-CFLAGS = --std=gnu99 -D_GNU_SOURCE=1 -mmmx -Wall -fno-strict-aliasing -fsingle-precision-constant
+CFLAGS += -D_GNU_SOURCE=1 -mmmx -Wall -fno-strict-aliasing -fsingle-precision-constant
 CFLGAS +=  -iquote $(shell pwd)/src 
 #	-Wunsafe-loop-optimizations
 
@@ -34,6 +34,13 @@ CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-u
 CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear -funsafe-loop-optimizations 
 CFLAGS += -fgcse-las -fgcse-sm -fmodulo-sched 
 CFLAGS += -fmerge-all-constants
+
+# on gcc 4.3 set precsicion of FPU to 32 bits (can get speed up for floats)
+# do this since everywhere inside our code we use only floats
+CFLAGS += -mpc32
+
+# let gcc generate the RCPSS and RSQRTSS instructions (fast recipricol)
+CFLAGS += -mrecip
 
 #CFLAGS += -fipa-pta  # bugs on ubuntu
 
@@ -45,18 +52,20 @@ CFLAGS += -fvect-cost-model -ftracer -fassociative-math -freciprocal-math -fno-s
 CFLAGS += -Wl,--as-needed
 
 PA_FLAGS = @PORTAUDIO_CFLAGS@ @PORTAUDIO_LIBS@ @FFTW_CFLAGS@ @FFTW_LIBS@
+JACK_FLAGS = @JACK_CFLAGS@ @JACK_LIBS@
 SDL_FLAGS = @SDL_CFLAGS@ @SDL_LIBS@ -lSDL_ttf -lm
 DFB_FLAGS = @DIRECTFB_CFLAGS@ @DIRECTFB_LIBS@
 
 AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/portaudio.c 
 
+ifneq ($(JACK_FLAGS), )
+AUDIO_SRCS += src/audio/jack.c
+endif
+
 -include config.mk
 
 #CFLAGS += -Wpointer-arith -Wmissing-prototypes -Wmissing-field-initializers \
 #	-Wunreachable-code
-
-
-CFLAGS := $(shell CC=$(CC) ./gcc-optioncheck $(CFLAGS))
 
 all: bin/sdl-test bin/sdlthread-test bin/audio-test dfb
 
@@ -85,16 +94,23 @@ config.mk:
 	touch config.mk
 
 bin/sdl-test: src/sdl.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/common.h Makefile config.mk
-	$(CC) src/sdl.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) -o $@
+	$(CC) $(CFLAGS) -DUSE_SDL \
+	src/sdl.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c $(SDL_FLAGS) -o $@
 
 bin/sdlthread-test: src/sdl-thread.c src/sdl-misc.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
-	$(CC) src/sdl-thread.c src/sdl-misc.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) $(PA_FLAGS) -o $@
+	$(CC) $(CFLAGS) -DUSE_SDL \
+	src/sdl-thread.c src/sdl-misc.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c \
+	$(SDL_FLAGS) $(PA_FLAGS) -o $@
 
 bin/dfb-test: src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
-	$(CC) src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c -DUSE_DIRECTFB $(CFLAGS) $(DFB_FLAGS) $(PA_FLAGS) -o $@
+	$(CC) $(CFLAGS) -DUSE_DIRECTFB \
+	src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c \
+	$(DFB_FLAGS) $(PA_FLAGS) -o $@
 
-bin/audio-test: $(AUDIO_SRCS)
-	$(CC) src/audio/sdl-test.c $(AUDIO_SRCS) src/sdl-misc.c src/optproc.c src/tribuf.c -DUSE_SDL $(CFLAGS) $(SDL_FLAGS) $(PA_FLAGS) -o $@
+bin/audio-test: $(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c src/tribuf.c
+	$(CC) -DDO_BEAT -DUSE_SDL $(CFLAGS) \
+	$(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c src/tribuf.c \
+	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
 %.s: %.c src/*.h Makefile config.mk
 	$(CC) $< $(CFLAGS) -S -o $@
@@ -105,12 +121,12 @@ configure: configure.ac
 	autoconf
 
 # autoheader might not change config.h.in, so touch a stamp file
-config.h.in: stamp-h.in
+src/config.h.in: stamp-h.in
 stamp-h.in: configure.ac
 		autoheader
 		echo timestamp > stamp-h.in
 
-config.h: stamp-h
+src/config.h: stamp-h
 stamp-h: config.h.in config.status
 	./config.status
 Makefile: Makefile.in config.status

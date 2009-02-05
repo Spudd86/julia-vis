@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include <jack/jack.h>
 
@@ -10,10 +11,14 @@
 static jack_port_t *in_port;
 
 
+/*TODO: 
+ * proper shutdown
+ * addd buffer change callback
+ */ 
+
 // jack callback
 static int process (jack_nframes_t nframes, void *arg)
 {
-	static int pos = 0;
 	float *in = (float *) jack_port_get_buffer (in_port, nframes);
 	
 	audio_update(in, nframes);
@@ -34,6 +39,10 @@ int jack_setup()
 		}
 		exit (1);
 	}
+	
+	printf("Sample Rate %i\n", jack_get_sample_rate(client));
+	
+	audio_setup(jack_get_sample_rate(client));
 
 	jack_set_process_callback (client, process, 0);
 	in_port = jack_port_register (client, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
@@ -42,4 +51,6 @@ int jack_setup()
 		fprintf (stderr, "cannot activate client");
 		exit(1);
 	}
+	
+	return 0;
 }

@@ -13,8 +13,10 @@ void optproc(int argc, char **argv, opt_data *res)
 	res->w = res->h = -1;
 	res->fullscreen = 0;
 	res->draw_rate = 30;
+	res->doublebuf = 0;
+	res->use_jack = 0;
 	
-	while((opt = getopt(argc, argv, "w:h:s:ft")) != -1) {
+	while((opt = getopt(argc, argv, "w:h:s:ftdj")) != -1) {
 		switch(opt) {
 			case 'w':
 				res->w = atoi(optarg);
@@ -24,6 +26,12 @@ void optproc(int argc, char **argv, opt_data *res)
 				break;
 			case 'f':
 				res->fullscreen = 1;
+				break;
+			case 'd':
+				res->doublebuf = 1;
+				break;
+			case 'j':
+				res->use_jack = 1;
 				break;
 			case 's':
 				res->draw_rate = atoi(optarg);

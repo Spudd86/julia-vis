@@ -1,6 +1,8 @@
 #ifndef PIXMISC_H
 #define PIXMISC_H
 
+#include "config.h"
+
 #include <unistd.h>
 #include <stdint.h>
 
@@ -9,7 +11,7 @@
 void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal);
 #endif
 
-#ifdef USE_DIRECTFB
+#ifdef HAVE_DIRECTFB
 #include <directfb.h>
 void pallet_blit_DFB(IDirectFBSurface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal);
 #endif

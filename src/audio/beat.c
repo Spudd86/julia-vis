@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <malloc.h>
 
 #include "audio.h"
 
@@ -15,9 +16,12 @@ static float Eh[BANDS*HIST];
 
 
 int beat_get_count(void) { return __sync_add_and_fetch(&beat_count, 0); }
-int beat_band_get_count(int b) {
-	if(b>=0 && b<BANDS) return __sync_add_and_fetch(beat_bands + b, 0);
-	else return 0;
+void beat_band_get_counts(audio_data *ad) {
+	if(ad->data == NULL) { 
+		ad->len = BANDS;
+		ad->data = malloc(sizeof(int)*BANDS);
+	}
+	memcpy(ad->data, beat_bands, sizeof(int)*BANDS);
 }
 
 static inline float sqr(float x) { return x*x; }

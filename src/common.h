@@ -10,6 +10,8 @@ typedef struct {
 	int w, h;
 	int fullscreen;
 	int draw_rate;
+	int doublebuf;
+	int use_jack;
 }opt_data;
 
 void optproc(int argc, char **argv, opt_data *res);

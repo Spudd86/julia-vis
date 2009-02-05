@@ -3,11 +3,14 @@
 /* Define to 1 if you have the `atexit' function. */
 #undef HAVE_ATEXIT
 
-/* Define if you have libreadline */
+/* Define if directfb is enabled */
 #undef HAVE_DIRECTFB
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
+
+/* Define if jack is enabled */
+#undef HAVE_JACK
 
 /* Define to 1 if you have the `m' library (-lm). */
 #undef HAVE_LIBM

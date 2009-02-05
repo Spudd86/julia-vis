@@ -26,6 +26,7 @@
 
 static opt_data opts;
 static int im_w = 0, im_h = 0;
+static int running = 1;
 static float map_fps=0;
 
 static int run_map_thread(tribuf *tb) 
@@ -60,6 +61,7 @@ static int run_map_thread(tribuf *tb)
 }
 
 int audio_setup_pa();
+int jack_setup();
 
 static SDL_Event user_event;
 static Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
@@ -69,7 +71,14 @@ int main(int argc, char **argv)
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	im_w = screen->w - screen->w%16; im_h = screen->h - screen->h%8;
 	
-	audio_setup_pa();
+#ifdef HAVE_JACK
+	if(opts.use_jack)
+		jack_setup();
+	else
+#else
+		audio_setup_pa();
+#endif
+	
 	maxsrc_setup(im_w, im_h);
 	
 	uint16_t *map_surf[3];
@@ -117,7 +126,7 @@ int main(int argc, char **argv)
 			cnt++;
 		}
 	}
-	running = false;
+	running = 0;
 	
 	int status;
 	SDL_WaitThread(map_thread, &status);

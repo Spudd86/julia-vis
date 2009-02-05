@@ -14,7 +14,7 @@ void maxblend_stride(void *restrict dest, int dest_stride, void *restrict source
 			dst[dest_stride*y+x] = IMAX(dst[dest_stride*y+x], src[w*y+x]);
 }
 
-//TODO: sse2 version of this (8 pixels at once!)
+//TODO: portable version (no x86 stuff)
 
 #ifndef __SSE2__
 //FIXME: currently this loses two bits of precision

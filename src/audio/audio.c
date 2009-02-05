@@ -17,8 +17,13 @@ static tribuf *fft_tb = NULL;
 
 static inline float sqr(float x) { return x*x; }
 
+/* TODO:
+ *  handle n != nr_samp in audio_update
+ *  add a setup that takes opts from main and calls pa or jack setups
+ */
+
 /**
- * take 1024 frames of audio and do update beat detection
+ * take nr_samp frames of audio and do update beat detection
  * http://www.gamedev.net/reference/programming/features/beatdetection/
  */
 static float *do_fft(float *in)

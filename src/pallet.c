@@ -1,12 +1,24 @@
-#include <unistd.h>
-#include <stdint.h>
+#include "config.h"
 
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#endif
 #include "mymm.h"
 
 #include "pixmisc.h"
 #include "common.h"
 
-// pallet must have 257 entries
+// pallet must have 257 entries (for easier interpolation on 16 bit indicies)
+// output pix = (pallet[in/256]*(in%256) + pallet[in/256+1]*(255-in%256])/256
+// for each colour component
+
+// the above is not done in 16 bit modes they just do out = pallet[in/256] (and conver the pallet)
+
+//TODO: load pallets from files of some sort
+//		pre-convert pallets to 565/555 if we're in a 16 bit mode (since we don't iterpolate there anyway)
 
 static void pallet_blit_SDL32(uint32_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
 {
@@ -230,7 +242,7 @@ void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, ui
 
 #endif
 
-#ifdef USE_DIRECTFB
+#ifdef HAVE_DIRECTFB
 
 #include <directfb.h>
 
