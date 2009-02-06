@@ -6,6 +6,7 @@
 #include <malloc.h>
 
 #include "tribuf.h"
+#include "common.h"
 
 struct tribuf_s {
 	unsigned int frame;
@@ -18,8 +19,7 @@ struct tribuf_s {
 
 tribuf* tribuf_new(void **data)
 {
-	tribuf *tb = malloc(sizeof(tribuf));
-	if(tb==NULL) abort();
+	tribuf *tb = xmalloc(sizeof(tribuf));
 	
 	tb->data = data;
 	tb->frame = tb->lastmin = 0;

@@ -75,9 +75,8 @@ int main(int argc, char **argv)
 	if(opts.use_jack)
 		jack_setup();
 	else
-#else
-		audio_setup_pa();
 #endif
+		audio_setup_pa();
 	
 	maxsrc_setup(im_w, im_h);
 	

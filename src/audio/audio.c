@@ -42,7 +42,7 @@ static float *do_fft(float *in)
 	return fft;
 }
 
-void audio_update(float *in, int n)
+void audio_update(const float *in, int n)
 {
 	float *samps = tribuf_get_write(samp_tb);
 	memcpy(samps, in, sizeof(float)*IMIN(n,nr_samp));
@@ -71,11 +71,15 @@ int audio_setup(int sr)
 {
 	nr_samp = (sr<50000)?1024:2048;
 	
+	printf("Sample Rate %i\nUsing %i samples/buffer\n", sr, nr_samp);
+	
 	fft_tmp = fftwf_malloc(sizeof(float) * nr_samp); // do xform in place
+	if(!fft_tmp) abort();
+	
 	p = fftwf_plan_r2r_1d(nr_samp, fft_tmp, fft_tmp, FFTW_R2HC, 0);
 
-	for(int i=0;i<3;i++) fft_data[i] = malloc(sizeof(float) * (nr_samp/2+1));
-	for(int i=0;i<3;i++) samp_data[i] = malloc(sizeof(float) * nr_samp);
+	for(int i=0;i<3;i++) fft_data[i] = xmalloc(sizeof(float) * (nr_samp/2+1));
+	for(int i=0;i<3;i++) samp_data[i] = xmalloc(sizeof(float) * nr_samp);
 	for(int i=0;i<3;i++) {
 		memset(samp_data[i], 0, sizeof(float) * nr_samp);
 		memset(fft_data[i], 0, sizeof(float) * nr_samp/2+1);
@@ -88,7 +92,7 @@ int audio_setup(int sr)
 	return 0;
 }
 
-void audio_stop()
+void audio_shutdown()
 {
 	fftwf_free(fft_tmp);
 	fftwf_destroy_plan(p);
