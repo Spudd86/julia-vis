@@ -1,6 +1,11 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include "config.h"
+#include <unistd.h>
+#include <stdlib.h>
+#include <malloc.h>
+
 //#define IMIN(x,y) ((x)+((((y)-(x)) >> 31)&((y)-(x))))
 //#define IMAX(x,y) ((x)-((((x)-(y)) >> 31)&((x)-(y))))
 #define IMIN(x,y) (((x)<(y))?(x):(y))
@@ -28,5 +33,7 @@ void optproc(int argc, char **argv, opt_data *res);
       }                                                        \
   }
 #endif
+
+static inline void *xmalloc(size_t s) { void *res = malloc(s); if(!res) abort(); return res; }
 
 #endif

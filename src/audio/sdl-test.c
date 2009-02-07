@@ -63,12 +63,12 @@ int main(int argc, char **argv)
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	int im_w = screen->w - screen->w%8, im_h = screen->h - screen->h%8;
 #ifdef HAVE_JACK
-	if(opts.use_jack)
+	if(opts.use_jack) {
+		printf("staring jack\n");
 		jack_setup();
-	else
-#else
-		audio_setup_pa();
+	} else
 #endif
+		audio_setup_pa();
 	
 	usleep(1000);
 	

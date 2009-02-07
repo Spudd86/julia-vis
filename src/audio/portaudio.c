@@ -1,6 +1,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <portaudio.h>
 
@@ -24,8 +25,10 @@ static int callback(const void *input,
 
 int audio_setup_pa()
 {
+	printf("Using PortAudio\n");
+	
 	PaError err = Pa_Initialize();
-	if( err != paNoError ) { printf(  "PortAudio error: %s\n", Pa_GetErrorText(err)); return -1; }
+	if( err != paNoError ) { printf(  "PortAudio error: %s\n", Pa_GetErrorText(err)); exit(1); }
 	
 	
 	/* Open an audio I/O stream. */
@@ -70,5 +73,6 @@ int audio_stop_pa()
 	return 0;
 error:
 	printf("Couldn't terminate: PortAudio error: %s\n", Pa_GetErrorText(err));
+	exit(1);
 	return -1;
 }

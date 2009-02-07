@@ -40,8 +40,6 @@ int jack_setup()
 		exit (1);
 	}
 	
-	printf("Sample Rate %i\n", jack_get_sample_rate(client));
-	
 	audio_setup(jack_get_sample_rate(client));
 
 	jack_set_process_callback (client, process, 0);
