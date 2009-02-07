@@ -118,8 +118,9 @@ void maxsrc_update(void)
 	
 	for(int i=0; i<samp; i++) {
 		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
-		s=sigmoid(3*s)*2 - 1;
-		//s=copysignf(expm1f(fabsf(s)+1)-expm1(1), s)/(expm1(2)-expm1(1));//)*2.0f - 1.0f; 
+		//s=sigmoid(2.1*s)*2 - 1;
+		//s=copysignf(expm1f(fabsf(s)*1.5+1)-expm1(1), s)/(expm1(2.5)-expm1(1));//)*2.0f - 1.0f; 
+		s=copysignf(logf(fabsf(s)+1)- logf(1), s)/(logf(2.5)-logf(1));
 		
 		float xt = (i - samp/2)*1.0f/samp;
 		float yt = 0.1f*s;

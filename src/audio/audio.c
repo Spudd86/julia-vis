@@ -88,6 +88,7 @@ int audio_setup(int sr)
 	fft_tb = tribuf_new(fft_data);
 	samp_tb = tribuf_new(samp_data);
 	
+	beat_setup();
 	
 	return 0;
 }

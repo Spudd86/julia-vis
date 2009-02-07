@@ -6,11 +6,19 @@ typedef struct {
 	float *data;
 } audio_data;
 
+typedef struct {
+	int bands;
+	int *counts;
+	float *means;
+	float *stddev;
+} beat_data;
+
 /**
  * return total number of beats so far
  */
+void beat_setup();
 int beat_get_count(void);
-void beat_band_get_counts(audio_data *ad);
+void beat_get_data(beat_data *);
 void beat_update(float *fft, int fft_len);
 
 int audio_setup(int sr);
