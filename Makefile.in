@@ -29,27 +29,34 @@ CFLAGS += -D_GNU_SOURCE=1 -mmmx -Wall -fno-strict-aliasing -fsingle-precision-co
 CFLGAS +=  -iquote $(shell pwd)/src 
 #	-Wunsafe-loop-optimizations
 
-CFLAGS += -O2 -finline-functions -maccumulate-outgoing-args
-CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller -fdelete-null-pointer-checks 
-CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear -funsafe-loop-optimizations 
-CFLAGS += -fgcse-las -fgcse-sm -fmodulo-sched 
-CFLAGS += -fmerge-all-constants
+ifdef DEBUG
+	CFLAGS += -ggdb
+else
+	CFLAGS += -O2 -finline-functions -maccumulate-outgoing-args
+	CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller -fdelete-null-pointer-checks 
+	CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear -funsafe-loop-optimizations 
+	CFLAGS += -fgcse-las -fgcse-sm -fmodulo-sched 
+	CFLAGS += -fmerge-all-constants
 
 # on gcc 4.3 set precsicion of FPU to 32 bits (can get speed up for floats)
 # do this since everywhere inside our code we use only floats
-CFLAGS += -mpc32
+	CFLAGS += -mpc32
 
 # let gcc generate the RCPSS and RSQRTSS instructions (fast recipricol)
-CFLAGS += -mrecip
+	CFLAGS += -mrecip
 
 #CFLAGS += -fipa-pta  # bugs on ubuntu
 
-CFLAGS += -fmodulo-sched-allow-regmoves -fgcse-after-reload -fsee -fipa-cp
+	CFLAGS += -fmodulo-sched-allow-regmoves -fgcse-after-reload -fsee -fipa-cp
 
-CFLAGS += -fsched-stalled-insns=2 -fsched-stalled-insns-dep=2
-CFLAGS += -fvect-cost-model -ftracer -ffast-math -fassociative-math -freciprocal-math -fno-signed-zeros
+	CFLAGS += -fsched-stalled-insns=2 -fsched-stalled-insns-dep=2
+	CFLAGS += -fvect-cost-model -ftracer -ffast-math  -fassociative-math -freciprocal-math -fno-signed-zeros
+
+endif
 
 CFLAGS += -Wl,--as-needed
+
+CFLAGS := $(shell ./gcc-optioncheck $(CFLAGS))
 
 PA_FLAGS = @PORTAUDIO_CFLAGS@ @PORTAUDIO_LIBS@ @FFTW_CFLAGS@ @FFTW_LIBS@
 JACK_FLAGS = @JACK_CFLAGS@ @JACK_LIBS@
