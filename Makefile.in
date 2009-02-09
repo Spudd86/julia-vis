@@ -100,13 +100,13 @@ distclean: clean
 config.mk:
 	touch config.mk
 
-bin/sdl-test: src/sdl.c src/sdl-misc.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
-	$(CC) $(CFLAGS) -DUSE_SDL \
-	src/sdl.c src/sdl-misc.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c \
+bin/sdl-test: src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
+	$(CC) $(CFLAGS) -DUSE_SDL -DMT_NO_INLINE \
+	src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c \
 	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
 bin/sdlthread-test: src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
-	$(CC) $(CFLAGS) -DUSE_SDL -D MT_NO_INLINE \
+	$(CC) $(CFLAGS) -DUSE_SDL -DMT_NO_INLINE \
 	src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c \
 	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 

@@ -16,8 +16,6 @@ void maxblend_stride(void *restrict dest, int dest_stride, void *restrict source
 
 //TODO: portable version (no x86 stuff)
 
-#ifndef __SSE2__
-
 void fade_pix2(void *restrict buf, int w, int h, uint8_t fade)
 {
 	__m64 *mbbuf = buf;
@@ -53,6 +51,8 @@ void fade_pix2(void *restrict buf, int w, int h, uint8_t fade)
 	}
 	_mm_empty();
 }
+
+#ifndef __SSE2__
 
 //FIXME: currently this loses two bits of precision
 void fade_pix(void *restrict dest, void *restrict src, int w, int h, uint8_t fade)

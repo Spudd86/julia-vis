@@ -21,7 +21,7 @@
 
 #include "audio/audio.h"
 
-#define IM_SIZE (374)
+#define IM_SIZE (512)
 
 #define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL
@@ -46,7 +46,6 @@ static int run_map_thread(tribuf *tb)
 	int beats = beat_get_count();
 	int done_time = tick0;
 	unsigned int last_beat_time = tick0;
-	int frames = 0;
 	
 	uint16_t *map_src = tribuf_get_read(tb);
     while(running) 

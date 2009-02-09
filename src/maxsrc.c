@@ -133,7 +133,7 @@ void maxsrc_update(void)
 	
 	audio_data ad;
 	audio_get_samples(&ad);
-	int samp = iw/2;
+	int samp = IMAX(iw,ih)*2/5;
 	
 	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz); 
 	float sx=sinf(tx), sy=sinf(ty), sz=sinf(tz); 
