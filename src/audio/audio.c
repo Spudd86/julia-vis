@@ -68,9 +68,7 @@ void audio_update(const float *in, int n)
 	
 	tribuf_finish_write(samp_tb);
 	buf_count++;
-#ifdef DO_BEAT
 	beat_update(do_fft(samps), nr_samp/2);
-#endif
 	
 	if(remain > 0) audio_update(in, remain);
 }

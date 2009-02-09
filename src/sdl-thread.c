@@ -4,6 +4,8 @@
 #include <math.h>
 #include <malloc.h>
 
+#include "mtwist/mtwist.h"
+
 #include <mm_malloc.h>
 
 #include <SDL.h>
@@ -19,7 +21,7 @@
 
 #include "audio/audio.h"
 
-#define IM_SIZE (512)
+#define IM_SIZE (374)
 
 #define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL
@@ -31,18 +33,29 @@ static float map_fps=0;
 
 static int run_map_thread(tribuf *tb) 
 {
-	float t0=0, t1=0;
+	//~ float t0=0, t1=0;
+	float vx, vy, x, y, xt, yt;
 	
-	Uint32 tick0, fps_oldtime;
+	mt_goodseed();
+	vx = vy = 0;
+	xt = 0.5f*((mt_lrand()%im_w)*2.0f/im_w - 1.0f); yt = 0.5f*((mt_lrand()%im_h)*2.0f/im_h - 1.0f);
+	x = 0.5f*((mt_lrand()%im_w)*2.0f/im_w - 1.0f); y = 0.5f*((mt_lrand()%im_h)*2.0f/im_h - 1.0f);
+	
+	Uint64 tick0, fps_oldtime;
 	fps_oldtime = tick0 = SDL_GetTicks();
 	float frametime = 100;
+	int beats = beat_get_count();
+	int done_time = tick0;
+	unsigned int last_beat_time = tick0;
+	int frames = 0;
 	
 	uint16_t *map_src = tribuf_get_read(tb);
     while(running) 
 	{
 		uint16_t *map_dest = tribuf_get_write(tb);
 
-		MAP(map_dest, map_src, im_w, im_h, sin(t0), sin(t1));
+		//MAP(map_dest, map_src, im_w, im_h, sin(t0), sin(t1));
+		MAP(map_dest, map_src, im_w, im_h, x, y);
 		maxblend(map_dest, maxsrc_get(), im_w, im_h);
 		
 		tribuf_finish_write(tb);
@@ -52,9 +65,34 @@ static int run_map_thread(tribuf *tb)
 
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		map_fps = 1000.0f / frametime;
-		float dt = (now - tick0) * 0.001f;
-		t0=0.05f*dt; t1=0.35f*dt;
-
+		//float dt = (now - tick0) * 0.001f;
+		
+		int newbeat = beat_get_count();
+		if(newbeat != beats && now - last_beat_time > 1000) {
+			xt = 0.5f*((mt_lrand()%im_w)*2.0f/im_w - 1.0f); yt = 0.5f*((mt_lrand()%im_h)*2.0f/im_h - 1.0f);
+			last_beat_time = now;
+		}
+		beats = newbeat;
+		
+		const float delt = 30.0f/200.0f;
+		const float tsped = 0.005;
+		const int dt = 1000/200;
+		
+		while(done_time <= now) {
+			float xtmp = xt - x, ytmp = yt-y;
+			float mag = xtmp*xtmp+ytmp*ytmp;
+				mag=(mag>0)?delt*0.4f/sqrtf(mag):0;
+			vx=(vx+xtmp*mag*tsped)/(tsped+1);
+			vy=(vy+ytmp*mag*tsped)/(tsped+1);
+			x=x+vx*delt;
+			y=y+vy*delt;
+			
+			done_time += dt;
+		}
+		
+		//done_time = now - (now%dt);
+		
+		//~ t0=0.05f*dt; t1=0.35f*dt;
 		fps_oldtime = now;
     }
 	return 0;
