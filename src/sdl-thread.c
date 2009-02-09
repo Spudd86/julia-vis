@@ -33,10 +33,9 @@ static float map_fps=0;
 
 static int run_map_thread(tribuf *tb) 
 {
-	//~ float t0=0, t1=0;
 	float vx, vy, x, y, xt, yt;
 	
-	mt_goodseed();
+	mt_goodseed(); // seed our PSRNG
 	vx = vy = 0;
 	xt = 0.5f*((mt_lrand()%im_w)*2.0f/im_w - 1.0f); yt = 0.5f*((mt_lrand()%im_h)*2.0f/im_h - 1.0f);
 	x = 0.5f*((mt_lrand()%im_w)*2.0f/im_w - 1.0f); y = 0.5f*((mt_lrand()%im_h)*2.0f/im_h - 1.0f);
@@ -54,7 +53,6 @@ static int run_map_thread(tribuf *tb)
 	{
 		uint16_t *map_dest = tribuf_get_write(tb);
 
-		//MAP(map_dest, map_src, im_w, im_h, sin(t0), sin(t1));
 		MAP(map_dest, map_src, im_w, im_h, x, y);
 		maxblend(map_dest, maxsrc_get(), im_w, im_h);
 		
@@ -65,7 +63,7 @@ static int run_map_thread(tribuf *tb)
 
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		map_fps = 1000.0f / frametime;
-		//float dt = (now - tick0) * 0.001f;
+		fps_oldtime = now;
 		
 		int newbeat = beat_get_count();
 		if(newbeat != beats && now - last_beat_time > 1000) {
@@ -89,11 +87,6 @@ static int run_map_thread(tribuf *tb)
 			
 			done_time += dt;
 		}
-		
-		//done_time = now - (now%dt);
-		
-		//~ t0=0.05f*dt; t1=0.35f*dt;
-		fps_oldtime = now;
     }
 	return 0;
 }
