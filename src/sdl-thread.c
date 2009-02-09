@@ -21,7 +21,7 @@
 
 #include "audio/audio.h"
 
-#define IM_SIZE (512)
+#define IM_SIZE (384)
 
 #define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL

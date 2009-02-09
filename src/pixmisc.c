@@ -14,9 +14,11 @@ void maxblend_stride(void *restrict dest, int dest_stride, void *restrict source
 			dst[dest_stride*y+x] = IMAX(dst[dest_stride*y+x], src[w*y+x]);
 }
 
+#ifndef __SSE2__
+
 //TODO: portable version (no x86 stuff)
 
-void fade_pix2(void *restrict buf, int w, int h, uint8_t fade)
+void fade_pix(void *restrict buf, int w, int h, uint8_t fade)
 {
 	__m64 *mbbuf = buf;
 	const __m64 fd = _mm_set1_pi16(fade<<7);
@@ -48,45 +50,6 @@ void fade_pix2(void *restrict buf, int w, int h, uint8_t fade)
 		v4 = _mm_mulhi_pi16(v4, fd);
 		v4 = _mm_slli_pi16(v4, 2);
 		mbbuf[i+3]=v4;
-	}
-	_mm_empty();
-}
-
-#ifndef __SSE2__
-
-//FIXME: currently this loses two bits of precision
-void fade_pix(void *restrict dest, void *restrict src, int w, int h, uint8_t fade)
-{
-	__m64 *mbdst = dest, *mbsrc = src;
-	const __m64 fd = _mm_set1_pi16(fade<<7);
-	//const __m64 fd = _mm_set1_pi16(fade);
-	for(unsigned int i=0; i < 2*w*h/sizeof(__m64); i+=4) { // TODO see if the prefeting is helping 
-		__builtin_prefetch(mbdst+i+4, 1, 0); __builtin_prefetch(mbsrc+i+4, 0, 0); 
-		__m64 v1, v2, v3, v4;//,t;
-		
-		v1 = mbsrc[i];
-		v1 = _mm_srli_pi16(v1, 1);
-		v1 = _mm_mulhi_pi16(v1, fd);
-		v1 = _mm_slli_pi16(v1, 2);
-		mbdst[i]=v1;
-		
-		v2 = mbsrc[i+1]; 
-		v2 = _mm_srli_pi16(v2, 1);
-		v2 = _mm_mulhi_pi16(v2, fd);
-		v2 = _mm_slli_pi16(v2, 2);
-		mbdst[i+1]=v2;
-		
-		v3 = mbsrc[i+2]; 
-		v3 = _mm_srli_pi16(v3, 1);
-		v3 = _mm_mulhi_pi16(v3, fd);
-		v3 = _mm_slli_pi16(v3, 2);
-		mbdst[i+2]=v3;
-
-		v4 = mbsrc[i+3]; 
-		v4 = _mm_srli_pi16(v4, 1);
-		v4 = _mm_mulhi_pi16(v4, fd);
-		v4 = _mm_slli_pi16(v4, 2);
-		mbdst[i+3]=v4;
 	}
 	_mm_empty();
 }
@@ -155,28 +118,27 @@ void maxblend(void *restrict dest, void *restrict src, int w, int h)
 	}
 }
 
-void fade_pix(void *restrict dest, void *restrict src, int w, int h, uint8_t fade)
+void fade_pix2(void *restrict buf, int w, int h, uint8_t fade)
 {
-	__m128i *mbdst = dest, *mbsrc = src;
-	const __m128i fd = _mm_set1_epi16(fade<<7);
+	__m128i *mbbuf = buf;
+	const __128i fd = _mm_set1_pi16(fade<<7);
 
 	for(unsigned int i=0; i < 2*w*h/sizeof(__m128i); i+=2) { // TODO see if the prefeting is helping 
-		__builtin_prefetch(mbdst+i+2, 1, 0); __builtin_prefetch(mbsrc+i+2, 0, 0); 
+		__builtin_prefetch(mbbuf+i+2, 1, 0);
 		__m128i v1, v2;//,t;
 		
-		v1 = mbsrc[i];
+		v1 = mbbuf[i];
 		v1 = _mm_srli_epi16(v1, 1);
 		v1 = _mm_mulhi_epi16(v1, fd);
 		v1 = _mm_slli_epi16(v1, 2);
-		mbdst[i]=v1;
+		mbbuf[i]=v1;
 		
-		v2 = mbsrc[i+1]; 
+		v2 = mbbuf[i+1]; 
 		v2 = _mm_srli_epi16(v2, 1);
 		v2 = _mm_mulhi_epi16(v2, fd);
 		v2 = _mm_slli_epi16(v2, 2);
-		mbdst[i+1]=v2;
+		mbbuf[i+1]=v2;
 	}
-	_mm_empty();
 }
 
 #endif

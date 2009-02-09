@@ -13,7 +13,7 @@ static void initbuf(uint16_t *max_src, int stride, int w, int h)
 	for(int y=0; y < h; y++)  {
 		for(int x=0; x < w; x++) {
 			float u = 2*(x-w*0.5f+0.5f)/w; float v = 2*(y-w*0.5f+0.5f)/h;
-			float d = sqrtf(u*u + v*v)*M_SQRT1_2;
+			float d = log2f(sqrtf(u*u + v*v)*M_SQRT1_2 + 1.0f);
 			max_src[y*stride + x] = (uint16_t)(fmaxf(1.0f - d, 0.0f)*UINT16_MAX);
 		}
 	}
@@ -96,8 +96,6 @@ static void draw_point(void *restrict dest, float px, float py)
 	}
 }
 
-void fade_pix2(void *restrict buf, int w, int h, uint8_t fade);
-
 static void zoom(uint16_t *out, uint16_t *in, int w, int h)
 {
 	float s = sinf(-0.001f), c = cosf(-0.001f);
@@ -128,9 +126,6 @@ void maxsrc_update(void)
 {
 	uint16_t *dst = tribuf_get_write(max_tb);
 	
-	zoom(dst, prev_src, iw, ih);
-	fade_pix2(dst, iw, ih, 255*98/100);
-	
 	audio_data ad;
 	audio_get_samples(&ad);
 	int samp = IMAX(iw,ih)*2/5;
@@ -143,13 +138,17 @@ void maxsrc_update(void)
 		{-cz*sy*cz+sx*sz,	-cx*sy*sz-sx*cz,	cx*cy}
 	};
 	
-	//maxblend_stride(dst + ih*iw/2 + iw/2, iw, point_src, pnt_w, pnt_h);
+	float xzf = fabsf(R[0][0]), yzf = fabsf(R[1][1]);
+	
+	// want to zoom x by 1.0 - (1-d)*xzf*0.01
+	// want to zoom y by 1.0 - (1-d)*yzf*0.01
+	
+	zoom(dst, prev_src, iw, ih);
+	fade_pix(dst, iw, ih, 255*98/100);
 	
 	for(int i=0; i<samp; i++) {
 		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
-		//s=sigmoid(2.1*s)*2 - 1;
-		//s=copysignf(expm1f(fabsf(s)*1.5+1)-expm1(1), s)/(expm1(2.5)-expm1(1));//)*2.0f - 1.0f; 
-		s=copysignf(logf(fabsf(s)+1)- logf(1), s)/(logf(2.5)-logf(1));
+		s=copysignf(logf(fabsf(s)*3+1)/2, s);
 		
 		float xt = (i - samp/2)*1.0f/samp;
 		float yt = 0.2f*s;
@@ -163,7 +162,6 @@ void maxsrc_update(void)
 		float xi = x*zvd*iw*3/4+iw/2 - pnt_w/2;
 		float yi = y*zvd*ih*3/4+ih/2 - pnt_h/2;
 		draw_point(dst, xi, yi);
-		//maxblend_stride(dst + yi*iw + xi, iw, point_src, pnt_w, pnt_h);
 	}
 	
 	tribuf_finish_write(max_tb);
