@@ -71,7 +71,7 @@ void beat_update(float *fft, int fft_len)
 		Eh[b][hi] = tmp;
 		
 		//float C = -0.0025714*V[b]+1.5142857;
-		float C = -0.00025714*V[b]+1.5142857*2.3;
+		float C = -0.00025714*V[b]+1.5142857*2.5;
 		if(tmp > C*E[b] && E[b]>0.002f) {
 			if(count - lastbeat > 10) {
 				__sync_add_and_fetch(&beat_count, 1);

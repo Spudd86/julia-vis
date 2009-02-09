@@ -100,8 +100,9 @@ int main(int argc, char **argv)
 	
 	SDL_Surface *voice_print = SDL_CreateRGBSurface(SDL_HWSURFACE, im_w, im_h/2, screen->format->BitsPerPixel, screen->format->Rmask, screen->format->Gmask, screen->format->Bmask, screen->format->Amask);
 	
-	const int green = (screen->format->BitsPerPixel == 32)?0xff00:(0x3f<<5);
-	const int blue = (screen->format->BitsPerPixel == 32)?0xff:0x1f;
+	const int pixbits = screen->format->BitsPerPixel;
+	const int green = (pixbits == 32)?0xff00:(0x3f<<5);
+	const int blue = (pixbits == 32)?0xff:0x1f;
 	
 	while(SDL_PollEvent(&event) >= 0)
 	{
@@ -118,24 +119,30 @@ int main(int argc, char **argv)
 		audio_get_fft(&d);
 		
 		SDL_LockSurface(voice_print);
+		int vpx = audio_get_buf_count() % im_w;
 		for(int i=0; i < im_h/2; i++) {
-			int x = audio_get_buf_count() % im_w;
 			int bri = 255*log2f(d.data[i*d.len/im_h]*255+1.0f)/8;
-			if(screen->format->BitsPerPixel == 16) {
+			if(pixbits == 16) {
 				int rb = bri >> 3;
 				int g = bri >> 2;
-				putpixel(voice_print, x, i, ((rb<<11) | (g<<5) | rb));
-			} else if(screen->format->BitsPerPixel == 15) {
+				putpixel(voice_print, vpx, i, ((rb<<11) | (g<<5) | rb));
+			} else if(pixbits == 15) {
 				int p = bri >> 3;
-				putpixel(voice_print, x, i, ((p<<10) | (p<<5) | p));
+				putpixel(voice_print, vpx, i, ((p<<10) | (p<<5) | p));
 			} else {
-				putpixel(voice_print, x, i, ((bri<<16) | (bri<<8) | bri));
+				putpixel(voice_print, vpx, i, ((bri<<16) | (bri<<8) | bri));
 			}
 		}
 		SDL_UnlockSurface(voice_print);
-		SDL_Rect blit_rect = { 0, 0, im_w, im_h/2 };
-		SDL_Rect blit_rect2 = { 0, im_h/2+1, im_w, im_h/2 };
+		//~ SDL_Rect blit_rect = { 0, 0, im_w, im_h/2 };
+		//~ SDL_Rect blit_rect2 = { 0, im_h/2+1, im_w, im_h/2 };
+		//~ SDL_BlitSurface(voice_print, &blit_rect, screen, &blit_rect2);
+		SDL_Rect blit_rect = { 0, 0, vpx, im_h/2 };
+		SDL_Rect blit_rect2 = { im_w-vpx-1, im_h/2+1, vpx, im_h/2 };
 		SDL_BlitSurface(voice_print, &blit_rect, screen, &blit_rect2);
+		blit_rect2.w = blit_rect.w = blit_rect2.x; blit_rect2.x = 0; blit_rect.x = vpx+1;
+		SDL_BlitSurface(voice_print, &blit_rect, screen, &blit_rect2);
+		
 		
 		if(SDL_MUSTLOCK(screen) && SDL_LockSurface(screen) < 0) break;
 		
