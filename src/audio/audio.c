@@ -47,15 +47,32 @@ static float *do_fft(float *in)
 	return fft;
 }
 
+static int bufp = 0;
+
+// TODO: double check correctness
 void audio_update(const float *in, int n)
 {
 	float *samps = tribuf_get_write(samp_tb);
-	memcpy(samps, in, sizeof(float)*IMIN(n,nr_samp));
+	int remain = 0;
+	
+	if(bufp == 0 && n == nr_samp) {
+		memcpy(samps, in, sizeof(float)*nr_samp);
+	} else {
+		int cpy = IMIN(n, nr_samp-bufp);
+		memcpy(samps+bufp, in, sizeof(float)*cpy);
+		remain = n - cpy;
+		in += cpy;
+		bufp = (bufp + cpy)%nr_samp;
+	}
+	if(bufp != 0) return;
+	
 	tribuf_finish_write(samp_tb);
 	buf_count++;
 #ifdef DO_BEAT
 	beat_update(do_fft(samps), nr_samp/2);
 #endif
+	
+	if(remain > 0) audio_update(in, remain);
 }
 
 int audio_get_samples(audio_data *d) {
