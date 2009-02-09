@@ -28,6 +28,10 @@ static int process (jack_nframes_t nframes, void *arg)
 
 static jack_client_t *client;
 
+static void shutdown(void) {
+	jack_client_close (client);
+}
+
 int jack_setup()
 {
 	jack_status_t status;
@@ -50,5 +54,6 @@ int jack_setup()
 		exit(1);
 	}
 	
+	atexit(&shutdown);
 	return 0;
 }

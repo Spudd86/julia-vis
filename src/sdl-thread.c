@@ -31,7 +31,7 @@ static float map_fps=0;
 
 static int run_map_thread(tribuf *tb) 
 {
-	float t0 = 0, t1 = 0;
+	float t0=0, t1=0;
 	
 	Uint32 tick0, fps_oldtime;
 	fps_oldtime = tick0 = SDL_GetTicks();

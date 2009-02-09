@@ -38,8 +38,8 @@ static int iw, ih;
 
 void maxsrc_setup(int w, int h)
 {
-	pnt_w = IMAX(w/32, 8); // need divisiable by 8, at least 8
-	pnt_h = IMAX(h/32, 8);
+	pnt_w = IMAX(w/24, 8); // need divisiable by 8, at least 8
+	pnt_h = IMAX(h/24, 8);
 	iw = w; ih = h;
 	point_src = setup_point(pnt_w, pnt_h);
 	
@@ -96,11 +96,40 @@ static void draw_point(void *restrict dest, float px, float py)
 	}
 }
 
+void fade_pix2(void *restrict buf, int w, int h, uint8_t fade);
+
+static void zoom(uint16_t *out, uint16_t *in, int w, int h)
+{
+	float s = sinf(-0.001f), c = cosf(-0.001f);
+	
+	float xstep = 2.0f/w, ystep = 2.0f/h;
+	for(int yd = 0; yd < h; yd++) {
+		float v = yd*ystep - 1.0f;// + 0.5f/h; 
+		for(int xd = 0; xd < w; xd++) {
+			float u = xd*xstep - 1.0f + 0.5f/w;
+			float d = 0.99 + (u*u + v*v)*0.01f;
+			float x = u*c - v*s;
+			float y = u*s + v*c;
+			x = (x*d+1.0f)*0.5f;
+			y = (y*d+1.0f)*0.5f;
+					
+			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
+			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
+			int x1 = xs>>8, x2 = x1+1, xf = xs&0xFF;
+			int y1 = ys>>8, y2 = y1+1, yf = ys&0xFF;
+			
+			*(out++) = (((in[y1*w + x1]*(0xff - xf) + in[y1*w + x2]*xf)*(0xff-yf) +
+						(in[y2*w + x1]*(0xff - xf) + in[y2*w + x2]*xf)*yf) >> 16);
+		}
+	}
+}
+
 void maxsrc_update(void)
 {
 	uint16_t *dst = tribuf_get_write(max_tb);
 	
-	fade_pix(dst, prev_src, iw, ih, 255*92/100);
+	zoom(dst, prev_src, iw, ih);
+	fade_pix2(dst, iw, ih, 255*98/100);
 	
 	audio_data ad;
 	audio_get_samples(&ad);
@@ -123,7 +152,7 @@ void maxsrc_update(void)
 		s=copysignf(logf(fabsf(s)+1)- logf(1), s)/(logf(2.5)-logf(1));
 		
 		float xt = (i - samp/2)*1.0f/samp;
-		float yt = 0.1f*s;
+		float yt = 0.2f*s;
 		float zt = 0.0f;
 		
 		float x = R[0][0]*xt + R[0][1]*yt + R[0][2]*zt;
@@ -140,5 +169,5 @@ void maxsrc_update(void)
 	tribuf_finish_write(max_tb);
 	prev_src = dst;
 	
-	tx+=0.005; ty+=0.01; tx-=0.0025;
+	tx+=0.03; ty+=0.01; tx-=0.025;
 }

@@ -13,7 +13,7 @@
 #include "audio.h"
 
 
-#define IM_SIZE (512)
+#define IM_SIZE (768)
 
 static opt_data opts;
 
@@ -56,10 +56,6 @@ static void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
 
 int audio_setup_pa();
 int jack_setup();
-static void line16(SDL_Surface *s, 
-                   int x1, int y1, 
-                   int x2, int y2, 
-                   Uint32 color);
 
 static inline float getsamp(float *data, int len, int i, int w) {
 	float res = 0;
@@ -69,6 +65,11 @@ static inline float getsamp(float *data, int len, int i, int w) {
 		res += data[i];
 	}
 	return res / (u-l);
+}
+
+static float sigmoid(float x) {
+	float e = expf(x);
+	return e/(1+e);
 }
 
 int main(int argc, char **argv) 
@@ -91,10 +92,16 @@ int main(int argc, char **argv)
 	Uint32 fps_oldtime = tick0 = SDL_GetTicks();
 	float frametime = 100;
 	SDL_Event	event;
+	float beat_throb = 0.0f;
 	
 	int oldbc = 0;
 	uint8_t *beats = malloc(sizeof(uint8_t)*im_w);
 	memset(beats, 0, sizeof(uint8_t)*im_w);
+	
+	SDL_Surface *voice_print = SDL_CreateRGBSurface(SDL_HWSURFACE, im_w, im_h/2, screen->format->BitsPerPixel, screen->format->Rmask, screen->format->Gmask, screen->format->Bmask, screen->format->Amask);
+	
+	const int green = (screen->format->BitsPerPixel == 32)?0xff00:(0x3f<<5);
+	const int blue = (screen->format->BitsPerPixel == 32)?0xff:0x1f;
 	
 	while(SDL_PollEvent(&event) >= 0)
 	{
@@ -102,81 +109,95 @@ int main(int argc, char **argv)
 			|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE))
 			break;
 		
-		SDL_Rect r = {0,0, im_w, im_h};
+		SDL_Rect r = {0,0, im_w, im_h/2+1};
 		SDL_FillRect(screen, &r, 0);
 		
 		audio_data d;
 		beat_data bd;
 		beat_get_data(&bd);
-		audio_get_samples(&d);
+		audio_get_fft(&d);
+		
+		SDL_LockSurface(voice_print);
+		for(int i=0; i < im_h/2; i++) {
+			int x = audio_get_buf_count() % im_w;
+			int bri = 255*log2f(d.data[i*d.len/im_h]*255+1.0f)/8;
+			if(screen->format->BitsPerPixel == 16) {
+				int rb = bri >> 3;
+				int g = bri >> 2;
+				putpixel(voice_print, x, i, ((rb<<11) | (g<<5) | rb));
+			} else if(screen->format->BitsPerPixel == 15) {
+				int p = bri >> 3;
+				putpixel(voice_print, x, i, ((p<<10) | (p<<5) | p));
+			} else {
+				putpixel(voice_print, x, i, ((bri<<16) | (bri<<8) | bri));
+			}
+		}
+		SDL_UnlockSurface(voice_print);
+		SDL_Rect blit_rect = { 0, 0, im_w, im_h/2 };
+		SDL_Rect blit_rect2 = { 0, im_h/2+1, im_w, im_h/2 };
+		SDL_BlitSurface(voice_print, &blit_rect, screen, &blit_rect2);
 		
 		if(SDL_MUSTLOCK(screen) && SDL_LockSurface(screen) < 0) break;
 		
 		int ox, oy;
 		
-		for(int i=0; i<d.len; i++) // draw a simple 'scope
-			putpixel(screen, im_w*3/4-1 + i*im_w/(d.len*4), im_h/8 - d.data[i]*im_h/8, 0xffffff);
-		
-		audio_get_fft(&d);
-		//~ ox = 0.125f*im_w; oy = (1.0f-2*d.data[0])*im_h*0.95;
-		//~ for(int i=0; i<d.len; i++) {// draw a simple 'scope
-			//~ int x = 0.125f*im_w+i*0.75f*im_w/d.len;
-			//~ int y = (1.0f-2*d.data[i])*im_h*0.95;
-			//~ line16(screen, ox, oy, x, y, 0x1f);
-			//~ ox=x; oy=y;
-			//~ //putpixel(screen, 0.125f*im_w+i*0.75f*im_w/d.len, (1.0f-2*d.data[i])*im_h*0.95, 0xff00);
-		//~ }
-		ox = 0.125f*im_w; oy = (1.0f-getsamp(d.data, d.len, 0, d.len/(bd.bands*4)))*im_h*0.95;
+		ox = 0.125f*im_w; oy = (1.0f-getsamp(d.data, d.len, 0, d.len/(bd.bands*4)))*(im_h-2);
 		for(int i=0; i<bd.bands; i++) {// draw a simple 'scope
 			int x = 0.125f*im_w+i*0.75f*im_w/(bd.bands);
-			//int y = 0.75*im_h;
-			int y = (1.0f - getsamp(d.data, d.len, i*d.len/(bd.bands*2), d.len/(bd.bands*4)))*im_h*0.95;
-			line16(screen, ox, oy, x, y, 0x1f);
-			//putpixel(screen,x, y, 0x1f);
+			int y = (1.0f - getsamp(d.data, d.len, i*d.len/(bd.bands*2), d.len/(bd.bands*4)))*(im_h-2);
+			draw_line(screen, ox, oy, x, y, blue);
 			ox=x; oy=y;
-			//putpixel(screen, 0.125f*im_w+i*0.75f*im_w/d.len, (1.0f-2*d.data[i])*im_h*0.95, 0xff00);
-		}
-		int beat_count = beat_get_count();
-		int beat_off = ((fps_oldtime-tick0)*982/10000)%im_w;
-		
-		for(int i=0; i < im_w; i++) {
-			if(beats[(i+beat_off)%im_w]) line16(screen, i, im_h/2-10, i, im_h/2 + 10, 0xffff);
 		}
 		
 		ox = 0.125f*im_w;
-		//int oy = (1.0f-bd.means[0])*im_h*0.95;
-		oy = (0.5 - 2*bd.means[0]*0.5)*im_h;
-		
+		oy = (1.0f-bd.means[0])*(im_h-2);
 		oy = abs(oy)%im_h;
 		ox = abs(ox)%im_w;
-		
+		putpixel(screen, ox, (1.0f - bd.stddev[0])*(im_h-2), 0xffffff00);
 		for(int i=1; i < bd.bands; i++) {
-			int x = 0.125f*im_w + i*0.75f*im_w/bd.bands;
-			//int y = (1.0f-bd.means[i])*im_h*0.95;
-			int y = (0.5 - 2*bd.means[i]*0.5)*im_h;
-			//putpixel(screen, x, y, 0x1f<<5);
+			int x = 0.125f*im_w + (i+1)*0.75f*im_w/bd.bands;
+			int y = (1.0f - bd.means[i])*(im_h-2);
 			
 			y = abs(y)%im_h;
 			x = abs(x)%im_w;
-			line16(screen, ox, oy, x, y, 0x3f<<5);
+			draw_line(screen, ox, oy, x, y, green);
 			ox = x; oy = y;
+			
+			x = 0.125f*im_w + i*0.75f*im_w/bd.bands;
+			y = (1.0f - bd.stddev[i])*(im_h-2);
+			putpixel(screen, x, y, 0xffff00);
 		}
 		
-		ox = 0.125f*im_w;
-		oy = (0.5 - bd.stddev[0]*0.5)*im_h;
-		
-		for(int i=1; i < bd.bands; i++) {
-			int x = 0.125f*im_w + i*0.75f*im_w/bd.bands;
-			int y = (0.5 - bd.stddev[i]*0.5)*im_h;
-			putpixel(screen, x, y, 0x1f);
-			//line16(screen, abs(ox)/1000, oy, abs(x)/1000, y, 0x3ff);
-			ox = x; oy = y;
+		int bh = (im_h/bd.bands)*2;
+		for(int b=0; b < bd.bands/4; b++) {
+			int by = b*bh;
+			ox = 0;
+			oy = (1.0f - log2f(beat_gethist(&bd, b, 0)*31+1.0f)/5)*bh+by; oy = IMAX(oy, 0);
+			for(int i=1; i < bd.histlen; i++) {
+				int x = (i+1)*(im_w-1)/bd.histlen;
+				float s = log2f(beat_gethist(&bd, b, i)*31+1.0f)/5;
+				int y = (1.0f - s)*bh+by;
+				y = IMAX(y, 0);
+				draw_line(screen, ox, oy, x, y, 0xffffffff);
+				ox = x; oy = y;
+			}
 		}
+		
+		int beat_count = beat_get_count();
+		int beat_off = ((fps_oldtime-tick0)*982/10000)%im_w;
+		//int beat_off = audio_get_buf_count() % im_w;
+		
+		for(int i=0; i < im_w; i++) {
+			if(beats[(i+beat_off)%im_w]) draw_line(screen, i, im_h*3/4-5, i, im_h*3/4+5, 0xffffffff);
+		}
+		
+		draw_line(screen, 2, im_h-10, 2, (sigmoid(-0.1*beat_throb)+0.5)*(im_h-12), 0xffffffff);
+		draw_line(screen, 3, im_h-10, 3, (sigmoid(-0.1*beat_throb)+0.5)*(im_h-12), 0xffffffff);
 		
 		if(SDL_MUSTLOCK(screen)) SDL_UnlockSurface(screen);
 		
 		char buf[128];
-		sprintf(buf,"%6.1f FPS %i beats", 1000.0f / frametime, beat_count);
+		sprintf(buf,"%6.1f FPS %i beats %6.1f", 1000.0f / frametime, beat_count, beat_throb);
 		DrawText(screen, buf);
 		
 		SDL_Flip(screen);
@@ -185,7 +206,10 @@ int main(int argc, char **argv)
 		Uint32 now = SDL_GetTicks();
 		int delay =  (tick0 + frmcnt*10000/982) - now;
 		beats[beat_off] = (oldbc != beat_count);
+		beat_throb = beat_throb*(0.996) + (oldbc != beat_count);
+		//beat_throb = sigmoid(1/beat_throb + (oldbc != beat_count)); 
 		oldbc = beat_count;
+		
 		
 		if(delay > 0)
 			SDL_Delay(delay);
@@ -197,84 +221,3 @@ int main(int argc, char **argv)
 	frmcnt++;
     return 0;
 }
-
-#define sign(a) (((a)<0) ? -1 : (a)>0 ? 1 : 0)
-#define max(a,b) (((a) > (b)) ? (a) : (b))
-#define min(a,b) (((a) < (b)) ? (a) : (b))
-#define abs(a) (((a)<0) ? -(a) : (a))
-
-static void line16(SDL_Surface *s, 
-                   int x1, int y1, 
-                   int x2, int y2, 
-                   Uint32 color)
-{
-  int d;
-  int x;
-  int y;
-  int ax;
-  int ay;
-  int sx;
-  int sy;
-  int dx;
-  int dy;
-
-  Uint8 *lineAddr;
-  Sint32 yOffset;
-
-  dx = x2 - x1;  
-  ax = abs(dx) << 1;  
-  sx = sign(dx);
-
-  dy = y2 - y1;  
-  ay = abs(dy) << 1;  
-  sy = sign(dy);
-  yOffset = sy * s->pitch;
-
-  x = x1;
-  y = y1;
-
-  lineAddr = ((Uint8 *)s->pixels) + (y * s->pitch);
-  if (ax>ay)
-  {                      /* x dominant */
-    d = ay - (ax >> 1);
-    for (;;)
-    {
-      *((Uint16 *)(lineAddr + (x << 1))) = (Uint16)color;
-
-      if (x == x2)
-      {
-        return;
-      }
-      if (d>=0)
-      {
-        y += sy;
-        lineAddr += yOffset;
-        d -= ax;
-      }
-      x += sx;
-      d += ay;
-    }
-  }
-  else
-  {                      /* y dominant */
-    d = ax - (ay >> 1);
-    for (;;)
-    {
-      *((Uint16 *)(lineAddr + (x << 1))) = (Uint16)color;
-
-      if (y == y2)
-      {
-        return;
-      }
-      if (d>=0) 
-      {
-        x += sx;
-        d -= ay;
-      }
-      y += sy;
-      lineAddr += yOffset;
-      d += ax;
-    }
-  }
-}
-

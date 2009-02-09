@@ -29,7 +29,7 @@ CFLAGS += -D_GNU_SOURCE=1 -mmmx -Wall -fno-strict-aliasing -fsingle-precision-co
 CFLGAS +=  -iquote $(shell pwd)/src 
 #	-Wunsafe-loop-optimizations
 
-CFLAGS += -O3 -ffast-math -finline-functions -maccumulate-outgoing-args
+CFLAGS += -O2 -finline-functions -maccumulate-outgoing-args
 CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller -fdelete-null-pointer-checks 
 CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear -funsafe-loop-optimizations 
 CFLAGS += -fgcse-las -fgcse-sm -fmodulo-sched 
@@ -47,7 +47,7 @@ CFLAGS += -mrecip
 CFLAGS += -fmodulo-sched-allow-regmoves -fgcse-after-reload -fsee -fipa-cp
 
 CFLAGS += -fsched-stalled-insns=2 -fsched-stalled-insns-dep=2
-CFLAGS += -fvect-cost-model -ftracer -fassociative-math -freciprocal-math -fno-signed-zeros
+CFLAGS += -fvect-cost-model -ftracer -ffast-math -fassociative-math -freciprocal-math -fno-signed-zeros
 
 CFLAGS += -Wl,--as-needed
 
@@ -93,23 +93,24 @@ distclean: clean
 config.mk:
 	touch config.mk
 
-bin/sdl-test: src/sdl.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/common.h Makefile config.mk
+bin/sdl-test: src/sdl.c src/sdl-misc.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
-	src/sdl.c src/sdl-misc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c $(SDL_FLAGS) -o $@
+	src/sdl.c src/sdl-misc.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c \
+	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
 bin/sdlthread-test: src/sdl-thread.c src/sdl-misc.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
 	src/sdl-thread.c src/sdl-misc.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c \
-	$(SDL_FLAGS) $(PA_FLAGS) -o $@
+	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
 bin/dfb-test: src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_DIRECTFB \
 	src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c \
-	$(DFB_FLAGS) $(PA_FLAGS) -o $@
+	$(DFB_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
-bin/audio-test: $(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c src/tribuf.c
+bin/audio-test: $(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c src/tribuf.c src/line.c
 	$(CC) -DDO_BEAT -DUSE_SDL $(CFLAGS) \
-	$(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c src/tribuf.c \
+	$(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c src/tribuf.c src/line.c \
 	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
 %.s: %.c src/*.h Makefile config.mk

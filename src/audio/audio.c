@@ -8,12 +8,17 @@
 #include "../common.h"
 #include "audio.h"
 
+int buf_count = 0;
 static int nr_samp = 0;
 static float *fft_tmp = NULL;
 static fftwf_plan p;
 
 static tribuf *samp_tb = NULL;
 static tribuf *fft_tb = NULL;
+
+int audio_get_buf_count(void) {
+	return buf_count;
+}
 
 static inline float sqr(float x) { return x*x; }
 
@@ -47,6 +52,7 @@ void audio_update(const float *in, int n)
 	float *samps = tribuf_get_write(samp_tb);
 	memcpy(samps, in, sizeof(float)*IMIN(n,nr_samp));
 	tribuf_finish_write(samp_tb);
+	buf_count++;
 #ifdef DO_BEAT
 	beat_update(do_fft(samps), nr_samp/2);
 #endif

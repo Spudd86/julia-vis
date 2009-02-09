@@ -1,12 +1,28 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <math.h>
+#include <complex.h>
+
 
 #include "mymm.h"
 
 #include "map.h"
 
 #include "common.h"
+
+// TODO: do a map for:
+// x0 = reg50*1.5/2.5; in [-0.3, 0.3]?
+// y0 = reg51*1.5/2.5;
+
+// xt=x;
+// x=2.5*sqr(y) - sqrt(abs(x))*sqrt(2.5)/2.5 + x0;
+// y=2.5*sqr(xt) - sqrt(abs(y))*sqrt(2.5)/2.5  + y0;
+
+// also for: (use c99 complex support? get's ugly when expanded...)
+// z = (z^4 + c1)/(z*z + c2)
+// 
+// where z,c1,c2 are complex numbers. and z starts at x,y
+// c1, c2 are beat responsive moving points
 
 /**
  * do the map for backwards iteration of julia set
@@ -38,7 +54,6 @@ MAP_FUNC_ATTR void soft_map(uint16_t *out, uint16_t *in, int w, int h, float x0,
 		}
 	}
 }
-
 
 //TODO: make go fast
 //TODO: make version for 4x4 tiles (possibly 8x8 as well)
@@ -128,3 +143,50 @@ MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in
 }
 
 
+MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float cx0, float cy0, float cx1, float cy1 )
+{
+	const float xoom = 3.0f, moox = 1.0f/xoom;
+	float xstep = 2.0f/w, ystep = 2.0f/h;
+	
+	for(int yd = 0; yd < h; yd++) {
+		float v = yd*ystep - 1.0f;
+		for(int xd = 0; xd < w; xd++) {
+			float u = xd*xstep -1.0f;
+			float a,b,c,d,sa,sb, cdivt, x, y;
+			
+			
+			a=u*xoom; b=v*xoom; sa=a*a; sb=b*b;
+			c=sa-sb + cx1; d=2*a*b+cy1;
+			b=4*(sa*a*b - a*b*sb) + cy0;  a=sa*sa -6*sa*sb + sb*sb + cx0;
+			cdivt = moox/(c*c + d*d); 
+			x= (a*c + b*d)*cdivt;  y= (a*d + c*b)*cdivt;
+					
+			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
+			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
+			int x1 = xs>>8, x2 = x1+1, xf = xs&0xFF;
+			int y1 = ys>>8, y2 = y1+1, yf = ys&0xFF;
+			
+			*(out++) = ((in[y1*w + x1]*(0xff - xf) + in[y1*w + x2]*xf)*(0xff-yf) +
+						(in[y2*w + x1]*(0xff - xf) + in[y2*w + x2]*xf)*yf) >> 16;
+		}
+	}
+}
+//~ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float complex c1, float complex c2 )
+//~ {
+	//~ float xstep = 2.0f/w, ystep = 2.0f/h;
+	//~ for(int yd = 0; yd < h; yd++) {
+		//~ float v = yd*ystep - 1.0f;
+		//~ for(int xd = 0; xd < w; xd++) {
+			//~ float complex z = 3*(xd*xstep -1.0f + v*I);
+			//~ float complex zsqr = z*z;
+			
+			//~ z = ((zsqr*zsqr + c1)/(zsqr + c2))/3.0f;
+			
+					
+			//~ unsigned int xs = IMIN(IMAX(lrintf(crealf(z)*w), 0), w-1);
+			//~ unsigned int ys = IMIN(IMAX(lrintf(cimagf(z)*h), 0), h-1);
+			//~ *out = in[ys*w + xs];
+			//~ out++;
+		//~ }
+	//~ }
+//~ }
