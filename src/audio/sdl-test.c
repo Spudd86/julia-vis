@@ -148,22 +148,22 @@ int main(int argc, char **argv)
 		
 		int ox, oy;
 		
-		ox = 0.125f*im_w; oy = (1.0f-getsamp(d.data, d.len, 0, d.len/(bd.bands*4)))*(im_h-2);
+		ox = 0.125f*im_w; oy = (1.0f-2*getsamp(d.data, d.len, 0, d.len/(bd.bands*4)))*(im_h-2);
 		for(int i=0; i<bd.bands; i++) {// draw a simple 'scope
 			int x = 0.125f*im_w+i*0.75f*im_w/(bd.bands);
-			int y = (1.0f - getsamp(d.data, d.len, i*d.len/(bd.bands*2), d.len/(bd.bands*4)))*(im_h-2);
+			int y = (1.0f - 2*getsamp(d.data, d.len, i*d.len/(bd.bands*2), d.len/(bd.bands*4)))*(im_h-2);
 			draw_line(screen, ox, oy, x, y, blue);
 			ox=x; oy=y;
 		}
 		
 		ox = 0.125f*im_w;
-		oy = (1.0f-bd.means[0])*(im_h-2);
+		oy = (1.0f-2*bd.means[0])*(im_h-2);
 		oy = abs(oy)%im_h;
 		ox = abs(ox)%im_w;
-		putpixel(screen, ox, (1.0f - bd.stddev[0])*(im_h-2), 0xffffff00);
+		putpixel(screen, ox, (1.0f - 2*bd.stddev[0])*(im_h-2), 0xffffff00);
 		for(int i=1; i < bd.bands; i++) {
 			int x = 0.125f*im_w + (i+1)*0.75f*im_w/bd.bands;
-			int y = (1.0f - bd.means[i])*(im_h-2);
+			int y = (1.0f - 2*bd.means[i])*(im_h-2);
 			
 			y = abs(y)%im_h;
 			x = abs(x)%im_w;
@@ -171,7 +171,7 @@ int main(int argc, char **argv)
 			ox = x; oy = y;
 			
 			x = 0.125f*im_w + i*0.75f*im_w/bd.bands;
-			y = (1.0f - bd.stddev[i])*(im_h-2);
+			y = (1.0f - 2*bd.stddev[i])*(im_h-2);
 			putpixel(screen, x, y, 0xffff00);
 		}
 		
@@ -218,8 +218,8 @@ int main(int argc, char **argv)
 		oldbc = beat_count;
 		
 		
-		if(delay > 0)
-			SDL_Delay(delay);
+		//~ if(delay > 0)
+			//~ SDL_Delay(delay);
 		
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		fps_oldtime = now;
