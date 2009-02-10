@@ -90,9 +90,6 @@ static int run_map_thread(tribuf *tb)
 	return 0;
 }
 
-int audio_setup_pa();
-int jack_setup();
-
 static SDL_Event user_event;
 static Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
 int main(int argc, char **argv) 
@@ -101,12 +98,7 @@ int main(int argc, char **argv)
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	im_w = screen->w - screen->w%16; im_h = screen->h - screen->h%8;
 	
-#ifdef HAVE_JACK
-	if(opts.use_jack)
-		jack_setup();
-	else
-#endif
-		audio_setup_pa();
+	audio_init(&opts);
 	
 	maxsrc_setup(im_w, im_h);
 	

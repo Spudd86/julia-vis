@@ -44,12 +44,7 @@ int main(int argc, char **argv)
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	int im_w = screen->w - screen->w%16, im_h = screen->h - screen->h%8;
 	
-#ifdef HAVE_JACK
-	if(opts.use_jack)
-		jack_setup();
-	else
-#endif
-		audio_setup_pa();
+	audio_init(&opts);
 	
 	//uint16_t *maxsrc = setup_maxsrc(im_w, im_h);
 	maxsrc_setup(im_w, im_h);

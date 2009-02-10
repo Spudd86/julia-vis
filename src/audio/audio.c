@@ -120,3 +120,17 @@ void audio_shutdown()
 	fftwf_destroy_plan(p);
 	fft_tmp = NULL;
 }
+
+int audio_setup_pa();
+int jack_setup(opt_data *);
+
+int audio_init(opt_data *od) 
+{
+	#ifdef HAVE_JACK
+	if(od->use_jack) {
+		printf("Starting jack\n");
+		return jack_setup(od);
+	} else
+#endif
+		return audio_setup_pa();
+}

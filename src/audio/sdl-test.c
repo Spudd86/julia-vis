@@ -77,13 +77,8 @@ int main(int argc, char **argv)
 	optproc(argc, argv, &opts);
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	int im_w = screen->w - screen->w%8, im_h = screen->h - screen->h%8;
-#ifdef HAVE_JACK
-	if(opts.use_jack) {
-		printf("staring jack\n");
-		jack_setup();
-	} else
-#endif
-		audio_setup_pa();
+	
+	audio_init(&opts);
 	
 	usleep(1000);
 	

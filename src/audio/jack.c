@@ -32,7 +32,7 @@ static void shutdown(void) {
 	jack_client_close (client);
 }
 
-int jack_setup()
+int jack_setup(opt_data *od)
 {
 	jack_status_t status;
 	client = jack_client_open("test", 0, &status);
@@ -53,7 +53,15 @@ int jack_setup()
 		fprintf (stderr, "cannot activate client");
 		exit(1);
 	}
-	
 	atexit(&shutdown);
+	
+	if(od->jack_opt !=NULL) { // connect to some ports!
+		const char **ports = jack_get_ports(client, od->jack_opt, NULL, JackPortIsOutput);
+		if(ports == NULL) return 0;
+		for(int i=0; ports[i]!=NULL; i++) 
+			jack_connect(client, ports[i], jack_port_name(in_port));
+		free(ports);
+	}
+
 	return 0;
 }

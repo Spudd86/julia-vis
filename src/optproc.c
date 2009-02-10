@@ -6,6 +6,8 @@
 
 #include "common.h"
 
+
+//TODO: use getopt_long 
 void optproc(int argc, char **argv, opt_data *res)
 {
 	int opt;
@@ -15,8 +17,9 @@ void optproc(int argc, char **argv, opt_data *res)
 	res->draw_rate = 30;
 	res->doublebuf = 0;
 	res->use_jack = 0;
+	res->jack_opt = NULL;
 	
-	while((opt = getopt(argc, argv, "w:h:s:ftdj")) != -1) {
+	while((opt = getopt(argc, argv, "w:h:s:ftdj::")) != -1) {
 		switch(opt) {
 			case 'w':
 				res->w = atoi(optarg);
@@ -32,6 +35,7 @@ void optproc(int argc, char **argv, opt_data *res)
 				break;
 			case 'j':
 				res->use_jack = 1;
+				res->jack_opt = optarg;
 				break;
 			case 's':
 				res->draw_rate = atoi(optarg);

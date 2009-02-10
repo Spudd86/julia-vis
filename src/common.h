@@ -17,6 +17,7 @@ typedef struct {
 	int draw_rate;
 	int doublebuf;
 	int use_jack;
+	const char *jack_opt;
 }opt_data;
 
 void optproc(int argc, char **argv, opt_data *res);
