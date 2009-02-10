@@ -121,22 +121,22 @@ void maxblend(void *restrict dest, void *restrict src, int w, int h)
 void fade_pix(void *restrict buf, int w, int h, uint8_t fade)
 {
 	__m128i *mbbuf = buf;
-	const __m128i fd = _emm_set1_pi16(fade<<7);
+	const __m128i fd = _mm_set1_epi16(fade<<7);
 
 	for(unsigned int i=0; i < 2*w*h/sizeof(__m128i); i+=2) { // TODO see if the prefeting is helping 
 		__builtin_prefetch(mbbuf+i+2, 1, 0);
 		__m128i v1, v2;//,t;
 		
 		v1 = mbbuf[i];
-		v1 = _emm_srli_epi16(v1, 1);
-		v1 = _emm_mulhi_epi16(v1, fd);
-		v1 = _emm_slli_epi16(v1, 2);
+		v1 = _mm_srli_epi16(v1, 1);
+		v1 = _mm_mulhi_epi16(v1, fd);
+		v1 = _mm_slli_epi16(v1, 2);
 		mbbuf[i]=v1;
 		
 		v2 = mbbuf[i+1]; 
-		v2 = _emm_srli_epi16(v2, 1);
-		v2 = _emm_mulhi_epi16(v2, fd);
-		v2 = _emm_slli_epi16(v2, 2);
+		v2 = _mm_srli_epi16(v2, 1);
+		v2 = _mm_mulhi_epi16(v2, fd);
+		v2 = _mm_slli_epi16(v2, 2);
 		mbbuf[i+1]=v2;
 	}
 }
