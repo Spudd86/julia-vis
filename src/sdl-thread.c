@@ -122,13 +122,16 @@ int main(int argc, char **argv)
 
 	printf("running with %dx%d bufs\n", im_w, im_h);
 	
-	usleep(1000);
+	usleep(1000); // wait a bit so we have some audio
+	maxsrc_update();
 	
 	SDL_Thread *map_thread = SDL_CreateThread(&run_map_thread, map_tb);
 	SDL_AddTimer(1000/opts.draw_rate, &timercallback, NULL);
 	
 	SDL_Event	event;
-	int prevfrm = 0, cnt = 0;
+	int prevfrm = 0;
+	Uint32 lasttime;
+	Uint32 tick0 = lasttime = SDL_GetTicks();
 	while(SDL_WaitEvent(&event) >= 0)
 	{
 		if(event.type == SDL_QUIT 
@@ -142,11 +145,12 @@ int main(int argc, char **argv)
 			DrawText(screen, buf);
 			SDL_Flip(screen);
 
-			if(!(cnt%2)) 
+			Uint64 now = SDL_GetTicks();
+			if(tribuf_get_frmnum(map_tb) - prevfrm > 1 && now - lasttime > 1000/16) {
 				maxsrc_update();
-			int frm = tribuf_get_frmnum(map_tb);
-			if(frm != prevfrm) cnt++;
-			prevfrm = frm;
+				prevfrm = tribuf_get_frmnum(map_tb);
+				lasttime = now;
+			}
 		}
 	}
 	running = 0;
