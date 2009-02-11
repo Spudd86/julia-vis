@@ -103,9 +103,10 @@ int main(int argc, char **argv)
 	maxsrc_setup(im_w, im_h);
 	
 	uint16_t *map_surf[3];
+	void *map_surf_mem = valloc(3 * im_w * im_h * sizeof(uint16_t));
+	memset(map_surf_mem, 0, 3 * im_w * im_h * sizeof(uint16_t));
 	for(int i=0; i<3; i++) {
-		map_surf[i] = valloc(im_w * im_h * sizeof(uint16_t));
-		memset(map_surf[i], 0, im_w * im_h * sizeof(uint16_t));
+		map_surf[i] = map_surf_mem + i * im_w * im_h * sizeof(uint16_t);
 	}
 	
 	uint32_t *pal = _mm_malloc(257 * sizeof(uint32_t), 64); // p4 has 64 byte cache line
@@ -130,7 +131,7 @@ int main(int argc, char **argv)
 	int prevfrm = 0, cnt = 0;
 	while(SDL_WaitEvent(&event) >= 0)
 	{
-		if(event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_QUIT 
+		if(event.type == SDL_QUIT 
 				|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
 			break;
 		} else if(event.type == SDL_USEREVENT) {
@@ -140,11 +141,12 @@ int main(int argc, char **argv)
 			sprintf(buf,"%6.1f FPS", map_fps);
 			DrawText(screen, buf);
 			SDL_Flip(screen);
-			//if(tribuf_get_frmnum(map_tb) != prevfrm && !(cnt%2)) {
-			if(!(cnt%2)) {
+
+			if(!(cnt%2)) 
 				maxsrc_update();
-			}
-			cnt++;
+			int frm = tribuf_get_frmnum(map_tb);
+			if(frm != prevfrm) cnt++;
+			prevfrm = frm;
 		}
 	}
 	running = 0;

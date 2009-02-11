@@ -29,9 +29,10 @@ static uint16_t *setup_point(int w, int h)
 }
 
 
-static tribuf *max_tb;
-static uint16_t *max_src[3];
+//~ static tribuf *max_tb;
+//~ static uint16_t *max_src[3];
 static uint16_t *prev_src;
+static uint16_t *next_src;
 static uint16_t *point_src;
 static int pnt_w, pnt_h;
 static int iw, ih;
@@ -43,23 +44,30 @@ void maxsrc_setup(int w, int h)
 	iw = w; ih = h;
 	point_src = setup_point(pnt_w, pnt_h);
 	
-	for(int i=0; i<3; i++) {
-		max_src[i] = valloc(w * h * sizeof(uint16_t));
-		memset(max_src[i], 0, w*h*sizeof(uint16_t));
-	}
+	prev_src = valloc(2 * w * h * sizeof(uint16_t));
+	memset(prev_src, 0, 2*w*h*sizeof(uint16_t));
+	next_src = prev_src + w*h;
 	
-	max_tb = tribuf_new((void **)max_src);
-	prev_src = tribuf_get_read(max_tb);
+	//~ max_src[0] = valloc(3 * w * h * sizeof(uint16_t));
+	//~ memset(max_src[0], 0, 3*w*h*sizeof(uint16_t));
+	//~ for(int i=1; i<3; i++)
+		//~ max_src[i] = max_src[0] + i * w * h;
+	
+	//~ for(int i=0; i<3; i++) {
+		//~ max_src[i] = valloc(w * h * sizeof(uint16_t));
+		//~ memset(max_src[i], 0, w*h*sizeof(uint16_t));
+	//~ }
+	
+	//~ next_src = max_src[0];
+	//~ prev_src = max_src[1];
+	//~ max_tb = tribuf_new((void **)max_src);
+	//~ prev_src = tribuf_get_read(max_tb);
 }
 
 uint16_t *maxsrc_get(void)
 {
-	return tribuf_get_read(max_tb);
-}
-
-static float sigmoid(float x) {
-	float e = expf(x);
-	return e/(1+e);
+	//return tribuf_get_read(max_tb);
+	return prev_src;
 }
 
 static float tx=0, ty=0, tz=0;
@@ -96,7 +104,7 @@ static void draw_point(void *restrict dest, float px, float py)
 	}
 }
 
-static void zoom(uint16_t *out, uint16_t *in, int w, int h)
+static void zoom(uint16_t *out, uint16_t *in, int w, int h, float xzf, float yzf)
 {
 	float s = sinf(-0.001f), c = cosf(-0.001f);
 	
@@ -105,7 +113,9 @@ static void zoom(uint16_t *out, uint16_t *in, int w, int h)
 		float v = yd*ystep - 1.0f;// + 0.5f/h; 
 		for(int xd = 0; xd < w; xd++) {
 			float u = xd*xstep - 1.0f + 0.5f/w;
-			float d = 0.99 + (u*u + v*v)*0.01f;
+			float d = 1.0f - sqrtf(u*u + v*v)*0.01*M_SQRT1_2;
+			//float xz = 1.0f - xzf*0.01f;
+			//float yz = 1.0f - yzf*0.01f;
 			float x = u*c - v*s;
 			float y = u*s + v*c;
 			x = (x*d+1.0f)*0.5f;
@@ -122,9 +132,16 @@ static void zoom(uint16_t *out, uint16_t *in, int w, int h)
 	}
 }
 
+
+// MUST NOT be called < frame of consumer apart (only uses double buffering)
+// if it's called too soon consumer may be using the frame we are modifying
+//   Note: this is also true of the triple buffering but for that to break we'd
+//       need to be calling this at least 3 times faster than the consumer is running
+//       which would be just wastful and stupid
 void maxsrc_update(void)
 {
-	uint16_t *dst = tribuf_get_write(max_tb);
+	//~ uint16_t *dst = tribuf_get_write(max_tb);
+	uint16_t *dst = next_src;
 	
 	audio_data ad;
 	audio_get_samples(&ad);
@@ -143,7 +160,7 @@ void maxsrc_update(void)
 	// want to zoom x by 1.0 - (1-d)*xzf*0.01
 	// want to zoom y by 1.0 - (1-d)*yzf*0.01
 	
-	zoom(dst, prev_src, iw, ih);
+	zoom(dst, prev_src, iw, ih, xzf, yzf);
 	fade_pix(dst, iw, ih, 255*98/100);
 	
 	for(int i=0; i<samp; i++) {
@@ -164,7 +181,8 @@ void maxsrc_update(void)
 		draw_point(dst, xi, yi);
 	}
 	
-	tribuf_finish_write(max_tb);
+	//~ tribuf_finish_write(max_tb);
+	next_src = prev_src;
 	prev_src = dst;
 	
 	tx+=0.03; ty+=0.01; tx-=0.025;
