@@ -39,7 +39,7 @@ static int iw, ih;
 
 void maxsrc_setup(int w, int h)
 {
-	pnt_w = IMAX(w/24, 8); // need divisiable by 8, at least 8
+	pnt_w = IMAX(w/24, 8);
 	pnt_h = IMAX(h/24, 8);
 	iw = w; ih = h;
 	point_src = setup_point(pnt_w, pnt_h);
@@ -104,22 +104,49 @@ static void draw_point(void *restrict dest, float px, float py)
 	}
 }
 
-static void zoom(uint16_t *out, uint16_t *in, int w, int h, float xzf, float yzf)
+static float sqr(float x) { return x*x; }
+
+static void zoom(uint16_t *out, uint16_t *in, int w, int h, float R[3][3])
 {
-	float s = sinf(-0.001f), c = cosf(-0.001f);
+	//~ float s = sinf(-0.001f), c = cosf(-0.001f);
+	//~ float x = R[0][0]*xt + R[0][1]*yt + R[0][2]*zt;
+	//~ float y = R[1][0]*xt + R[1][1]*yt + R[1][2]*zt;
+	//~ float z = R[2][0]*xt + R[2][1]*yt + R[2][2]*zt;
+	
+	//~ xv = (R[0][0], R[1][0], R[2][0])
+	//~ yv = (R[0][1], R[1][1], R[2][1])
+	//~ zv = (R[0][2], R[1][2], R[2][2])
+	
+	// t = (u, v, 0)
+	// p = proj(t,xv) + proj(t, yv) + proj(t, zv) 
+	// p == t
+	
 	
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	for(int yd = 0; yd < h; yd++) {
 		float v = yd*ystep - 1.0f;// + 0.5f/h; 
 		for(int xd = 0; xd < w; xd++) {
-			float u = xd*xstep - 1.0f + 0.5f/w;
-			float d = 1.0f - sqrtf(u*u + v*v)*0.01*M_SQRT1_2;
-			//float xz = 1.0f - xzf*0.01f;
-			//float yz = 1.0f - yzf*0.01f;
-			float x = u*c - v*s;
-			float y = u*s + v*c;
-			x = (x*d+1.0f)*0.5f;
-			y = (y*d+1.0f)*0.5f;
+			float u = xd*xstep - 1.0f;
+			float tmp;
+			//float x, y;
+			float d = 0.95f + 0.05*sqrtf(u*u + v*v);//*M_SQRT1_2
+			float p[] = {
+				(u*R[0][0] + v*R[0][1]),
+				(u*R[1][0] + v*R[1][1])*d,
+				(u*R[2][0] + v*R[2][1])*d
+			};
+			
+			
+			float x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
+			float y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
+			//~ float z = p[0]*R[2][0] + p[1]*R[2][1] + p[2]*R[2][2];
+			//x=x/(z+2); y=y/(z+2);
+			//float xz = d*(xzf*u - yzf*v);
+			//float yz = d*(yzf*u + xzf*v);
+			//~ float x = u*c - v*s;
+			//~ float y = u*s + v*c;
+			//~ x = (x+1.0f)*0.5f;
+			//~ y = (y+1.0f)*0.5f;
 					
 			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
 			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
@@ -147,20 +174,30 @@ void maxsrc_update(void)
 	audio_get_samples(&ad);
 	int samp = IMAX(iw,ih)*2/5;
 	
+	//tx = 0; ty = 0; tz = M_PI_4;
+	
 	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz); 
 	float sx=sinf(tx), sy=sinf(ty), sz=sinf(tz); 
+	//~ float R[][3] = {
+		//~ {cy*cz,				cy*sz,				-cy},
+		//~ {sx*sy*cz-cx*sz,	sz*sy*sz+cz*cz,		-sx*cy},
+		//~ {-cz*sy*cz+sx*sz,	-cx*sy*sz-sx*cz,	cx*cy}
+	//~ };
+	
 	float R[][3] = {
-		{cy*cz,				cy*sz,				-cy},
-		{sx*sy*cz-cx*sz,	sz*sy*sz+cz*cz,		-sx*cy},
-		{-cz*sy*cz+sx*sz,	-cx*sy*sz-sx*cz,	cx*cy}
+		{cz*cy-sz*sx*sy, -sz*cx, -sy*cz-cy*sz*sx},
+		{sz*cy+cz*sx*sy,  cz*cx, -sy*sz+cy*cz*sx},
+		{cx*sy         ,    -sx,  cy*cx}
 	};
 	
-	float xzf = fabsf(R[0][0]), yzf = fabsf(R[1][1]);
+	//~ float xzf = fabsf(R[0][1]), yzf = fabsf(R[1][1]);
 	
 	// want to zoom x by 1.0 - (1-d)*xzf*0.01
 	// want to zoom y by 1.0 - (1-d)*yzf*0.01
 	
-	zoom(dst, prev_src, iw, ih, xzf, yzf);
+	// actually need to rotate, zoom along y, rotate back
+	
+	zoom(dst, prev_src, iw, ih, R);
 	fade_pix(dst, iw, ih, 255*98/100);
 	
 	for(int i=0; i<samp; i++) {
@@ -171,9 +208,9 @@ void maxsrc_update(void)
 		float yt = 0.2f*s;
 		float zt = 0.0f;
 		
-		float x = R[0][0]*xt + R[0][1]*yt + R[0][2]*zt;
-		float y = R[1][0]*xt + R[1][1]*yt + R[1][2]*zt;
-		float z = R[2][0]*xt + R[2][1]*yt + R[2][2]*zt;
+		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
+		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
+		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
 		float zvd = 1/(z+2);
 		
 		float xi = x*zvd*iw*3/4+iw/2 - pnt_w/2;
@@ -185,5 +222,5 @@ void maxsrc_update(void)
 	next_src = prev_src;
 	prev_src = dst;
 	
-	tx+=0.03; ty+=0.01; tx-=0.025;
+	tx+=0.02; ty+=0.01; tz-=0.003;
 }

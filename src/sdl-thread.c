@@ -72,7 +72,7 @@ static int run_map_thread(tribuf *tb)
 		beats = newbeat;
 		
 		const float delt = 30.0f/200.0f;
-		const float tsped = 0.005;
+		const float tsped = 0.002;
 		const int dt = 1000/200;
 		
 		while(done_time <= now) {
