@@ -11,6 +11,8 @@
 
 static TTF_Font *font = NULL;
 
+
+// TODO: improve automatic mode selection
 SDL_Surface *sdl_setup(opt_data *opts, int im_size)
 {
 	printf("Initializing SDL.\n");
@@ -28,7 +30,7 @@ SDL_Surface *sdl_setup(opt_data *opts, int im_size)
     printf("SDL initialized.\n");
 
 
-	const int vidflags = SDL_HWSURFACE | SDL_HWACCEL | ((opts->doublebuf)?(SDL_DOUBLEBUF | SDL_ASYNCBLIT):0);
+	const int vidflags = SDL_HWSURFACE | SDL_HWACCEL | SDL_ASYNCBLIT | ((opts->doublebuf)?(SDL_DOUBLEBUF):0);
 	const SDL_VideoInfo *vid_info = SDL_GetVideoInfo();
 	SDL_Rect **modes = SDL_ListModes(vid_info->vfmt, vidflags);
 	if (modes == (SDL_Rect**)0) {
