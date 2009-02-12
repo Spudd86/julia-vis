@@ -8,7 +8,7 @@
 
 #ifdef USE_SDL
 #include <SDL.h>
-void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal);
+void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, int pi);
 #endif
 
 #ifdef HAVE_DIRECTFB
@@ -26,4 +26,7 @@ void fade_pix(void *restrict buf, int w, int h, uint8_t fade);
 uint16_t *maxsrc_get(void);
 void maxsrc_setup(int w, int h);
 void maxsrc_update(void);
+
+void pallet_init(void);
+
 #endif

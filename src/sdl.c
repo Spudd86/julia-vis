@@ -54,17 +54,6 @@ int main(int argc, char **argv)
 		map_surf[i] = valloc(im_w * im_h * sizeof(uint16_t));
 		memset(map_surf[i], 0, im_w * im_h * sizeof(uint16_t));
 	}
-	//~ map_surf[0] = valloc(im_w * im_h * sizeof(uint16_t));
-	//~ map_surf[1] = valloc(im_w * im_h * sizeof(uint16_t));
-	//~ for(int i=0; i < im_w * im_h; i++) {
-		//~ map_surf[0][i] = max_src[i];
-		//~ map_surf[1][i] = max_src[i];
-	//~ }
-	
-	uint32_t *pal = memalign(64, 257 * sizeof(uint32_t));
-	for(int i = 0; i < 256; i++) pal[i] = ((2*abs(i-127))<<16) | (i<<8) | ((255-i));
-	pal[256] = pal[255];
-
 	
 	int m = 0, cnt = 0;
 	float vx1, vy1, x1, y1, xt1, yt1;
@@ -95,11 +84,12 @@ int main(int argc, char **argv)
 		//~ m = (m+1)&0x1; 
 		//~ maxblend(map_surf[m], max_src, im_w, im_h);
 		maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
-		//soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, sin(t0)*0.5, cos(t1)*0.5, sin(t2)*0.5, sin(t3));
-		soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1, x2, y2);
+		
+		//soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1, x2, y2);
+		soft_map_butterfly(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
 		m = (m+1)&0x1;
 		
-		PALLET_BLIT(screen, map_surf[m], im_w, im_h, pal);
+		PALLET_BLIT(screen, map_surf[m], im_w, im_h, 2);
 		
 		char buf[32];
 		sprintf(buf,"%6.1f FPS", 1000.0f / frametime);
@@ -107,9 +97,9 @@ int main(int argc, char **argv)
 		
 		SDL_Flip(screen);
 		
-		//if(!(cnt%2)) {
+		if(!(cnt%2)) {
 			maxsrc_update();
-		//}
+		}
 		cnt++;
 
 		Uint32 now = SDL_GetTicks();
@@ -127,7 +117,7 @@ int main(int argc, char **argv)
 		beats = newbeat;
 		
 		const float delt = 30.0f/200.0f;
-		const float tsped = 0.005;
+		const float tsped = 0.002;
 		const int dt = 1000/200;
 		
 		while(done_time <= now) {

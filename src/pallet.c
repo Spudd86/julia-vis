@@ -11,6 +11,95 @@
 #include "pixmisc.h"
 #include "common.h"
 
+struct pallet_colour {
+	unsigned char r, g, b;
+	unsigned char pos;
+};
+
+static const int num_pallets = 4;
+static const struct pallet_colour static_pallets[4][64] = {
+    
+	{	//  r    g    b  pos
+		{   0,  11, 138,   0},
+		{ 255, 111, 255, 104},
+		{ 111, 111, 255, 125},
+		{ 111, 230, 255, 152},
+		{ 255, 216, 111, 185},
+		{ 255, 111, 111, 211},
+		{ 255, 255, 255, 255}
+	},
+
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0},
+		{   0,   0, 128,  60},
+		{ 255, 128,  64, 137},
+		{ 255, 255, 255, 230},
+		{   0,   0, 255, 255}
+	},
+
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0},
+		{ 255,   0, 128,  52},
+		{ 196,   0,   0,  86},
+		{   0,   0,   0, 175},
+		{ 255,   0, 128, 231},
+		{ 255, 255, 255, 255}
+	},
+
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0},
+		{   0,   0,   0,  29},
+		{ 115, 230,   0, 195},
+		{  45, 255, 255, 255}
+	}
+
+	// END
+	//{   0,   0,   0,   0},
+	//{   0,   0,   0,   0}
+};
+
+
+//TODO: make sure these have good alignment
+//~ static uint16_t pallets555[4][256+16] __attribute__((aligned)); // keep aligned
+//~ static uint16_t pallets565[4][256+16] __attribute__((aligned));
+static uint32_t pallets32[4][256+8] __attribute__((aligned));
+
+void pallet_init(void) {
+	for(int p=0; p < num_pallets; p++) {
+		
+		struct pallet_colour *curpal = static_pallets[p];
+		int j = 0;
+		do {
+			j++;
+			
+			for(int i = curpal[j-1].pos; i < curpal[j].pos; i++) {
+				int r = (curpal[j-1].r*(curpal[j].pos-i) + curpal[j].r*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
+				int g = (curpal[j-1].g*(curpal[j].pos-i) + curpal[j].g*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
+				int b = (curpal[j-1].b*(curpal[j].pos-i) + curpal[j].b*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
+				
+				//~ pallets555[p][i] = ((r&0xfa)<<7)|((g&0xfa)<<2)|(b>>3); // not woring right, plus doesn't seem to offer any speedup
+				//~ pallets565[p][i] = ((r&0xfa)<<8)|((g&0xfc)<<3)|(b>>3);
+				pallets32[p][i] = (r<<16)|(g<<8)|b;
+			}
+			
+		} while(static_pallets[p][j].pos != 255);
+		//~ pallets555[p][256] = pallets555[p][255];
+		//~ pallets565[p][256] = pallets565[p][255];
+		pallets32[p][256]  = pallets32[p][255];
+	}
+}
+
+static void *pallet_getpal(int i, int bits) {
+	if(i<0 || i>=num_pallets) return NULL;
+	if(bits == 32)
+		return pallets32[i];
+	//~ else if(bits == 16)
+		//~ return pallets565[i];
+	//~ else if(bits == 15)
+		//~ return pallets555[i];
+	return NULL;
+}
+
 // pallet must have 257 entries (for easier interpolation on 16 bit indicies)
 // output pix = (pallet[in/256]*(in%256) + pallet[in/256+1]*(255-in%256])/256
 // for each colour component
@@ -97,6 +186,25 @@ static void pallet_blit_SDL32(uint32_t  * restrict dest, unsigned int dst_stride
 			tmp = _mm_packs_pu16(tmp, col1);
 			//_mm_stream_pi((__m64 *)(dest + y*dst_stride + x+2), tmp);
 			*(__m64 *)(dest + y*dst_stride + x + 2) = tmp;
+		}
+	}
+}
+
+static void pallet_blit_SDL16(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint16_t *restrict pal)
+{
+	for(unsigned int y = 0; y < h; y++) {
+		for(unsigned int x = 0; x < w; x+=4) {
+			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
+			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
+			
+			int v = src[y*src_stride + x];
+			*(uint16_t *)(dest + y*dst_stride + x*2) = pal[v/256];
+			v = src[y*src_stride + x+1];
+			*(uint16_t *)(dest + y*dst_stride + (x+1)*2) = pal[v/256];
+			v = src[y*src_stride + x+2];
+			*(uint16_t *)(dest + y*dst_stride + (x+2)*2) = pal[v/256];
+			v = src[y*src_stride + x+3];
+			*(uint16_t *)(dest + y*dst_stride + (x+3)*2) = pal[v/256];
 		}
 	}
 }
@@ -226,14 +334,18 @@ static void pallet_blit_SDL555(uint8_t  * restrict dest, unsigned int dst_stride
 
 #include <SDL.h>
 
-void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal)
+void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, int pi)
 {
 	const int src_stride = w;
 	w = IMIN(w, dst->w);
 	h = IMIN(h, dst->h);
 	
+	void *pal = pallet_getpal(pi, 32);//dst->format->BitsPerPixel);
+	
 	if((SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) || w < 0 || h < 0) return;
 	if(dst->format->BitsPerPixel == 32) pallet_blit_SDL32(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
+	//~ else if(dst->format->BitsPerPixel == 16 || dst->format->BitsPerPixel == 15)
+		//~ pallet_blit_SDL16(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
 	else if(dst->format->BitsPerPixel == 16) pallet_blit_SDL565(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
 	else if(dst->format->BitsPerPixel == 15) pallet_blit_SDL555(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
 	_mm_empty();

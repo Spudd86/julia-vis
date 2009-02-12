@@ -29,8 +29,6 @@ static uint16_t *setup_point(int w, int h)
 }
 
 
-//~ static tribuf *max_tb;
-//~ static uint16_t *max_src[3];
 static uint16_t *prev_src;
 static uint16_t *next_src;
 static uint16_t *point_src;
@@ -47,26 +45,9 @@ void maxsrc_setup(int w, int h)
 	prev_src = valloc(2 * w * h * sizeof(uint16_t));
 	memset(prev_src, 0, 2*w*h*sizeof(uint16_t));
 	next_src = prev_src + w*h;
-	
-	//~ max_src[0] = valloc(3 * w * h * sizeof(uint16_t));
-	//~ memset(max_src[0], 0, 3*w*h*sizeof(uint16_t));
-	//~ for(int i=1; i<3; i++)
-		//~ max_src[i] = max_src[0] + i * w * h;
-	
-	//~ for(int i=0; i<3; i++) {
-		//~ max_src[i] = valloc(w * h * sizeof(uint16_t));
-		//~ memset(max_src[i], 0, w*h*sizeof(uint16_t));
-	//~ }
-	
-	//~ next_src = max_src[0];
-	//~ prev_src = max_src[1];
-	//~ max_tb = tribuf_new((void **)max_src);
-	//~ prev_src = tribuf_get_read(max_tb);
 }
 
-uint16_t *maxsrc_get(void)
-{
-	//return tribuf_get_read(max_tb);
+uint16_t *maxsrc_get(void) {
 	return prev_src;
 }
 
@@ -104,49 +85,24 @@ static void draw_point(void *restrict dest, float px, float py)
 	}
 }
 
-static float sqr(float x) { return x*x; }
-
 static void zoom(uint16_t *out, uint16_t *in, int w, int h, float R[3][3])
 {
-	//~ float s = sinf(-0.001f), c = cosf(-0.001f);
-	//~ float x = R[0][0]*xt + R[0][1]*yt + R[0][2]*zt;
-	//~ float y = R[1][0]*xt + R[1][1]*yt + R[1][2]*zt;
-	//~ float z = R[2][0]*xt + R[2][1]*yt + R[2][2]*zt;
-	
-	//~ xv = (R[0][0], R[1][0], R[2][0])
-	//~ yv = (R[0][1], R[1][1], R[2][1])
-	//~ zv = (R[0][2], R[1][2], R[2][2])
-	
-	// t = (u, v, 0)
-	// p = proj(t,xv) + proj(t, yv) + proj(t, zv) 
-	// p == t
-	
-	
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	for(int yd = 0; yd < h; yd++) {
-		float v = yd*ystep - 1.0f;// + 0.5f/h; 
+		float v = yd*ystep - 1.0f;
 		for(int xd = 0; xd < w; xd++) {
 			float u = xd*xstep - 1.0f;
-			float tmp;
-			//float x, y;
-			float d = 0.95f + 0.05*sqrtf(u*u + v*v);//*M_SQRT1_2
-			float p[] = {
+	
+			float d = 0.95f + 0.05*sqrtf(u*u + v*v);
+			float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 				(u*R[0][0] + v*R[0][1]),
 				(u*R[1][0] + v*R[1][1])*d,
 				(u*R[2][0] + v*R[2][1])*d
 			};
 			
-			
+			// rotate back and shift/scale to [0, 1]
 			float x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
 			float y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
-			//~ float z = p[0]*R[2][0] + p[1]*R[2][1] + p[2]*R[2][2];
-			//x=x/(z+2); y=y/(z+2);
-			//float xz = d*(xzf*u - yzf*v);
-			//float yz = d*(yzf*u + xzf*v);
-			//~ float x = u*c - v*s;
-			//~ float y = u*s + v*c;
-			//~ x = (x+1.0f)*0.5f;
-			//~ y = (y+1.0f)*0.5f;
 					
 			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
 			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
@@ -167,7 +123,6 @@ static void zoom(uint16_t *out, uint16_t *in, int w, int h, float R[3][3])
 //       which would be just wastful and stupid
 void maxsrc_update(void)
 {
-	//~ uint16_t *dst = tribuf_get_write(max_tb);
 	uint16_t *dst = next_src;
 	
 	audio_data ad;
@@ -178,24 +133,12 @@ void maxsrc_update(void)
 	
 	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz); 
 	float sx=sinf(tx), sy=sinf(ty), sz=sinf(tz); 
-	//~ float R[][3] = {
-		//~ {cy*cz,				cy*sz,				-cy},
-		//~ {sx*sy*cz-cx*sz,	sz*sy*sz+cz*cz,		-sx*cy},
-		//~ {-cz*sy*cz+sx*sz,	-cx*sy*sz-sx*cz,	cx*cy}
-	//~ };
 	
 	float R[][3] = {
 		{cz*cy-sz*sx*sy, -sz*cx, -sy*cz-cy*sz*sx},
 		{sz*cy+cz*sx*sy,  cz*cx, -sy*sz+cy*cz*sx},
 		{cx*sy         ,    -sx,  cy*cx}
 	};
-	
-	//~ float xzf = fabsf(R[0][1]), yzf = fabsf(R[1][1]);
-	
-	// want to zoom x by 1.0 - (1-d)*xzf*0.01
-	// want to zoom y by 1.0 - (1-d)*yzf*0.01
-	
-	// actually need to rotate, zoom along y, rotate back
 	
 	zoom(dst, prev_src, iw, ih, R);
 	fade_pix(dst, iw, ih, 255*98/100);
@@ -218,7 +161,6 @@ void maxsrc_update(void)
 		draw_point(dst, xi, yi);
 	}
 	
-	//~ tribuf_finish_write(max_tb);
 	next_src = prev_src;
 	prev_src = dst;
 	

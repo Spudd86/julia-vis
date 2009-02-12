@@ -101,6 +101,7 @@ int main(int argc, char **argv)
 	audio_init(&opts);
 	
 	maxsrc_setup(im_w, im_h);
+	pallet_init();
 	
 	uint16_t *map_surf[3];
 	void *map_surf_mem = valloc(3 * im_w * im_h * sizeof(uint16_t));
@@ -109,10 +110,10 @@ int main(int argc, char **argv)
 		map_surf[i] = map_surf_mem + i * im_w * im_h * sizeof(uint16_t);
 	}
 	
-	uint32_t *pal = _mm_malloc(257 * sizeof(uint32_t), 64); // p4 has 64 byte cache line
-	for(int i = 0; i < 256; i++) pal[i] = ((2*abs(i-127))<<16) | (i<<8) | ((255-i));
-	pal[256] = pal[255];
-
+	//~ uint32_t *pal = _mm_malloc(257 * sizeof(uint32_t), 64); // p4 has 64 byte cache line
+	//~ for(int i = 0; i < 256; i++) pal[i] = ((2*abs(i-127))<<16) | (i<<8) | ((255-i));
+	//~ pal[256] = pal[255];
+	
 	tribuf *map_tb = tribuf_new((void **)map_surf);
 	
 	user_event.type=SDL_USEREVENT;
@@ -130,16 +131,15 @@ int main(int argc, char **argv)
 	
 	SDL_Event	event;
 	int prevfrm = 0;
-	Uint32 lasttime;
-	Uint32 tick0 = lasttime = SDL_GetTicks();
+	Uint32 lasttime = SDL_GetTicks();
 	while(SDL_WaitEvent(&event) >= 0)
 	{
 		if(event.type == SDL_QUIT 
 				|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
 			break;
 		} else if(event.type == SDL_USEREVENT) {
-			PALLET_BLIT(screen, tribuf_get_read(map_tb), im_w, im_h, pal);
-			//PALLET_BLIT(screen, maxsrc_get(), im_w, im_h, pal);
+			PALLET_BLIT(screen, tribuf_get_read(map_tb), im_w, im_h, 1);
+			//PALLET_BLIT(screen, maxsrc_get(), im_w, im_h, 1);
 			char buf[32];
 			sprintf(buf,"%6.1f FPS", map_fps);
 			DrawText(screen, buf);

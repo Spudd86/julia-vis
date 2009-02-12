@@ -142,18 +142,45 @@ MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in
 	}
 }
 
+MAP_FUNC_ATTR void soft_map_butterfly(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float cx0, float cy0)
+{
+	const float xstep = 2.0f/w, ystep = 2.0f/h;
+	const float sm = sqrtf(2.5f)/2.5f;
+
+	cx0*=1.5/2.5; cy0*=1.5/2.5;
+	
+	for(int yd = 0; yd < h; yd++) {
+		float v = yd*ystep - 1.0f;
+		for(int xd = 0; xd < w; xd++) {
+			float u = xd*xstep -1.0f;
+			
+			float x = 2.5f*v*v - sqrtf(fabsf(u))*sm + cx0;  
+			float y = 2.5f*u*u - sqrtf(fabsf(v))*sm + cy0;
+					
+			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
+			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
+			int x1 = xs>>8, x2 = x1+1, xf = xs&0xFF;
+			int y1 = ys>>8, y2 = y1+1, yf = ys&0xFF;
+			
+			*(out++) = ((in[y1*w + x1]*(0xff - xf) + in[y1*w + x2]*xf)*(0xff-yf) +
+						(in[y2*w + x1]*(0xff - xf) + in[y2*w + x2]*xf)*yf) >> 16;
+		}
+	}
+}
 
 MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float cx0, float cy0, float cx1, float cy1 )
 {
 	const float xoom = 3.0f, moox = 1.0f/xoom;
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	
+	cx1*=0.25; cy1*=0.25;
+	cx0*=4; cy0*=4;
+	
 	for(int yd = 0; yd < h; yd++) {
 		float v = yd*ystep - 1.0f;
 		for(int xd = 0; xd < w; xd++) {
 			float u = xd*xstep -1.0f;
 			float a,b,c,d,sa,sb, cdivt, x, y;
-			
 			
 			a=u*xoom; b=v*xoom; sa=a*a; sb=b*b;
 			c=sa-sb + cx1; d=2*a*b+cy1;
@@ -171,11 +198,12 @@ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict 
 		}
 	}
 }
-//~ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float complex c1, float complex c2 )
+//~ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float cx0, float cy0, float cx1, float cy1 )
 //~ {
+	//~ float complex c1 = cx0 + cy0*I; float complex c2 = cx1 + cy1*I;
 	//~ float xstep = 2.0f/w, ystep = 2.0f/h;
 	//~ for(int yd = 0; yd < h; yd++) {
-		//~ float v = yd*ystep - 1.0f;
+		//~ float v = 3*(yd*ystep - 1.0f);
 		//~ for(int xd = 0; xd < w; xd++) {
 			//~ float complex z = 3*(xd*xstep -1.0f + v*I);
 			//~ float complex zsqr = z*z;
