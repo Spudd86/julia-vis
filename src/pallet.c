@@ -64,6 +64,8 @@ static const struct pallet_colour static_pallets[4][64] = {
 //~ static uint16_t pallets565[4][256+16] __attribute__((aligned));
 static uint32_t pallets32[4][256+8] __attribute__((aligned));
 
+static uint32_t active_pal[257] __attribute__((aligned)); 
+
 void pallet_init(void) {
 	for(int p=0; p < num_pallets; p++) {
 		
@@ -87,17 +89,95 @@ void pallet_init(void) {
 		//~ pallets565[p][256] = pallets565[p][255];
 		pallets32[p][256]  = pallets32[p][255];
 	}
+	
+	memcpy(active_pal, pallets32[1], sizeof(uint32_t)*257);
 }
 
-static void *pallet_getpal(int i, int bits) {
-	if(i<0 || i>=num_pallets) return NULL;
-	if(bits == 32)
-		return pallets32[i];
-	//~ else if(bits == 16)
-		//~ return pallets565[i];
-	//~ else if(bits == 15)
-		//~ return pallets555[i];
-	return NULL;
+static int pallet_changing = 0;
+static int palpos = 0;
+static int nextpal = 0;
+static int curpal = 1;
+
+static void *pallet_getpal() {
+	return active_pal;
+}
+
+void pallet_step(int step) {
+	if(!pallet_changing) return;
+	palpos += step;
+	if(palpos >=256) {
+		pallet_changing = palpos = 0;
+		curpal = nextpal;
+		memcpy(active_pal, pallets32[nextpal], sizeof(uint32_t)*257);
+		return;
+	}
+	
+	__m64 zero = _mm_cvtsi32_si64(0ll);
+	__m64 mask = (__m64)(0x00ff00ff00ff);
+	__m64 vt = _mm_set1_pi16(palpos); // same for all i
+	
+	for(int i = 0; i < 256; i+=4) {
+		__m64 s1 = *(__m64 *)(pallets32[nextpal]+i);
+		__m64 s2 = s1;
+		s1 = _mm_unpacklo_pi8(s1, zero);
+		s2 = _mm_unpackhi_pi8(s2, zero);
+		
+		__m64 d1 = *(__m64 *)(pallets32[curpal]+i);
+		__m64 d2 = d1;
+		d1 = _mm_unpacklo_pi8(d1, zero);
+		d2 = _mm_unpackhi_pi8(d2, zero);
+		
+		s1 = _mm_mullo_pi16(s1, vt);
+		vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
+		d1 = _mm_mullo_pi16(d1, vt);
+		s1 = _mm_add_pi16(s1, d1);
+		s1 = _mm_srli_pi16(s1, 8);
+		
+		d2 = _mm_mullo_pi16(d2, vt);
+		vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
+		s2 = _mm_mullo_pi16(s2, vt);
+		s2 = _mm_add_pi16(s2, d2);
+		s2 = _mm_srli_pi16(s2, 8);
+			
+		s1 = _mm_packs_pu16(s1, s2);
+		*(__m64 *)(active_pal+i) = s1;
+		
+		s1 = *(__m64 *)(pallets32[nextpal]+i+2);
+		s2 = s1;
+		s1 = _mm_unpacklo_pi8(s1, zero);
+		s2 = _mm_unpackhi_pi8(s2, zero);
+		
+		d1 = *(__m64 *)(pallets32[curpal]+i+2);
+		d2 = d1;
+		d1 = _mm_unpacklo_pi8(d1, zero);
+		d2 = _mm_unpackhi_pi8(d2, zero);
+		
+		s1 = _mm_mullo_pi16(s1, vt);
+		vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
+		d1 = _mm_mullo_pi16(d1, vt);
+		s1 = _mm_add_pi16(s1, d1);
+		s1 = _mm_srli_pi16(s1, 8);
+		
+		d2 = _mm_mullo_pi16(d2, vt);
+		vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
+		s2 = _mm_mullo_pi16(s2, vt);
+		s2 = _mm_add_pi16(s2, d2);
+		s2 = _mm_srli_pi16(s2, 8);
+			
+		s1 = _mm_packs_pu16(s1, s2);
+		*(__m64 *)(active_pal+i+2) = s1;
+	}
+	active_pal[256] = active_pal[255];
+	_mm_empty();
+	
+}
+
+void pallet_start_switch(int next) {
+	if(pallet_changing || next == curpal) return; // haven't finished the last one
+	
+	if(next<0 || next>=num_pallets) return;
+	nextpal = next;
+	pallet_changing = 1;
 }
 
 // pallet must have 257 entries (for easier interpolation on 16 bit indicies)
@@ -143,11 +223,10 @@ static void pallet_blit_SDL32(uint32_t  * restrict dest, unsigned int dst_stride
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
 			
-			vt = _mm_set1_pi16(v);
-			vt = _mm_and_si64(vt, mask);
-    		col1 = _mm_mullo_pi16(col1, vt);
+			// re-use vt from before, just do cols in opposite order
+			col2 = _mm_mullo_pi16(col2, vt);
 			vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
-    		col2 = _mm_mullo_pi16(col2, vt);
+			col1 = _mm_mullo_pi16(col1, vt);
     		col1 = _mm_add_pi16(col1, col2);
     		col1 = _mm_srli_pi16(col1, 8);
 			
@@ -160,8 +239,6 @@ static void pallet_blit_SDL32(uint32_t  * restrict dest, unsigned int dst_stride
 			col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
-			vt = _mm_set1_pi16(v);
-			vt = _mm_and_si64(vt, mask);
     		col1 = _mm_mullo_pi16(col1, vt);
 			vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
     		col2 = _mm_mullo_pi16(col2, vt);
@@ -175,11 +252,9 @@ static void pallet_blit_SDL32(uint32_t  * restrict dest, unsigned int dst_stride
 			col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
-			vt = _mm_set1_pi16(v);
-			vt = _mm_and_si64(vt, mask);
-    		col1 = _mm_mullo_pi16(col1, vt);
+			col2 = _mm_mullo_pi16(col2, vt);
 			vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
-    		col2 = _mm_mullo_pi16(col2, vt);
+			col1 = _mm_mullo_pi16(col1, vt);
     		col1 = _mm_add_pi16(col1, col2);
     		col1 = _mm_srli_pi16(col1, 8);
 			

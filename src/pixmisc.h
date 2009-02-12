@@ -28,5 +28,8 @@ void maxsrc_setup(int w, int h);
 void maxsrc_update(void);
 
 void pallet_init(void);
+void pallet_step(int step);
+void pallet_start_switch(int nextpal);
+
 
 #endif

@@ -130,6 +130,7 @@ int main(int argc, char **argv)
 	SDL_AddTimer(1000/opts.draw_rate, &timercallback, NULL);
 	
 	SDL_Event	event;
+	int beats = 0;
 	int prevfrm = 0;
 	Uint32 lasttime = SDL_GetTicks();
 	while(SDL_WaitEvent(&event) >= 0)
@@ -144,6 +145,14 @@ int main(int argc, char **argv)
 			sprintf(buf,"%6.1f FPS", map_fps);
 			DrawText(screen, buf);
 			SDL_Flip(screen);
+			
+			int newbeat = beat_get_count();
+			if(newbeat != beats) {
+				pallet_start_switch(newbeat%4);
+			}
+			beats = newbeat;
+			
+			pallet_step(2);
 
 			Uint64 now = SDL_GetTicks();
 			if(tribuf_get_frmnum(map_tb) - prevfrm > 1 && now - lasttime > 1000/16) {

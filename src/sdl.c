@@ -15,6 +15,8 @@
 #include "sdl-misc.h"
 #include "pixmisc.h"
 
+#include "audio/audio.h"
+
 #define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL
 
