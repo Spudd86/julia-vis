@@ -35,7 +35,7 @@ static void shutdown(void) {
 int jack_setup(opt_data *od)
 {
 	jack_status_t status;
-	client = jack_client_open("test", 0, &status);
+	client = jack_client_open("test", JackNoStartServer, &status);
 	if (client == NULL) {
 		fprintf (stderr, "jack_client_open() failed, status = 0x%2.0x\n", status);
 		if (status & JackServerFailed) {
