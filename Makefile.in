@@ -116,7 +116,7 @@ bin/dfb-test: src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c 
 	$(DFB_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
 bin/audio-test: $(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c src/tribuf.c src/line.c
-	$(CC) -DDO_BEAT -DUSE_SDL $(CFLAGS) \
+	$(CC) -DFFT_TRIBUF -DUSE_SDL $(CFLAGS) \
 	$(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c src/tribuf.c src/line.c \
 	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 

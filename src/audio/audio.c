@@ -14,7 +14,9 @@ static float *fft_tmp = NULL;
 static fftwf_plan p;
 
 static tribuf *samp_tb = NULL;
+#ifdef FFT_TRIBUF
 static tribuf *fft_tb = NULL;
+#endif
 
 int audio_get_buf_count(void) {
 	return buf_count;
@@ -36,14 +38,21 @@ static float *do_fft(float *in)
 	memcpy(fft_tmp, in, sizeof(float)*nr_samp);
 	fftwf_execute(p);
 	
-	float *fft = tribuf_get_write(fft_tb);
+	float *fft;
+	#ifdef FFT_TRIBUF
+	fft = tribuf_get_write(fft_tb);
+	#else
+	fft = fft_tmp;
+	#endif
 	fft[0] = fabsf(fft_tmp[0])/nr_samp;
 	fft[nr_samp/2] = fabsf(fft_tmp[nr_samp/2])/nr_samp;
 	
 	for(int i=1; i < nr_samp/2; i++)
 		fft[i] = sqrtf(sqr(fft_tmp[i]) + sqr(fft_tmp[nr_samp-i]))/nr_samp;
 	
+	#ifdef FFT_TRIBUF
 	tribuf_finish_write(fft_tb);
+	#endif
 	return fft;
 }
 
@@ -78,12 +87,13 @@ int audio_get_samples(audio_data *d) {
 	d->data = tribuf_get_read(samp_tb);
 	return 0;
 }
-
+#ifdef FFT_TRIBUF
 int audio_get_fft(audio_data *d) {
 	d->len = nr_samp/2+1;
 	d->data = tribuf_get_read(fft_tb);
 	return 0;
 }
+#endif
 
 static void *fft_data[3];
 static void *samp_data[3];
@@ -98,15 +108,19 @@ int audio_setup(int sr)
 	if(!fft_tmp) abort();
 	
 	p = fftwf_plan_r2r_1d(nr_samp, fft_tmp, fft_tmp, FFTW_R2HC, 0);
-
-	for(int i=0;i<3;i++) fft_data[i] = xmalloc(sizeof(float) * (nr_samp/2+1));
-	for(int i=0;i<3;i++) samp_data[i] = xmalloc(sizeof(float) * nr_samp);
+	
 	for(int i=0;i<3;i++) {
+		samp_data[i] = xmalloc(sizeof(float) * nr_samp);
 		memset(samp_data[i], 0, sizeof(float) * nr_samp);
-		memset(fft_data[i], 0, sizeof(float) * nr_samp/2+1);
 	}
 	
+	#ifdef FFT_TRIBUF
+	for(int i=0;i<3;i++) {
+		fft_data[i] = xmalloc(sizeof(float) * (nr_samp/2+1));
+		memset(fft_data[i], 0, sizeof(float) * nr_samp/2+1);
+	}
 	fft_tb = tribuf_new(fft_data);
+	#endif
 	samp_tb = tribuf_new(samp_data);
 	
 	beat_setup();
