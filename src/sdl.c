@@ -28,6 +28,7 @@ int main(int argc, char **argv)
 	optproc(argc, argv, &opts);
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	int im_w = screen->w - screen->w%16, im_h = screen->h - screen->h%8;
+	printf("running with %dx%d bufs\n", im_w, im_h);
 	
 	audio_init(&opts);
 	
@@ -35,10 +36,9 @@ int main(int argc, char **argv)
 	pallet_init(screen->format->BitsPerPixel == 8);
 
 	uint16_t *map_surf[2];
-	for(int i=0; i<2; i++) {
-		map_surf[i] = valloc(im_w * im_h * sizeof(uint16_t));
-		memset(map_surf[i], 0, im_w * im_h * sizeof(uint16_t));
-	}
+	map_surf[0] = valloc(2 * im_w * im_h * sizeof(uint16_t));
+	memset(map_surf[0], 0, 2 * im_w * im_h * sizeof(uint16_t));
+	map_surf[1] = map_surf[0] + im_w * im_h;
 	
 	int m = 0, cnt = 0;
 	float vx1, vy1, x1, y1, xt1, yt1;

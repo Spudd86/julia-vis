@@ -89,15 +89,12 @@ static int run_map_thread(tribuf *tb)
 	return 0;
 }
 
-static SDL_Event user_event;
-static int lastdrawn=0;
-static tribuf *map_tb = NULL;
-
 int main(int argc, char **argv) 
 {    
 	optproc(argc, argv, &opts);
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	im_w = screen->w - screen->w%16; im_h = screen->h - screen->h%8;
+	printf("running with %dx%d bufs\n", im_w, im_h);
 	
 	audio_init(&opts);
 	
@@ -106,33 +103,23 @@ int main(int argc, char **argv)
 	
 	uint16_t *map_surf[3];
 	void *map_surf_mem = valloc(3 * im_w * im_h * sizeof(uint16_t));
-	memset(map_surf_mem, 0, 3 * im_w * im_h * sizeof(uint16_t));
-	for(int i=0; i<3; i++) {
+	for(int i=0; i<3; i++)
 		map_surf[i] = map_surf_mem + i * im_w * im_h * sizeof(uint16_t);
-	}
+	memset(map_surf_mem, 0, 3 * im_w * im_h * sizeof(uint16_t));
 	
-	map_tb = tribuf_new((void **)map_surf);
+	tribuf *map_tb = tribuf_new((void **)map_surf);
 	
-	user_event.type=SDL_USEREVENT;
-	user_event.user.code=2;
-	user_event.user.data1=NULL;
-	user_event.user.data2=NULL;
-
-	printf("running with %dx%d bufs\n", im_w, im_h);
-	
-	usleep(1000); // wait a bit so we have some audio
 	maxsrc_update();
-	
-	SDL_Thread *map_thread = SDL_CreateThread(&run_map_thread, map_tb);
 
-	
-	SDL_Event	event;
 	int beats = 0;
 	int prevfrm = 0;
 	int frmcnt = 0;
+	int lastdrawn=0;
 	Uint32 tick0 = SDL_GetTicks();
 	Uint32 lasttime = tick0;
-
+	
+	SDL_Thread *map_thread = SDL_CreateThread(&run_map_thread, map_tb);
+	SDL_Event event;
 	while(SDL_PollEvent(&event) >= 0)
 	{
 		if(event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
@@ -161,8 +148,8 @@ int main(int argc, char **argv)
 		
 		Uint64 now = SDL_GetTicks();
 		int delay =  (tick0 + frmcnt*1000/opts.draw_rate) - now;
-		frmcnt++;
 		if(delay > 0) SDL_Delay(delay);
+		frmcnt++;
 	}
 	running = 0;
 	

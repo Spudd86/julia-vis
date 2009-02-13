@@ -141,11 +141,15 @@ int jack_setup(opt_data *);
 
 int audio_init(opt_data *od) 
 {
+	int rc;
 	#ifdef HAVE_JACK
 	if(od->use_jack) {
 		printf("Starting jack\n");
-		return jack_setup(od);
+		rc = jack_setup(od);
 	} else
 	#endif
-		return audio_setup_pa();
+		rc = audio_setup_pa();
+	
+	usleep(1000); // wait a bit so we have some audio in the buffer
+	return rc;
 }
