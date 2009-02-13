@@ -20,23 +20,7 @@
 #define MAP soft_map_interp
 #define PALLET_BLIT pallet_blit_SDL
 
-
 #define IM_SIZE (384)
-
-//~ // set up source for maxblending
-//~ static uint16_t *setup_maxsrc(int w, int h) 
-//~ {
-	//~ uint16_t *max_src = valloc(w * h * sizeof(uint16_t));
-
-	//~ for(int y=0; y < h; y++)  {
-		//~ for(int x=0; x < w; x++) {
-			//~ float u = 2*(float)x/w - 1; float v = 2*(float)y/h - 1;
-			//~ float d = sqrtf(u*u + v*v);
-			//~ max_src[y*w + x] = (uint16_t)((1.0f - fminf(d, 0.5)*2)*UINT16_MAX);
-		//~ }
-	//~ }
-	//~ return max_src;
-//~ }
 
 static opt_data opts;
 
@@ -50,6 +34,7 @@ int main(int argc, char **argv)
 	
 	//uint16_t *maxsrc = setup_maxsrc(im_w, im_h);
 	maxsrc_setup(im_w, im_h);
+	pallet_init();
 
 	uint16_t *map_surf[2];
 	for(int i=0; i<2; i++) {
@@ -82,13 +67,21 @@ int main(int argc, char **argv)
 			|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE))
 			break;
 		
-		//~ MAP(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, sin(t0)*0.75, sin(t1)*0.75);
+		if(!(cnt%3)) {
+			maxsrc_update();
+		}
+		cnt++;
+		
+		//~ soft_map_butterfly(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
+		//~ MAP(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
 		//~ m = (m+1)&0x1; 
-		//~ maxblend(map_surf[m], max_src, im_w, im_h);
 		maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
 		
-		//soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1, x2, y2);
-		soft_map_butterfly(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
+		soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1, x2, y2);
+		m = (m+1)&0x1;
+		
+		maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
+		soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1, x2, y2);
 		m = (m+1)&0x1;
 		
 		PALLET_BLIT(screen, map_surf[m], im_w, im_h, 2);
@@ -99,11 +92,8 @@ int main(int argc, char **argv)
 		
 		SDL_Flip(screen);
 		
-		if(!(cnt%2)) {
-			maxsrc_update();
-		}
-		cnt++;
-
+		pallet_step(2);
+		
 		Uint32 now = SDL_GetTicks();
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		//float dt = (now - tick0) * 0.001f;
@@ -111,6 +101,7 @@ int main(int argc, char **argv)
 		fps_oldtime = now;
 		
 		int newbeat = beat_get_count();
+		if(newbeat != beats) pallet_start_switch(newbeat%4);
 		if(newbeat != beats && now - last_beat_time > 1000) {
 			xt1 = 0.5f*((mt_lrand()%im_w)*2.0f/im_w - 1.0f); yt1 = 0.5f*((mt_lrand()%im_h)*2.0f/im_h - 1.0f);
 			xt2 = 0.5f*((mt_lrand()%im_w)*2.0f/im_w - 1.0f); yt2 = 0.5f*((mt_lrand()%im_h)*2.0f/im_h - 1.0f);

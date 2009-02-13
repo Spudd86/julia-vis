@@ -68,6 +68,8 @@ SDL_Surface *sdl_setup(opt_data *opts, int im_size)
 
 	vid_info = SDL_GetVideoInfo();
 	printf("\nusing mode %dx%d-%d\n", vid_info->current_w, vid_info->current_h, vid_info->vfmt->BitsPerPixel);
+	printf("Rshift=%i\nGShift=%i\nBShift=%i\n", screen->format->Rshift, screen->format->Gshift, screen->format->Bshift);
+	printf("Rmask=%x\nGmask=%x\nBmask=%x\n\n", screen->format->Rmask, screen->format->Gmask, screen->format->Bmask);
 
 	return screen;
 }

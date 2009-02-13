@@ -156,6 +156,8 @@ MAP_FUNC_ATTR void soft_map_butterfly(uint16_t *restrict out, uint16_t *restrict
 			
 			float x = 2.5f*v*v - sqrtf(fabsf(u))*sm + cx0;  
 			float y = 2.5f*u*u - sqrtf(fabsf(v))*sm + cy0;
+			
+			x = (x+1.0f)*0.5f; y = (y+1.0f)*0.5f;
 					
 			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
 			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
@@ -173,8 +175,8 @@ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict 
 	const float xoom = 3.0f, moox = 1.0f/xoom;
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	
-	cx1*=0.25; cy1*=0.25;
-	cx0*=4; cy0*=4;
+	cx1*=2; cy1*=2;
+	cx0*=2; cy0*=2;
 	
 	for(int yd = 0; yd < h; yd++) {
 		float v = yd*ystep - 1.0f;
@@ -187,7 +189,9 @@ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict 
 			b=4*(sa*a*b - a*b*sb) + cy0;  a=sa*sa -6*sa*sb + sb*sb + cx0;
 			cdivt = moox/(c*c + d*d); 
 			x= (a*c + b*d)*cdivt;  y= (a*d + c*b)*cdivt;
-					
+			
+			x = (x+1.0f)*0.5f; y = (y+1.0f)*0.5f;
+			
 			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
 			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
 			int x1 = xs>>8, x2 = x1+1, xf = xs&0xFF;
@@ -195,6 +199,7 @@ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict 
 			
 			*(out++) = ((in[y1*w + x1]*(0xff - xf) + in[y1*w + x2]*xf)*(0xff-yf) +
 						(in[y2*w + x1]*(0xff - xf) + in[y2*w + x2]*xf)*yf) >> 16;
+			//~ *(out++) = (fabsf(x) <= 1.0f && fabsf(y) <= 1.0f)
 		}
 	}
 }
