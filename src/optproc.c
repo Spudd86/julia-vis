@@ -6,7 +6,7 @@
 
 #include "common.h"
 
-static const *helpstr =
+static const char *helpstr =
 "Usage: %s [-w width] [-h height] [-s screen updates/second] [-fdp] [-j<pattern>]\n"
 "\t-p try to set an 8bpp mode (hardware pallets)\n"
 "\t-f go fullscreen\n"

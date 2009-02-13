@@ -209,12 +209,10 @@ int main(int argc, char **argv)
 		int delay =  (tick0 + frmcnt*10000/982) - now;
 		beats[beat_off] = (oldbc != beat_count);
 		beat_throb = beat_throb*(0.996) + (oldbc != beat_count);
-		//beat_throb = sigmoid(1/beat_throb + (oldbc != beat_count)); 
 		oldbc = beat_count;
 		
-		
-		//~ if(delay > 0)
-			//~ SDL_Delay(delay);
+		if(delay > 0)
+			SDL_Delay(delay);
 		
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		fps_oldtime = now;

@@ -37,8 +37,8 @@ static int iw, ih;
 
 void maxsrc_setup(int w, int h)
 {
-	pnt_w = IMAX(w/24, 12);
-	pnt_h = IMAX(h/24, 12);
+	pnt_w = IMAX(w/24, 16);
+	pnt_h = IMAX(h/24, 16);
 	iw = w; ih = h;
 	point_src = setup_point(pnt_w, pnt_h);
 	

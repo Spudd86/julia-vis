@@ -37,7 +37,7 @@ void beat_get_data(beat_data *ad) {
 	ad->counts = beat_bands;
 	ad->stddev = V;
 	ad->means  = E;
-	ad->hist = Eh;
+	ad->hist = (void *)Eh;
 }
 
 static inline float sqr(float x) { return x*x; }

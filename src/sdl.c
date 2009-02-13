@@ -18,7 +18,6 @@
 #include "audio/audio.h"
 
 #define MAP soft_map_interp
-#define PALLET_BLIT pallet_blit_SDL
 
 #define IM_SIZE (384)
 
@@ -74,16 +73,18 @@ int main(int argc, char **argv)
 		//~ soft_map_butterfly(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
 		//~ MAP(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
 		//~ m = (m+1)&0x1; 
+		//~ maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
+		//~ MAP(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
+		//~ m = (m+1)&0x1; 
 		maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
 		
 		soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1, x2, y2);
 		m = (m+1)&0x1;
-		
 		maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
 		soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1, x2, y2);
 		m = (m+1)&0x1;
 		
-		PALLET_BLIT(screen, map_surf[m], im_w, im_h, 2);
+		pallet_blit_SDL(screen, map_surf[m], im_w, im_h);
 		
 		char buf[32];
 		sprintf(buf,"%6.1f FPS", 1000.0f / frametime);

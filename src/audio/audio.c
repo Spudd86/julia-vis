@@ -93,9 +93,10 @@ int audio_get_fft(audio_data *d) {
 	d->data = tribuf_get_read(fft_tb);
 	return 0;
 }
-#endif
 
 static void *fft_data[3];
+#endif
+
 static void *samp_data[3];
 // sr is sample rate
 int audio_setup(int sr)
@@ -145,6 +146,6 @@ int audio_init(opt_data *od)
 		printf("Starting jack\n");
 		return jack_setup(od);
 	} else
-#endif
+	#endif
 		return audio_setup_pa();
 }

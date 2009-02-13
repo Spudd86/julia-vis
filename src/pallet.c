@@ -69,7 +69,7 @@ static uint32_t active_pal[257] __attribute__((aligned));
 void pallet_init(int bswap) {
 	for(int p=0; p < num_pallets; p++) {
 		
-		struct pallet_colour *curpal = static_pallets[p];
+		const struct pallet_colour *curpal = static_pallets[p];
 		int j = 0;
 		do {
 			j++;
@@ -98,10 +98,6 @@ static int pallet_changing = 0;
 static int palpos = 0;
 static int nextpal = 0;
 static int curpal = 1;
-
-static void *pallet_getpal() {
-	return active_pal;
-}
 
 void pallet_step(int step) {
 	if(!pallet_changing) return;
@@ -438,13 +434,13 @@ static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, uint16
 
 #include <SDL.h>
 
-void pallet_blit_SDL(SDL_Surface *dst, uint16_t* restrict src, int w, int h, int pi)
+void pallet_blit_SDL(SDL_Surface *dst, uint16_t* restrict src, int w, int h)
 {
 	const int src_stride = w;
 	w = IMIN(w, dst->w);
 	h = IMIN(h, dst->h);
 	
-	void *pal = pallet_getpal(pi, 32);//dst->format->BitsPerPixel);
+	void *pal = active_pal;
 	
 	if((SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) || w < 0 || h < 0) return;
 	if(dst->format->BitsPerPixel == 32) pallet_blit32(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
@@ -495,7 +491,6 @@ void pallet_blit_DFB(IDirectFBSurface *dst, uint16_t * restrict src, int w, int 
 			//~ *(int32_t *)(dest + y*dst_stride + x*4) = pal[src[y*w + x]>>8];
 //~ }
 
-//TODO load/generate pallets
 
 // this one is sort of what I'd like to do but there is no 8 bit mmx mul :(
 //~ void pallet_blitSDL(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pal)

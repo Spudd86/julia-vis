@@ -8,7 +8,7 @@
 
 #ifdef USE_SDL
 #include <SDL.h>
-void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, int pi);
+void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h);
 #endif
 
 #ifdef HAVE_DIRECTFB

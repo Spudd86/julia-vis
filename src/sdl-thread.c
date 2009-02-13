@@ -24,7 +24,6 @@
 #define IM_SIZE (384)
 
 #define MAP soft_map_interp
-#define PALLET_BLIT pallet_blit_SDL
 
 static opt_data opts;
 static int im_w = 0, im_h = 0;
@@ -91,7 +90,9 @@ static int run_map_thread(tribuf *tb)
 }
 
 static SDL_Event user_event;
-static Uint32 timercallback(Uint32 t, void *data) {SDL_PushEvent(&user_event); return t; }
+static int lastdrawn=0;
+static tribuf *map_tb = NULL;
+
 int main(int argc, char **argv) 
 {    
 	optproc(argc, argv, &opts);
@@ -110,7 +111,7 @@ int main(int argc, char **argv)
 		map_surf[i] = map_surf_mem + i * im_w * im_h * sizeof(uint16_t);
 	}
 	
-	tribuf *map_tb = tribuf_new((void **)map_surf);
+	map_tb = tribuf_new((void **)map_surf);
 	
 	user_event.type=SDL_USEREVENT;
 	user_event.user.code=2;
@@ -123,32 +124,32 @@ int main(int argc, char **argv)
 	maxsrc_update();
 	
 	SDL_Thread *map_thread = SDL_CreateThread(&run_map_thread, map_tb);
-	SDL_AddTimer(1000/opts.draw_rate, &timercallback, NULL);
+
 	
 	SDL_Event	event;
 	int beats = 0;
 	int prevfrm = 0;
-	Uint32 lasttime = SDL_GetTicks();
-	while(SDL_WaitEvent(&event) >= 0)
+	int frmcnt = 0;
+	Uint32 tick0 = SDL_GetTicks();
+	Uint32 lasttime = tick0;
+
+	while(SDL_PollEvent(&event) >= 0)
 	{
-		if(event.type == SDL_QUIT 
-				|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
+		if(event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
 			break;
-		} else if(event.type == SDL_USEREVENT) {
-			PALLET_BLIT(screen, tribuf_get_read(map_tb), im_w, im_h, 1);
-			//PALLET_BLIT(screen, maxsrc_get(), im_w, im_h, 1);
+		} else if(lastdrawn < tribuf_get_frmnum(map_tb)) {
+			lastdrawn = tribuf_get_frmnum(map_tb);
+			pallet_blit_SDL(screen, tribuf_get_read(map_tb), im_w, im_h);
+			//pallet_blit_SDL(screen, maxsrc_get(), im_w, im_h);
 			char buf[32];
 			sprintf(buf,"%6.1f FPS", map_fps);
 			DrawText(screen, buf);
 			SDL_Flip(screen);
 			
 			int newbeat = beat_get_count();
-			if(newbeat != beats) {
-				pallet_start_switch(newbeat%4);
-			}
-			beats = newbeat;
-			
+			if(newbeat != beats) pallet_start_switch(newbeat%4);
 			pallet_step(2);
+			beats = newbeat;
 
 			Uint64 now = SDL_GetTicks();
 			if(tribuf_get_frmnum(map_tb) - prevfrm > 1 && now - lasttime > 1000/16) {
@@ -157,6 +158,11 @@ int main(int argc, char **argv)
 				lasttime = now;
 			}
 		}
+		
+		Uint64 now = SDL_GetTicks();
+		int delay =  (tick0 + frmcnt*1000/opts.draw_rate) - now;
+		frmcnt++;
+		if(delay > 0) SDL_Delay(delay);
 	}
 	running = 0;
 	
