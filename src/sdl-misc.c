@@ -29,8 +29,8 @@ SDL_Surface *sdl_setup(opt_data *opts, int im_size)
 
     printf("SDL initialized.\n");
 
-
-	const int vidflags = SDL_HWSURFACE | SDL_HWACCEL | SDL_ASYNCBLIT | ((opts->doublebuf)?(SDL_DOUBLEBUF):0);
+//
+	const int vidflags = SDL_HWSURFACE | SDL_HWACCEL | SDL_ASYNCBLIT | SDL_ANYFORMAT | SDL_HWPALETTE | ((opts->doublebuf)?(SDL_DOUBLEBUF):0);
 	const SDL_VideoInfo *vid_info = SDL_GetVideoInfo();
 	SDL_Rect **modes = SDL_ListModes(vid_info->vfmt, vidflags);
 	if (modes == (SDL_Rect**)0) {
@@ -43,21 +43,21 @@ SDL_Surface *sdl_setup(opt_data *opts, int im_size)
 		if(opts->w < 0 && opts->h < 0) opts->w = opts->h = im_size;
 		else if(opts->w < 0) opts->w = opts->h;
 		else if(opts->h < 0) opts->h = opts->w;
-		screen = SDL_SetVideoMode(opts->w, opts->h, vid_info->vfmt->BitsPerPixel, vidflags | ((opts->fullscreen)?SDL_FULLSCREEN:0));
+		screen = SDL_SetVideoMode(opts->w, opts->h, (opts->hw_pallet?8:32), vidflags | ((opts->fullscreen)?SDL_FULLSCREEN:0));
 
 	} else {
 		if(opts->w < 0 && opts->h < 0) opts->h = im_size;
-		int mode=0;
+		int mode=-1;
 		for (int i=0; modes[i]; i++) {
 			printf("  %d x %d\n", modes[i]->w, modes[i]->h);
-			if(modes[i]->w >= opts->w && modes[i]->h >= opts->h && modes[i]->h <= modes[mode]->h)
+			if(modes[i]->w >= opts->w && modes[i]->h >= opts->h)
 				mode = i;
 		}
-		if(modes[mode]->w < im_size && modes[mode]->h < im_size) {
+		if(mode == -1) {
 			printf("No usable modes available!\n");
 			exit(-1);
 		}
-		screen = SDL_SetVideoMode(modes[mode]->w, modes[mode]->h, vid_info->vfmt->BitsPerPixel, vidflags);
+		screen = SDL_SetVideoMode(modes[mode]->w, modes[mode]->h, (opts->hw_pallet?8:32), vidflags);
 	}
 
     if ( screen == NULL ) {

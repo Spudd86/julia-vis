@@ -101,7 +101,7 @@ int main(int argc, char **argv)
 	audio_init(&opts);
 	
 	maxsrc_setup(im_w, im_h);
-	pallet_init();
+	pallet_init(screen->format->BitsPerPixel == 8);
 	
 	uint16_t *map_surf[3];
 	void *map_surf_mem = valloc(3 * im_w * im_h * sizeof(uint16_t));
@@ -109,10 +109,6 @@ int main(int argc, char **argv)
 	for(int i=0; i<3; i++) {
 		map_surf[i] = map_surf_mem + i * im_w * im_h * sizeof(uint16_t);
 	}
-	
-	//~ uint32_t *pal = _mm_malloc(257 * sizeof(uint32_t), 64); // p4 has 64 byte cache line
-	//~ for(int i = 0; i < 256; i++) pal[i] = ((2*abs(i-127))<<16) | (i<<8) | ((255-i));
-	//~ pal[256] = pal[255];
 	
 	tribuf *map_tb = tribuf_new((void **)map_surf);
 	

@@ -6,14 +6,6 @@
 
 #include "mymm.h"
 
-void maxblend_stride(void *restrict dest, int dest_stride, void *restrict source, int w, int h)
-{
-	uint16_t *restrict dst = dest, *restrict src = source;
-	for(int y=0; y < h; y++) 
-		for(int x=0; x < w; x++)
-			dst[dest_stride*y+x] = IMAX(dst[dest_stride*y+x], src[w*y+x]);
-}
-
 #ifndef __SSE2__
 
 //TODO: portable version (no x86 stuff)
@@ -54,7 +46,7 @@ void fade_pix(void *restrict buf, int w, int h, uint8_t fade)
 	_mm_empty();
 }
 
-// requires w%16 == 0
+// requires h*w%32 == 0
 void maxblend(void *restrict dest, void *restrict src, int w, int h)
 {
 	__m64 *mbdst = dest, *mbsrc = src;

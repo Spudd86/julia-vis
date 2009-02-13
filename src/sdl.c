@@ -32,9 +32,8 @@ int main(int argc, char **argv)
 	
 	audio_init(&opts);
 	
-	//uint16_t *maxsrc = setup_maxsrc(im_w, im_h);
 	maxsrc_setup(im_w, im_h);
-	pallet_init();
+	pallet_init(screen->format->BitsPerPixel == 8);
 
 	uint16_t *map_surf[2];
 	for(int i=0; i<2; i++) {
@@ -96,8 +95,6 @@ int main(int argc, char **argv)
 		
 		Uint32 now = SDL_GetTicks();
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
-		//float dt = (now - tick0) * 0.001f;
-		//t0=0.07f*dt; t1=-0.09f*dt; t2=0.1f*dt; t3=0.05f*dt;
 		fps_oldtime = now;
 		
 		int newbeat = beat_get_count();

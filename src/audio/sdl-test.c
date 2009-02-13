@@ -105,7 +105,7 @@ int main(int argc, char **argv)
 			|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE))
 			break;
 		
-		SDL_Rect r = {0,0, im_w, im_h/2+1};
+		SDL_Rect r = {0,0, im_w, im_h/2};
 		SDL_FillRect(screen, &r, 0);
 		
 		audio_data d;

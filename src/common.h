@@ -17,6 +17,7 @@ typedef struct {
 	int draw_rate;
 	int doublebuf;
 	int use_jack;
+	int hw_pallet;
 	const char *jack_opt;
 }opt_data;
 

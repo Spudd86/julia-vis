@@ -66,7 +66,7 @@ static uint32_t pallets32[4][256+8] __attribute__((aligned));
 
 static uint32_t active_pal[257] __attribute__((aligned)); 
 
-void pallet_init(void) {
+void pallet_init(int bswap) {
 	for(int p=0; p < num_pallets; p++) {
 		
 		struct pallet_colour *curpal = static_pallets[p];
@@ -81,7 +81,8 @@ void pallet_init(void) {
 				
 				//~ pallets555[p][i] = ((r&0xfa)<<7)|((g&0xfa)<<2)|(b>>3); // not woring right, plus doesn't seem to offer any speedup
 				//~ pallets565[p][i] = ((r&0xfa)<<8)|((g&0xfc)<<3)|(b>>3);
-				pallets32[p][i] = (r<<16)|(g<<8)|b;
+				if(bswap) pallets32[p][i] = (r)|(g<<8)|(b<<16);
+				else pallets32[p][i] = (r<<16)|(g<<8)|b;
 			}
 			
 		} while(static_pallets[p][j].pos != 255);
@@ -189,7 +190,7 @@ void pallet_start_switch(int next) {
 //TODO: load pallets from files of some sort
 //		pre-convert pallets to 565/555 if we're in a 16 bit mode (since we don't iterpolate there anyway)
 
-static void pallet_blit_SDL32(uint32_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
+static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
 {
 	__m64 zero = _mm_cvtsi32_si64(0ll);
 	__m64 mask = (__m64)(0x00ff00ff00ff);
@@ -265,26 +266,26 @@ static void pallet_blit_SDL32(uint32_t  * restrict dest, unsigned int dst_stride
 	}
 }
 
-static void pallet_blit_SDL16(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint16_t *restrict pal)
-{
-	for(unsigned int y = 0; y < h; y++) {
-		for(unsigned int x = 0; x < w; x+=4) {
-			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
-			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
+//~ static void pallet_blit16(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint16_t *restrict pal)
+//~ {
+	//~ for(unsigned int y = 0; y < h; y++) {
+		//~ for(unsigned int x = 0; x < w; x+=4) {
+			//~ __builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
+			//~ __builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
 			
-			int v = src[y*src_stride + x];
-			*(uint16_t *)(dest + y*dst_stride + x*2) = pal[v/256];
-			v = src[y*src_stride + x+1];
-			*(uint16_t *)(dest + y*dst_stride + (x+1)*2) = pal[v/256];
-			v = src[y*src_stride + x+2];
-			*(uint16_t *)(dest + y*dst_stride + (x+2)*2) = pal[v/256];
-			v = src[y*src_stride + x+3];
-			*(uint16_t *)(dest + y*dst_stride + (x+3)*2) = pal[v/256];
-		}
-	}
-}
+			//~ int v = src[y*src_stride + x];
+			//~ *(uint16_t *)(dest + y*dst_stride + x*2) = pal[v/256];
+			//~ v = src[y*src_stride + x+1];
+			//~ *(uint16_t *)(dest + y*dst_stride + (x+1)*2) = pal[v/256];
+			//~ v = src[y*src_stride + x+2];
+			//~ *(uint16_t *)(dest + y*dst_stride + (x+2)*2) = pal[v/256];
+			//~ v = src[y*src_stride + x+3];
+			//~ *(uint16_t *)(dest + y*dst_stride + (x+3)*2) = pal[v/256];
+		//~ }
+	//~ }
+//~ }
 
-static void pallet_blit_SDL565(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
+static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
@@ -344,7 +345,7 @@ static void pallet_blit_SDL565(uint8_t  * restrict dest, unsigned int dst_stride
 	}
 }
 
-static void pallet_blit_SDL555(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
+static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
 {	
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
@@ -405,11 +406,39 @@ static void pallet_blit_SDL555(uint8_t  * restrict dest, unsigned int dst_stride
 	}
 }
 
+static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, uint16_t* restrict src, unsigned int src_stride, int w, int h)
+{
+	for(unsigned int y = 0; y < h; y++) {
+		for(unsigned int x = 0; x < w; x+=16) {
+			__builtin_prefetch(src + y*src_stride + x + 16, 0, 0);
+			__builtin_prefetch(dest + y*dst_stride + x + 16, 1, 0);
+			
+			__m64 p1, p2;
+			
+			p1 = *(__m64 *)(src + y*src_stride + x);
+			p1  = _mm_srli_pi16(p1, 8);
+			p2 = *(__m64 *)(src + y*src_stride + x+4);
+			p2  = _mm_srli_pi16(p2, 8);
+			
+			p1 = _mm_packs_pu16(p1, p2);
+			*(__m64 *)(dest + y*dst_stride + x) = p1;
+			
+			p1 = *(__m64 *)(src + y*src_stride + x+8);
+			p1  = _mm_srli_pi16(p1, 8);
+			p2 = *(__m64 *)(src + y*src_stride + x+12);
+			p2  = _mm_srli_pi16(p2, 8);
+			
+			p1 = _mm_packs_pu16(p1, p2);
+			*(__m64 *)(dest + y*dst_stride + x+ 8) = p1;
+		}
+	}
+}
+
 #ifdef USE_SDL
 
 #include <SDL.h>
 
-void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, int pi)
+void pallet_blit_SDL(SDL_Surface *dst, uint16_t* restrict src, int w, int h, int pi)
 {
 	const int src_stride = w;
 	w = IMIN(w, dst->w);
@@ -418,11 +447,15 @@ void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h, in
 	void *pal = pallet_getpal(pi, 32);//dst->format->BitsPerPixel);
 	
 	if((SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) || w < 0 || h < 0) return;
-	if(dst->format->BitsPerPixel == 32) pallet_blit_SDL32(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
+	if(dst->format->BitsPerPixel == 32) pallet_blit32(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
 	//~ else if(dst->format->BitsPerPixel == 16 || dst->format->BitsPerPixel == 15)
-		//~ pallet_blit_SDL16(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
-	else if(dst->format->BitsPerPixel == 16) pallet_blit_SDL565(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
-	else if(dst->format->BitsPerPixel == 15) pallet_blit_SDL555(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
+		//~ pallet_blit16(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
+	else if(dst->format->BitsPerPixel == 16) pallet_blit565(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
+	else if(dst->format->BitsPerPixel == 15) pallet_blit555(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
+	else if(dst->format->BitsPerPixel == 8) { // need to set surface's pallet
+		pallet_blit8(dst->pixels, dst->pitch, src, src_stride, w, h);
+		SDL_SetColors(dst, pal, 0, 256);
+	}
 	_mm_empty();
 	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
 }
@@ -446,9 +479,9 @@ void pallet_blit_DFB(IDirectFBSurface *dst, uint16_t * restrict src, int w, int 
 	w = IMIN(w, dst_w);
 	h = IMIN(h, dst_h);
 	dst->Lock(dst, DSLF_WRITE, &dst_pixels, &dst_pitch); // TODO: error check
-	if(dst_format == DSPF_RGB32) pallet_blit_SDL32(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
-	else if(dst_format == DSPF_RGB16) pallet_blit_SDL565(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
-	else if(dst_format == DSPF_RGB555) pallet_blit_SDL555(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
+	if(dst_format == DSPF_RGB32) pallet_blit32(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
+	else if(dst_format == DSPF_RGB16) pallet_blit565(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
+	else if(dst_format == DSPF_RGB555) pallet_blit555(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
 	_mm_empty();
 	dst->Unlock(dst);
 }
