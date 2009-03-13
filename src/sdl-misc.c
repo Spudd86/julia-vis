@@ -16,6 +16,8 @@ static TTF_Font *font = NULL;
 SDL_Surface *sdl_setup(opt_data *opts, int im_size)
 {
 	printf("Initializing SDL.\n");
+	putenv("SDL_NOMOUSE=1");
+	
     if((SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTTHREAD | SDL_INIT_TIMER)==-1)) {
         printf("Could not initialize SDL: %s.\n", SDL_GetError());
         exit(-1);
