@@ -203,6 +203,90 @@ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict 
 		}
 	}
 }
+
+
+MAP_FUNC_ATTR void soft_map_rational_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float cx0, float cy0, float cx1, float cy1)
+{
+	const float xoom = 3.0f, moox = 1.0f/xoom;
+	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
+	float v0 = -1.0f;
+	for(int yd = 0; yd < h; yd+=BLOCK_SIZE) {
+		float v1 = v0+vstep;
+		
+		float a,b,c,d,sa,sb, cdivt, x, y;
+			
+		a=-xoom; b=v0*xoom; sa=a*a; sb=b*b;
+		c=sa-sb + cx1; d=2*a*b+cy1;
+		b=4*(sa*a*b - a*b*sb) + cy0;  a=sa*sa -6*sa*sb + sb*sb + cx0;
+		cdivt = moox/(c*c + d*d); 
+		x= (a*c + b*d)*cdivt;  y= (a*d + c*b)*cdivt;
+		float y00 = (y+1.0f)*0.5f;
+		float x00 = (x+1.0f)*0.5f; 
+		
+		a=-xoom; b=v1*xoom; sa=a*a; sb=b*b;
+		c=sa-sb + cx1; d=2*a*b+cy1;
+		b=4*(sa*a*b - a*b*sb) + cy0;  a=sa*sa -6*sa*sb + sb*sb + cx0;
+		cdivt = moox/(c*c + d*d); 
+		x= (a*c + b*d)*cdivt;  y= (a*d + c*b)*cdivt;
+		float y10 = (y+1.0f)*0.5f;
+		float x10 = (x+1.0f)*0.5f; 
+		float u1 = -1.0f;
+		for(int xd = 0; xd < w; xd+=BLOCK_SIZE) {
+			u1 = u1+ustep;
+			
+			a=u1*xoom; b=v0*xoom; sa=a*a; sb=b*b;
+			c=sa-sb + cx1; d=2*a*b+cy1;
+			b=4*(sa*a*b - a*b*sb) + cy0;  a=sa*sa -6*sa*sb + sb*sb + cx0;
+			cdivt = moox/(c*c + d*d); 
+			x= (a*c + b*d)*cdivt;  y= (a*d + c*b)*cdivt;
+			float y01 = (y+1.0f)*0.5f;
+			float x01 = (x+1.0f)*0.5f; 
+			
+			a=u1*xoom; b=v1*xoom; sa=a*a; sb=b*b;
+			c=sa-sb + cx1; d=2*a*b+cy1;
+			b=4*(sa*a*b - a*b*sb) + cy0;  a=sa*sa -6*sa*sb + sb*sb + cx0;
+			cdivt = moox/(c*c + d*d); 
+			x= (a*c + b*d)*cdivt;  y= (a*d + c*b)*cdivt;
+			float y11 = (y+1.0f)*0.5f;
+			float x11 = (x+1.0f)*0.5f; 
+			
+			int x0 = IMIN(IMAX(lrintf(x00*w*256), 0), (w-1)*256);
+			int y0 = IMIN(IMAX(lrintf(y00*h*256), 0), (h-1)*256);
+			
+			int x1 = IMIN(IMAX(lrintf(x01*w*256), 0), (w-1)*256);
+			int y1 = IMIN(IMAX(lrintf(y01*h*256), 0), (h-1)*256);
+			
+			int x0s = (IMIN(IMAX(lrintf(x10*w*256), 0), (w-1)*256) - x0)/BLOCK_SIZE;
+			int x1s = (IMIN(IMAX(lrintf(x11*w*256), 0), (w-1)*256) - x1)/BLOCK_SIZE;
+			int y0s = (IMIN(IMAX(lrintf(y10*h*256), 0), (h-1)*256) - y0)/BLOCK_SIZE;
+			int y1s = (IMIN(IMAX(lrintf(y11*h*256), 0), (h-1)*256) - y1)/BLOCK_SIZE;
+			
+			for(int yt=0; yt<BLOCK_SIZE; yt++, x0+=x0s, y0+=y0s, x1+=x1s, y1+=y1s) {
+				int x = x0;
+				int y = y0;
+				int xst = (x1 - x0)/BLOCK_SIZE;
+				int yst = (y1 - y0)/BLOCK_SIZE;
+				for(int xt=0; xt<BLOCK_SIZE; xt++, x+=xst, y+=yst) {
+					int xs=x/256, ys=y/256;
+					int xf=x&0xFF, yf=y&0xFF;
+
+					int xi1 = xs; 
+					int yi1 = ys*w;
+					int xi2 = IMIN(xi1+1,w-1);
+					int yi2 = IMIN(yi1+w,(h-1)*w);
+					
+					out[(yd+yt)*w+xd+xt] = ((in[yi1 + xi1]*(255 - xf) + in[yi1 + xi2]*xf)*(255-yf) +
+								(in[yi2 + xi1]*(255 - xf) + in[yi2 + xi2]*xf)*yf) >> 16;
+
+				}
+			}
+			y00 = y01; y10 = y11;
+			x00 = x01; x10 = x11;
+		}
+		v0=v1;
+	}
+}
+
 //~ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float cx0, float cy0, float cx1, float cy1 )
 //~ {
 	//~ float complex c1 = cx0 + cy0*I; float complex c2 = cx1 + cy1*I;
