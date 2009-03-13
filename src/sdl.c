@@ -51,11 +51,13 @@ int main(int argc, char **argv)
 	xt2 = 0.5f*((mt_lrand()%im_w)*2.0f/im_w - 1.0f); yt2 = 0.5f*((mt_lrand()%im_h)*2.0f/im_h - 1.0f);
 	x2 = 0.5f*((mt_lrand()%im_w)*2.0f/im_w - 1.0f); y2 = 0.5f*((mt_lrand()%im_h)*2.0f/im_h - 1.0f);
 	
-	Uint32 tick0;
-	Uint32 fps_oldtime = tick0 = SDL_GetTicks();
+	float fx1=x1, fy1=y1, fx2=x2, fy2=y2;
+	
+	Uint32 tick0, fps_oldtime;
+	fps_oldtime = tick0 = SDL_GetTicks();
 	float frametime = 100;
 	int beats = beat_get_count();
-	int done_time = tick0;
+	uint64_t done_frms = 0;
 	unsigned int last_beat_time = tick0;
 
 	SDL_Event	event;
@@ -74,8 +76,8 @@ int main(int argc, char **argv)
 		//~ MAP(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
 		//~ m = (m+1)&0x1; 
 		//~ maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
-		//~ MAP(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
-		//~ m = (m+1)&0x1; 
+		//MAP(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
+		//m = (m+1)&0x1; 
 		maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
 		
 		soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1, x2, y2);
@@ -95,6 +97,7 @@ int main(int argc, char **argv)
 		pallet_step(2);
 		
 		Uint32 now = SDL_GetTicks();
+		
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		fps_oldtime = now;
 		
@@ -107,11 +110,13 @@ int main(int argc, char **argv)
 		}
 		beats = newbeat;
 		
-		const float delt = 30.0f/200.0f;
+		const int steps_ps = 100;
+		const float delt = 30.0f/steps_ps;
 		const float tsped = 0.002;
-		const int dt = 1000/200;
+		const uint64_t dt = 1000/steps_ps;
+		const uint64_t del = now - tick0;
 		
-		while(done_time <= now) {
+		while(done_frms*dt + dt < del) {
 			float xtmp1 = xt1 - x1, ytmp1 = yt1-y1;
 			float xtmp2 = xt2 - x2, ytmp2 = yt2-y2;
 			float mag = xtmp1*xtmp1+ytmp1*ytmp1+xtmp2*xtmp2+ytmp2*ytmp2;
@@ -125,8 +130,23 @@ int main(int argc, char **argv)
 			x2=x2+vx2*delt;
 			y2=y2+vy2*delt;
 			
-			done_time += dt;
+			done_frms++;
 		}
+/*		float frac = (delt*(del - done_frms*dt))/dt;
+		float xtmp1 = xt1 - x1, ytmp1 = yt1-y1;
+		float xtmp2 = xt2 - x2, ytmp2 = yt2-y2;
+		float mag = xtmp1*xtmp1+ytmp1*ytmp1+xtmp2*xtmp2+ytmp2*ytmp2;
+			mag=(mag>0)?delt*0.4f/sqrtf(mag):0;
+		fx1=(vx1+xtmp1*mag*tsped)/(tsped+1);
+		fy1=(vy1+ytmp1*mag*tsped)/(tsped+1);
+		fx2=(vx2+xtmp2*mag*tsped)/(tsped+1);
+		fy2=(vy2+ytmp2*mag*tsped)/(tsped+1);
+		fx1=x1+fx1*frac;
+		fy1=y1+fy1*frac;
+		fx2=x2+fx2*frac;
+		fy2=y2+fy2*frac;
+*/		
+		fx1=x1;fy1=y1;fx2=x2;fy2=y2;
 	}
 
     return 0;
