@@ -30,13 +30,14 @@ int audio_setup_pa()
 	PaError err = Pa_Initialize();
 	if( err != paNoError ) { printf(  "PortAudio error: %s\n", Pa_GetErrorText(err)); exit(1); }
 	
+	PaDeviceInfo *inf = Pa_GetDeviceInfo(Pa_GetDefaultInputDevice());
 	
 	/* Open an audio I/O stream. */
     err = Pa_OpenDefaultStream( &stream,
-                                1,          /* no input channels */
-                                0,          /* stereo output */
+                                1,          /* 1 input channel */
+                                0,          /* no output */
                                 paFloat32,  /* 32 bit floating point output */
-                                SAMPLE_RATE,
+                                inf->defaultSampleRate,
                                 1024,        /* frames per buffer, i.e. the number
                                                    of sample frames that PortAudio will
                                                    request from the callback. Many apps
@@ -48,8 +49,9 @@ int audio_setup_pa()
                                 NULL ); /*This is a pointer that will be passed to
                                                    your callback*/
     if( err != paNoError ) goto error;
-
-	audio_setup(SAMPLE_RATE);
+	
+	PaStreamInfo *si = Pa_GetStreamInfo (stream);
+	audio_setup(si->sampleRate);
 	
 	err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
