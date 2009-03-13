@@ -127,7 +127,9 @@ void maxsrc_update(void)
 	
 	audio_data ad;
 	audio_get_samples(&ad);
-	int samp = IMAX(iw,ih)*2/5;
+	//int samp = IMAX(iw,ih)*3/5;
+	//int samp = IMAX(IMAX(iw,ih)*3/5, 1023);
+	int samp = IMAX(IMAX(iw,ih), 1023);
 	
 	//tx = 0; ty = 0; tz = M_PI_4;
 	

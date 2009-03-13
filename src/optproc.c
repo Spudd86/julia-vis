@@ -10,6 +10,8 @@ static const char *helpstr =
 "Usage: %s [-w width] [-h height] [-s screen updates/second] [-fdp] [-j<pattern>]\n"
 "\t-p try to set an 8bpp mode (hardware pallets)\n"
 "\t-f go fullscreen\n"
+"\t-a oscolliscope update rate [default 12]\n"
+"\t-s screen update rate [default 30, threaded only]\n"
 "\t-d try to enable double buffering\n"
 "\t-j use jack optionally specify a pattern of ports to connect to\n"
 ;
@@ -23,12 +25,13 @@ void optproc(int argc, char **argv, opt_data *res)
 	res->w = res->h = -1;
 	res->fullscreen = 0;
 	res->draw_rate = 30;
+	res->maxsrc_rate = 12;
 	res->doublebuf = 0;
 	res->hw_pallet = 0;
 	res->use_jack = 0;
 	res->jack_opt = NULL;
 	
-	while((opt = getopt(argc, argv, "w:h:s:ftpdj::")) != -1) {
+	while((opt = getopt(argc, argv, "w:h:s:a:ftpdj::")) != -1) {
 		switch(opt) {
 			case 'w':
 				res->w = atoi(optarg);
@@ -51,6 +54,9 @@ void optproc(int argc, char **argv, opt_data *res)
 				break;
 			case 's':
 				res->draw_rate = atoi(optarg);
+				break;
+			case 'a':
+				res->maxsrc_rate = atoi(optarg);
 				break;
 			case 't': // will be threads on/off
 				//break;

@@ -14,6 +14,7 @@
 typedef struct {
 	int w, h;
 	int fullscreen;
+	int maxsrc_rate;
 	int draw_rate;
 	int doublebuf;
 	int use_jack;
