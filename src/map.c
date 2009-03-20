@@ -176,7 +176,7 @@ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict 
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	
 	cx1*=2; cy1*=2;
-	cx0*=2; cy0*=2;
+	cx0*=1; cy0*=1;
 	
 	for(int yd = 0; yd < h; yd++) {
 		float v = yd*ystep - 1.0f;
@@ -204,6 +204,7 @@ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict 
 	}
 }
 
+#define infs(a, b) ((isfinite(a))?(a):(b))
 
 MAP_FUNC_ATTR void soft_map_rational_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float cx0, float cy0, float cx1, float cy1)
 {
@@ -252,7 +253,6 @@ MAP_FUNC_ATTR void soft_map_rational_interp(uint16_t *restrict out, uint16_t *re
 			
 			int x0 = IMIN(IMAX(lrintf(x00*w*256), 0), (w-1)*256);
 			int y0 = IMIN(IMAX(lrintf(y00*h*256), 0), (h-1)*256);
-			
 			int x1 = IMIN(IMAX(lrintf(x01*w*256), 0), (w-1)*256);
 			int y1 = IMIN(IMAX(lrintf(y01*h*256), 0), (h-1)*256);
 			
