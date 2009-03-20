@@ -99,13 +99,83 @@ static int palpos = 0;
 static int nextpal = 0;
 static int curpal = 1;
 
+#ifdef __SEE2__
+#include <emmintrin.h>
 void pallet_step(int step) {
 	if(!pallet_changing) return;
 	palpos += step;
 	if(palpos >=256) {
 		pallet_changing = palpos = 0;
 		curpal = nextpal;
-		memcpy(active_pal, pallets32[nextpal], sizeof(uint32_t)*257);
+		//memcpy(active_pal, pallets32[nextpal], sizeof(uint32_t)*257);
+		return;
+	}
+	
+	__m128i zero = _mm_setzero_si128();
+	__m128i mask = _mm_set1_epi16(0x00ff);
+	__m128i vt = _mm_set1_epi16(palpos); // same for all i
+	
+	for(int i = 0; i < 256; i+=8) {
+		__m128i s1 = *(__m128i *)(pallets32[nextpal]+i);
+		__m128i s2 = s1;
+		s1 = _mm_unpacklo_epi8(s1, zero);
+		s2 = _mm_unpackhi_epi8(s2, zero);
+		
+		__m128i d1 = *(__m128i *)(pallets32[curpal]+i);
+		__m128i d2 = d1;
+		d1 = _mm_unpacklo_epi8(d1, zero);
+		d2 = _mm_unpackhi_epi8(d2, zero);
+		
+		s1 = _mm_mullo_epi16(s1, vt);
+		vt = _mm_andnot_si128(vt, mask); // vt = 255 - vt
+		d1 = _mm_mullo_epi16(d1, vt);
+		s1 = _mm_add_epi16(s1, d1);
+		s1 = _mm_srli_epi16(s1, 8);
+		
+		d2 = _mm_mullo_epi16(d2, vt);
+		vt = _mm_andnot_si128(vt, mask); // vt = 255 - vt
+		s2 = _mm_mullo_epi16(s2, vt);
+		s2 = _mm_add_epi16(s2, d2);
+		s2 = _mm_srli_epi16(s2, 8);
+			
+		s1 = _mm_packs_epu16(s1, s2);
+		*(__m128i *)(active_pal+i) = s1;
+		
+		s1 = *(__m128i *)(pallets32[nextpal]+i+4);
+		s2 = s1;
+		s1 = _mm_unpacklo_epi8(s1, zero);
+		s2 = _mm_unpackhi_epi8(s2, zero);
+		
+		d1 = *(__m128i *)(pallets32[curpal]+i+4);
+		d2 = d1;
+		d1 = _mm_unpacklo_epi8(d1, zero);
+		d2 = _mm_unpackhi_epi8(d2, zero);
+		
+		s1 = _mm_mullo_epi16(s1, vt);
+		vt = _mm_andnot_si128(vt, mask); // vt = 255 - vt
+		d1 = _mm_mullo_epi16(d1, vt);
+		s1 = _mm_add_epi16(s1, d1);
+		s1 = _mm_srli_epi16(s1, 8);
+		
+		d2 = _mm_mullo_epi16(d2, vt);
+		vt = _mm_andnot_si128(vt, mask); // vt = 255 - vt
+		s2 = _mm_mullo_epi16(s2, vt);
+		s2 = _mm_add_epi16(s2, d2);
+		s2 = _mm_srli_epi16(s2, 8);
+			
+		s1 = _mm_packs_epu16(s1, s2);
+		*(__m128 *)(active_pal+i+4) = s1;
+	}
+	active_pal[256] = active_pal[255];
+}
+#else
+void pallet_step(int step) {
+	if(!pallet_changing) return;
+	palpos += step;
+	if(palpos >=256) {
+		pallet_changing = palpos = 0;
+		curpal = nextpal;
+		//memcpy(active_pal, pallets32[nextpal], sizeof(uint32_t)*257);
 		return;
 	}
 	
@@ -166,8 +236,8 @@ void pallet_step(int step) {
 	}
 	active_pal[256] = active_pal[255];
 	_mm_empty();
-	
 }
+#endif
 
 void pallet_start_switch(int next) {
 	if(pallet_changing || next == curpal) return; // haven't finished the last one
@@ -188,12 +258,12 @@ void pallet_start_switch(int next) {
 
 static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
 {
-	__m64 zero = _mm_cvtsi32_si64(0ll);
-	__m64 mask = (__m64)(0x00ff00ff00ff);
+	const __m64 zero = _mm_cvtsi32_si64(0ll);
+	const __m64 mask = (__m64)(0x00ff00ff00ff);
 	dst_stride /= 4;
 	
 	for(unsigned int y = 0; y < h; y++) {
-		for(unsigned int x = 0; x < w; x+=4) {
+		for(unsigned int x = 0; x < w; x+=2) {
 			int v = src[y*src_stride + x];
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
 			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
@@ -203,12 +273,12 @@ static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, ui
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
 			
-		    //col1 = (col1*v + col2*(0xff-v))/256;
+		    //col1 = (col2*v + col1*(0xff-v))/256;
 			__m64 vt = _mm_set1_pi16(v);
 			vt = _mm_and_si64(vt, mask);
-    		col1 = _mm_mullo_pi16(col1, vt);
+			col2 = _mm_mullo_pi16(col2, vt);
 			vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
-    		col2 = _mm_mullo_pi16(col2, vt);
+			col1 = _mm_mullo_pi16(col1, vt);
     		col1 = _mm_add_pi16(col1, col2);
     		col1 = _mm_srli_pi16(col1, 8);
     		
@@ -220,7 +290,8 @@ static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, ui
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
 			
-			// re-use vt from before, just do cols in opposite order
+			vt = _mm_set1_pi16(v);
+			vt = _mm_and_si64(vt, mask);
 			col2 = _mm_mullo_pi16(col2, vt);
 			vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
 			col1 = _mm_mullo_pi16(col1, vt);
@@ -236,9 +307,12 @@ static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, ui
 			col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
-    		col1 = _mm_mullo_pi16(col1, vt);
+			
+			vt = _mm_set1_pi16(v);
+			vt = _mm_and_si64(vt, mask);
+			col2 = _mm_mullo_pi16(col2, vt);
 			vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
-    		col2 = _mm_mullo_pi16(col2, vt);
+			col1 = _mm_mullo_pi16(col1, vt);
     		col1 = _mm_add_pi16(col1, col2);
     		col1 = _mm_srli_pi16(col1, 8);
     		
@@ -249,6 +323,9 @@ static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, ui
 			col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
+			
+			vt = _mm_set1_pi16(v);
+			vt = _mm_and_si64(vt, mask);
 			col2 = _mm_mullo_pi16(col2, vt);
 			vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
 			col1 = _mm_mullo_pi16(col1, vt);
