@@ -16,8 +16,9 @@ struct pallet_colour {
 	unsigned char pos;
 };
 
-static const int num_pallets = 4;
-static const struct pallet_colour static_pallets[4][64] = {
+#define NUM_PALLETS 5
+static const int num_pallets = NUM_PALLETS;
+static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
     
 	{	//  r    g    b  pos
 		{   0,  11, 138,   0},
@@ -51,6 +52,15 @@ static const struct pallet_colour static_pallets[4][64] = {
 		{   0,   0,   0,  29},
 		{ 115, 230,   0, 195},
 		{  45, 255, 255, 255}
+	},
+	
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0}, // TODO tweak this
+		{ 196,  23,   0,  10},
+		{ 255, 255, 255,  25},
+		{  32,  96,   0,  50},
+		{ 115, 230,   0, 200},
+		{  45, 255, 255, 255}
 	}
 
 	// END
@@ -62,7 +72,7 @@ static const struct pallet_colour static_pallets[4][64] = {
 //TODO: make sure these have good alignment
 //~ static uint16_t pallets555[4][256+16] __attribute__((aligned)); // keep aligned
 //~ static uint16_t pallets565[4][256+16] __attribute__((aligned));
-static uint32_t pallets32[4][256+8] __attribute__((aligned));
+static uint32_t pallets32[NUM_PALLETS][256+8] __attribute__((aligned));
 
 static uint32_t active_pal[257] __attribute__((aligned)); 
 
@@ -91,7 +101,7 @@ void pallet_init(int bswap) {
 		pallets32[p][256]  = pallets32[p][255];
 	}
 	
-	memcpy(active_pal, pallets32[1], sizeof(uint32_t)*257);
+	memcpy(active_pal, pallets32[4], sizeof(uint32_t)*257);
 }
 
 static int pallet_changing = 0;
@@ -244,7 +254,7 @@ void pallet_start_switch(int next) {
 	
 	if(next<0 || next>=num_pallets) return;
 	nextpal = next;
-	pallet_changing = 1;
+	//pallet_changing = 1;
 }
 
 // pallet must have 257 entries (for easier interpolation on 16 bit indicies)

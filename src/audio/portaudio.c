@@ -30,7 +30,7 @@ int audio_setup_pa()
 	PaError err = Pa_Initialize();
 	if( err != paNoError ) { printf(  "PortAudio error: %s\n", Pa_GetErrorText(err)); exit(1); }
 	
-	PaDeviceInfo *inf = Pa_GetDeviceInfo(Pa_GetDefaultInputDevice());
+	const PaDeviceInfo *inf = Pa_GetDeviceInfo(Pa_GetDefaultInputDevice());
 	
 	/* Open an audio I/O stream. */
     err = Pa_OpenDefaultStream( &stream,
@@ -50,7 +50,7 @@ int audio_setup_pa()
                                                    your callback*/
     if( err != paNoError ) goto error;
 	
-	PaStreamInfo *si = Pa_GetStreamInfo (stream);
+	const PaStreamInfo *si = Pa_GetStreamInfo (stream);
 	audio_setup(si->sampleRate);
 	
 	err = Pa_StartStream( stream );

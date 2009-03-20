@@ -48,7 +48,8 @@ void maxsrc_setup(int w, int h)
 }
 
 uint16_t *maxsrc_get(void) {
-	return prev_src;
+	__sync_synchronize();
+	return prev_src; // atomic?
 }
 
 static float tx=0, ty=0, tz=0;
@@ -121,6 +122,7 @@ static void zoom(uint16_t *out, uint16_t *in, int w, int h, float R[3][3])
 //   Note: this is also true of the triple buffering but for that to break we'd
 //       need to be calling this at least 3 times faster than the consumer is running
 //       which would be just wastful and stupid
+// hmm the double buffering here doesn't quite seem to work.... 
 void maxsrc_update(void)
 {
 	uint16_t *dst = next_src;
@@ -162,9 +164,9 @@ void maxsrc_update(void)
 		float yi = y*zvd*ih*3/4+ih/2 - pnt_h/2;
 		draw_point(dst, xi, yi);
 	}
-	
+	//next_src = __sync_val_compare_and_swap(&prev_src, prev_src, next_src);
 	next_src = prev_src;
-	prev_src = dst;
+	prev_src = dst; // atomic?
 	
 	tx+=0.02; ty+=0.01; tz-=0.003;
 }

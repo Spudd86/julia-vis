@@ -187,6 +187,7 @@ int main(int argc, char **argv)
 		
 		int beat_count = beat_get_count();
 		int beat_off = ((fps_oldtime-tick0)*982/10000)%im_w;
+		//int beat_off = ((fps_oldtime-tick0)*1000/10000)%im_w;
 		//int beat_off = audio_get_buf_count() % im_w;
 		
 		for(int i=0; i < im_w; i++) {
@@ -206,6 +207,7 @@ int main(int argc, char **argv)
 		
 		frmcnt++;
 		Uint32 now = SDL_GetTicks();
+		//int delay =  (tick0 + frmcnt*10000/1000) - now;
 		int delay =  (tick0 + frmcnt*10000/982) - now;
 		beats[beat_off] = (oldbc != beat_count);
 		beat_throb = beat_throb*(0.996) + (oldbc != beat_count);

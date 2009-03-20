@@ -106,7 +106,7 @@ bin/sdl-test: src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/max
 	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
 bin/sdlthread-test: src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
-	$(CC) $(CFLAGS) -DUSE_SDL -DMT_NO_INLINE \
+	$(CC) $(CFLAGS) -DUSE_SDL -DMT_NO_INLINE -DTRIBUF_LOCKING \
 	src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c \
 	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 

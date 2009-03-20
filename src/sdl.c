@@ -76,15 +76,15 @@ int main(int argc, char **argv)
 		//~ MAP(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
 		//~ m = (m+1)&0x1; 
 		//~ maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
-		//MAP(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
-		//m = (m+1)&0x1; 
+		MAP(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1);
+		m = (m+1)&0x1; 
 		maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
 		
-		soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1, x2, y2);
-		m = (m+1)&0x1;
-		maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
-		soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1, x2, y2);
-		m = (m+1)&0x1;
+		//~ soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h,  x1, y1, x2, y2);
+		//~ m = (m+1)&0x1;
+		//~ maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
+		//~ soft_map_rational(map_surf[(m+1)&0x1], map_surf[m], im_w, im_h, x1, y1, x2, y2);
+		//~ m = (m+1)&0x1;
 		
 		pallet_blit_SDL(screen, map_surf[m], im_w, im_h);
 		
@@ -132,7 +132,7 @@ int main(int argc, char **argv)
 			
 			done_frms++;
 		}
-/*		float frac = (delt*(del - done_frms*dt))/dt;
+		float frac = (delt*(del - done_frms*dt))/dt;
 		float xtmp1 = xt1 - x1, ytmp1 = yt1-y1;
 		float xtmp2 = xt2 - x2, ytmp2 = yt2-y2;
 		float mag = xtmp1*xtmp1+ytmp1*ytmp1+xtmp2*xtmp2+ytmp2*ytmp2;
@@ -145,7 +145,7 @@ int main(int argc, char **argv)
 		fy1=y1+fy1*frac;
 		fx2=x2+fx2*frac;
 		fy2=y2+fy2*frac;
-*/		
+		
 		fx1=x1;fy1=y1;fx2=x2;fy2=y2;
 	}
 

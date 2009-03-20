@@ -120,9 +120,9 @@ int audio_setup(int sr)
 		fft_data[i] = xmalloc(sizeof(float) * (nr_samp/2+1));
 		memset(fft_data[i], 0, sizeof(float) * nr_samp/2+1);
 	}
-	fft_tb = tribuf_new(fft_data);
+	fft_tb = tribuf_new(fft_data, 0);
 	#endif
-	samp_tb = tribuf_new(samp_data);
+	samp_tb = tribuf_new(samp_data, 0);
 	
 	beat_setup();
 	

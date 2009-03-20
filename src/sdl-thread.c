@@ -31,8 +31,12 @@ static int im_w = 0, im_h = 0;
 static int running = 1;
 static float map_fps=0;
 
+#include <pthread.h>
+
 static int run_map_thread(tribuf *tb) 
 {
+	//pthread_setschedprio(pthread_self(), 5);
+	
 	float vx, vy, x, y, xt, yt, u, v;
 	
 	mt_goodseed(); // seed our PSRNG
@@ -50,13 +54,13 @@ static int run_map_thread(tribuf *tb)
 	struct timespec fpstimes[40]; for(int i=0; i<40; i++) fpstimes[i] = tm0;
 	
 	uint64_t done_frms=0;
-	uint16_t *map_src = tribuf_get_read(tb);
+	uint16_t *map_src = tribuf_get_read_nolock(tb);
     while(running) 
 	{
 		frmcnt++;
 		
 		uint16_t *map_dest = tribuf_get_write(tb);
-
+		
 		MAP(map_dest, map_src, im_w, im_h, u, v);
 		maxblend(map_dest, maxsrc_get(), im_w, im_h);
 		
@@ -104,6 +108,8 @@ static int run_map_thread(tribuf *tb)
 		u = x + frac*(vx+xtmp*mag*tsped)/(tsped+1);
 		v = y + frac*(vy+ytmp*mag*tsped)/(tsped+1);
 		//~ u=x; v=y;
+		//SDL_Delay(10);
+
     }
 	return 0;
 }
@@ -126,7 +132,7 @@ int main(int argc, char **argv)
 		map_surf[i] = map_surf_mem + i * im_w * im_h * sizeof(uint16_t);
 	memset(map_surf_mem, 0, 3 * im_w * im_h * sizeof(uint16_t));
 	
-	tribuf *map_tb = tribuf_new((void **)map_surf);
+	tribuf *map_tb = tribuf_new((void **)map_surf, 1);
 	
 	maxsrc_update();
 
@@ -136,9 +142,11 @@ int main(int argc, char **argv)
 	int lastdrawn=0;
 	int maxfrms = 0;
 	Uint32 tick0 = SDL_GetTicks();
-	Uint32 lasttime = tick0;
+	Uint32 lastupdate, lasttime; lastupdate = lasttime = tick0;
+	Uint32 fpstimes[opts.draw_rate]; for(int i=0; i<opts.draw_rate; i++) fpstimes[i] = tick0;
+	float scr_fps = 0;
 	
-	SDL_Thread *map_thread = SDL_CreateThread(&run_map_thread, map_tb);
+	SDL_Thread *map_thread = SDL_CreateThread((void *)&run_map_thread, map_tb);
 	SDL_Event event;
 	while(SDL_PollEvent(&event) >= 0)
 	{
@@ -147,20 +155,26 @@ int main(int argc, char **argv)
 		} else if(lastdrawn < tribuf_get_frmnum(map_tb)) {
 			lastdrawn = tribuf_get_frmnum(map_tb);
 			pallet_blit_SDL(screen, tribuf_get_read(map_tb), im_w, im_h);
+			tribuf_finish_read(map_tb);
 			//pallet_blit_SDL(screen, maxsrc_get(), im_w, im_h);
-			char buf[32];
-			sprintf(buf,"%6.1f FPS", map_fps);
+			char buf[64];
+			sprintf(buf,"%6.1f FPS %6.1f UPS", map_fps, scr_fps);
 			DrawText(screen, buf);
 			SDL_Flip(screen);
 			
 			int newbeat = beat_get_count();
-			if(newbeat != beats) pallet_start_switch(newbeat%4);
+			if(newbeat != beats) pallet_start_switch(newbeat%5);
 			pallet_step(2);
 			beats = newbeat;
 
 			const int maxsrc_ps = opts.maxsrc_rate;
 			Uint32 now = SDL_GetTicks();
-			if(tribuf_get_frmnum(map_tb) - prevfrm > 1 && (tick0+(maxfrms*1000)/maxsrc_ps) - now > 1000/maxsrc_ps) {
+			
+			float fpsd = now - fpstimes[frmcnt%opts.draw_rate];
+			fpstimes[frmcnt%opts.draw_rate] = now;
+			scr_fps = opts.draw_rate * 1000.0f/ fpsd;
+			
+			if(tribuf_get_frmnum(map_tb) - prevfrm > 2 && (tick0+(maxfrms*1000)/maxsrc_ps) - now > 1000/maxsrc_ps) {
 				maxsrc_update();
 				maxfrms++;
 				prevfrm = tribuf_get_frmnum(map_tb);
