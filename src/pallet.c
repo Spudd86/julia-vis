@@ -254,7 +254,7 @@ void pallet_start_switch(int next) {
 	
 	if(next<0 || next>=num_pallets) return;
 	nextpal = next;
-	//pallet_changing = 1;
+	pallet_changing = 1;
 }
 
 // pallet must have 257 entries (for easier interpolation on 16 bit indicies)
