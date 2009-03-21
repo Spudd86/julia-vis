@@ -37,12 +37,7 @@ static int run_map_thread(tribuf *tb)
 {
 	//pthread_setschedprio(pthread_self(), 5);
 	
-	float vx, vy, x, y, xt, yt, u, v;
-	
-	mt_goodseed(); // seed our PSRNG
-	vx = vy = 0;
-	xt = 0.5f*((mt_lrand()%im_w)*2.0f/im_w - 1.0f); yt = 0.5f*((mt_lrand()%im_h)*2.0f/im_h - 1.0f);
-	u = x = 0.5f*((mt_lrand()%im_w)*2.0f/im_w - 1.0f); v = y = 0.5f*((mt_lrand()%im_h)*2.0f/im_h - 1.0f);
+	struct point_data *pd = new_point_data(2);
 	
 	Uint32 tick0, fps_oldtime, frmcnt=0;
 	struct timespec tm0;
@@ -53,7 +48,6 @@ static int run_map_thread(tribuf *tb)
 	
 	struct timespec fpstimes[40]; for(int i=0; i<40; i++) fpstimes[i] = tm0;
 	
-	uint64_t done_frms=0;
 	uint16_t *map_src = tribuf_get_read_nolock(tb);
     while(running) 
 	{
@@ -61,7 +55,7 @@ static int run_map_thread(tribuf *tb)
 		
 		uint16_t *map_dest = tribuf_get_write(tb);
 		
-		MAP(map_dest, map_src, im_w, im_h, u, v);
+		MAP(map_dest, map_src, im_w, im_h, pd);
 		maxblend(map_dest, maxsrc_get(), im_w, im_h);
 		
 		tribuf_finish_write(tb);
@@ -74,42 +68,19 @@ static int run_map_thread(tribuf *tb)
 		float fpsd = (tm.tv_sec - fpstimes[frmcnt%40].tv_sec)+(tm.tv_nsec - fpstimes[frmcnt%40].tv_nsec)/1000000000.0f;
 		fpstimes[frmcnt%40] = tm;
 		map_fps = 40.0f / fpsd;
-				
+		
+		const uint64_t del = (tm.tv_sec - tm0.tv_sec)*1000000 + (tm.tv_nsec - tm0.tv_nsec)/1000;
 		int newbeat = beat_get_count();
 		if(newbeat != beats && now - last_beat_time > 1000) {
-			xt = 0.5f*((mt_lrand()%im_w)*2.0f/im_w - 1.0f); yt = 0.5f*((mt_lrand()%im_h)*2.0f/im_h - 1.0f);
 			last_beat_time = now;
-		}
+			update_points(pd, del, 1);
+		} else update_points(pd, del, 0);
 		beats = newbeat;
 		
-		const int steps_ps = 150;
-		const float delt = 30.0f/steps_ps;
-		const float tsped = 0.002;
-		const uint64_t dt = 1000000/steps_ps;
-		const uint64_t del = (tm.tv_sec - tm0.tv_sec)*1000000 + (tm.tv_nsec - tm0.tv_nsec)/1000;
-		
-		// maybe replace with minimum # of times per second or something...
-		while(done_frms*dt + dt < del) {
-			float xtmp = xt - x, ytmp = yt-y;
-			float mag = xtmp*xtmp+ytmp*ytmp;
-			mag=(mag>0)?delt*0.4f/sqrtf(mag):0;
-			vx=(vx+xtmp*mag*tsped)/(tsped+1);
-			vy=(vy+ytmp*mag*tsped)/(tsped+1);
-			x=x+vx*delt;
-			y=y+vy*delt;
-			
-			done_frms++;
-		}
-		// compute a partial step for next frame (hopefully reduce aliasing, ie jerkyness)
-		float frac = (delt*(del - done_frms*dt))/dt;
-		float xtmp = xt - x, ytmp = yt-y;
-		float mag = xtmp*xtmp+ytmp*ytmp;
-		mag=(mag>0)?delt*0.4f/sqrtf(mag):0;
-		u = x + frac*(vx+xtmp*mag*tsped)/(tsped+1);
-		v = y + frac*(vy+ytmp*mag*tsped)/(tsped+1);
-		//~ u=x; v=y;
-		//SDL_Delay(10);
-
+		if(map_fps > 250) 
+			SDL_Delay(3); // hard limit ourselves to ~350FPS because 1500FPS is just pointless use of CPU (except of course as bragging rights that we can do it)
+						// high threshhold because we want it high enough that we don't notice if we jitter back
+						// and fourth across it
     }
 	return 0;
 }
@@ -150,21 +121,22 @@ int main(int argc, char **argv)
 	SDL_Event event;
 	while(SDL_PollEvent(&event) >= 0)
 	{
+		int nextfrm = tribuf_get_frmnum(map_tb);
 		if(event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
 			break;
-		} else if(lastdrawn < tribuf_get_frmnum(map_tb)) {
-			lastdrawn = tribuf_get_frmnum(map_tb);
+		} else if(lastdrawn < nextfrm) {
+			lastdrawn = nextfrm;
+			pallet_step(2);
 			pallet_blit_SDL(screen, tribuf_get_read(map_tb), im_w, im_h);
 			tribuf_finish_read(map_tb);
-			//pallet_blit_SDL(screen, maxsrc_get(), im_w, im_h);
+			
 			char buf[64];
 			sprintf(buf,"%6.1f FPS %6.1f UPS", map_fps, scr_fps);
 			DrawText(screen, buf);
 			SDL_Flip(screen);
 			
 			int newbeat = beat_get_count();
-			if(newbeat != beats) pallet_start_switch(newbeat%5);
-			pallet_step(2);
+			if(newbeat != beats) pallet_start_switch(mt_lrand()%5);
 			beats = newbeat;
 
 			const int maxsrc_ps = opts.maxsrc_rate;
@@ -180,12 +152,16 @@ int main(int argc, char **argv)
 				prevfrm = tribuf_get_frmnum(map_tb);
 				lasttime = now;
 			}
+			
+			now = SDL_GetTicks();
+			int delay =  (tick0 + frmcnt*1000/opts.draw_rate) - now;
+			if(delay > 0) SDL_Delay(delay);
+			frmcnt++;
+		} else  {
+			SDL_Delay(1000/map_fps); // hope we gete a new frame
 		}
 		
-		Uint32 now = SDL_GetTicks();
-		int delay =  (tick0 + frmcnt*1000/opts.draw_rate) - now;
-		if(delay > 0) SDL_Delay(delay);
-		frmcnt++;
+		
 	}
 	running = 0;
 	

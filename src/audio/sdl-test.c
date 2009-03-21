@@ -54,9 +54,6 @@ static void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
     }
 }
 
-int audio_setup_pa();
-int jack_setup();
-
 static inline float getsamp(float *data, int len, int i, int w) {
 	float res = 0;
 	int l = IMAX(i-w, 1); // skip sample 0 it's average for energy for entire interval
@@ -113,7 +110,8 @@ int main(int argc, char **argv)
 		beat_get_data(&bd);
 		audio_get_fft(&d);
 		
-		SDL_LockSurface(voice_print);
+		//SDL_LockSurface(voice_print);
+		if(SDL_MUSTLOCK(voice_print) && SDL_LockSurface(voice_print) < 0) { printf("failed to lock voice_print\n"); break; }
 		int vpx = audio_get_buf_count() % im_w;
 		for(int i=0; i < im_h/2; i++) {
 			int bri = 255*log2f(d.data[i*d.len/im_h]*255+1.0f)/8;
@@ -128,10 +126,8 @@ int main(int argc, char **argv)
 				putpixel(voice_print, vpx, i, ((bri<<16) | (bri<<8) | bri));
 			}
 		}
-		SDL_UnlockSurface(voice_print);
-		//~ SDL_Rect blit_rect = { 0, 0, im_w, im_h/2 };
-		//~ SDL_Rect blit_rect2 = { 0, im_h/2+1, im_w, im_h/2 };
-		//~ SDL_BlitSurface(voice_print, &blit_rect, screen, &blit_rect2);
+		if(SDL_MUSTLOCK(voice_print)) SDL_UnlockSurface(voice_print);
+
 		SDL_Rect blit_rect = { 0, 0, vpx, im_h/2 };
 		SDL_Rect blit_rect2 = { im_w-vpx-1, im_h/2+1, vpx, im_h/2 };
 		SDL_BlitSurface(voice_print, &blit_rect, screen, &blit_rect2);
@@ -139,7 +135,7 @@ int main(int argc, char **argv)
 		SDL_BlitSurface(voice_print, &blit_rect, screen, &blit_rect2);
 		
 		
-		if(SDL_MUSTLOCK(screen) && SDL_LockSurface(screen) < 0) break;
+		if(SDL_MUSTLOCK(screen) && SDL_LockSurface(screen) < 0) { printf("failed to lock screen\n"); break; }
 		
 		int ox, oy;
 		
@@ -200,7 +196,7 @@ int main(int argc, char **argv)
 		if(SDL_MUSTLOCK(screen)) SDL_UnlockSurface(screen);
 		
 		char buf[128];
-		sprintf(buf,"%6.1f FPS %i beats %6.1f", 1000.0f / frametime, beat_count, beat_throb);
+		sprintf(buf,"%6.1f FPS %4i beats %6.1f", 1000.0f / frametime, beat_count, beat_throb);
 		DrawText(screen, buf);
 		
 		SDL_Flip(screen);

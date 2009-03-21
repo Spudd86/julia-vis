@@ -85,6 +85,7 @@ void audio_update(const float *in, int n)
 int audio_get_samples(audio_data *d) {
 	d->len = nr_samp;
 	d->data = tribuf_get_read(samp_tb);
+	tribuf_finish_read(samp_tb); // TODO: fix interface so this doesn't need to be here
 	return 0;
 }
 #ifdef FFT_TRIBUF

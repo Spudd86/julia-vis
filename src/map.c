@@ -35,7 +35,7 @@
  * @param w width of image (needs power of 2)
  * @param h height of image (needs divisable by ?)
  */
-MAP_FUNC_ATTR void soft_map(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
+MAP_FUNC_ATTR void soft_map(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float x0, float y0)
 {
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	x0  = x0*0.25f + 0.5f;
@@ -58,7 +58,7 @@ MAP_FUNC_ATTR void soft_map(uint16_t *out, uint16_t *in, int w, int h, float x0,
 //TODO: make go fast
 //TODO: make version for 4x4 tiles (possibly 8x8 as well)
 //TODO: make fast sse/mmx version
-MAP_FUNC_ATTR void soft_map_bl(uint16_t *out, uint16_t *in, int w, int h, float x0, float y0)
+MAP_FUNC_ATTR void soft_map_bl(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float x0, float y0)
 {
 	float xstep = 2.0f/w, ystep = 2.0f/h; 
 	x0  = x0*0.25f + 0.5f;
@@ -83,11 +83,12 @@ MAP_FUNC_ATTR void soft_map_bl(uint16_t *out, uint16_t *in, int w, int h, float 
 
 #define BLOCK_SIZE 8
 
-MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float x0, float y0)
+MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
-	x0  = x0*0.25f + 0.5f;
-	y0  = y0*0.25f + 0.5f;
+	
+	const float x0 = pd->p[0]*0.25f + 0.5f, y0=pd->p[1]*0.25f + 0.5f;
+
 	float v0 = -1.0f;
 	for(int yd = 0; yd < h; yd+=BLOCK_SIZE) {
 		float v1 = v0+vstep;
@@ -142,12 +143,12 @@ MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in
 	}
 }
 
-MAP_FUNC_ATTR void soft_map_butterfly(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float cx0, float cy0)
+MAP_FUNC_ATTR void soft_map_butterfly(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
 	const float xstep = 2.0f/w, ystep = 2.0f/h;
 	const float sm = sqrtf(2.5f)/2.5f;
 
-	cx0*=1.5/2.5; cy0*=1.5/2.5;
+	const float cx0 = pd->p[0]*1.5/2.5, cy0 = pd->p[1]*1.5/2.5;
 	
 	for(int yd = 0; yd < h; yd++) {
 		float v = yd*ystep - 1.0f;
@@ -170,13 +171,13 @@ MAP_FUNC_ATTR void soft_map_butterfly(uint16_t *restrict out, uint16_t *restrict
 	}
 }
 
-MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float cx0, float cy0, float cx1, float cy1 )
+//MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float cx0, float cy0, float cx1, float cy1 )
+MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
+	//cx1*=2; cy1*=2;
 	const float xoom = 3.0f, moox = 1.0f/xoom;
 	float xstep = 2.0f/w, ystep = 2.0f/h;
-	
-	cx1*=2; cy1*=2;
-	cx0*=1; cy0*=1;
+	const float cx0 = pd->p[0], cy0 = pd->p[1], cx1 = pd->p[2]*2, cy1 = pd->p[3]*2;
 	
 	for(int yd = 0; yd < h; yd++) {
 		float v = yd*ystep - 1.0f;
@@ -206,8 +207,9 @@ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict 
 
 #define infs(a, b) ((isfinite(a))?(a):(b))
 
-MAP_FUNC_ATTR void soft_map_rational_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float cx0, float cy0, float cx1, float cy1)
+MAP_FUNC_ATTR void soft_map_rational_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
+	const float cx0 = pd->p[0], cy0 = pd->p[1], cx1 = pd->p[2]*2, cy1 = pd->p[3]*2;
 	const float xoom = 3.0f, moox = 1.0f/xoom;
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
 	float v0 = -1.0f;
@@ -307,3 +309,32 @@ MAP_FUNC_ATTR void soft_map_rational_interp(uint16_t *restrict out, uint16_t *re
 		//~ }
 	//~ }
 //~ }
+
+//~ #ifdef __SSE4_1__
+#if 0
+MAP_FUNC_ATTR void soft_map_bl_sse4(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float x0, float y0)
+{
+	float xstep = 2.0f/w, ystep = 2.0f/h; 
+	
+	__m128 xm, ym;
+	
+	x0  = x0*0.25f + 0.5f;
+	y0  = y0*0.25f + 0.5f;
+	for(int yd = 0; yd < h; yd++) {
+		float v = yd*ystep - 1.0f;
+		for(int xd = 0; xd < w; xd++) {
+			float u = xd*xstep - 1.0f;
+			float y = 2*u*v + y0;
+			float x = u*u - v*v + x0;
+			
+			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
+			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
+			int x1 = xs>>8, x2 = x1+1, xf = xs&0xFF;
+			int y1 = ys>>8, y2 = y1+1, yf = ys&0xFF;
+			
+			*(out++) = ((in[y1*w + x1]*(0xff - xf) + in[y1*w + x2]*xf)*(0xff-yf) +
+						(in[y2*w + x1]*(0xff - xf) + in[y2*w + x2]*xf)*yf) >> 16;
+		}
+	}
+}
+#endif

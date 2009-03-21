@@ -101,13 +101,23 @@ void pallet_init(int bswap) {
 		pallets32[p][256]  = pallets32[p][255];
 	}
 	
-	memcpy(active_pal, pallets32[4], sizeof(uint32_t)*257);
+	memcpy(active_pal, pallets32[1], sizeof(uint32_t)*257);
 }
 
 static int pallet_changing = 0;
 static int palpos = 0;
 static int nextpal = 0;
 static int curpal = 1;
+
+void pallet_step(int step);
+
+void pallet_start_switch(int next) {
+	if(pallet_changing || next == curpal) return; // haven't finished the last one
+	
+	if(next<0 || next>=num_pallets) return;
+	nextpal = next;
+	pallet_changing = 1;
+}
 
 #ifdef __SEE2__
 #include <emmintrin.h>
@@ -125,13 +135,20 @@ void pallet_step(int step) {
 	__m128i mask = _mm_set1_epi16(0x00ff);
 	__m128i vt = _mm_set1_epi16(palpos); // same for all i
 	
-	for(int i = 0; i < 256; i+=8) {
-		__m128i s1 = *(__m128i *)(pallets32[nextpal]+i);
+	const __m128i * restrict const next = (__m128i *)pallets32[nextpal];
+	const __m128i * restrict const old  = (__m128i *)pallets32[curpal];
+	__m128i * restrict const dest = (__m128i *)active_pal;
+	
+	//for(int i = 0; i < 256; i+=32) {
+	for(int i = 0; i < (256*4)/sizeof(__m128i); i+=2) {
+		//__m128i s1 = *(__m128i *)(pallets32[nextpal]+i);
+		__m128i s1 = *(next+i);
 		__m128i s2 = s1;
 		s1 = _mm_unpacklo_epi8(s1, zero);
 		s2 = _mm_unpackhi_epi8(s2, zero);
 		
-		__m128i d1 = *(__m128i *)(pallets32[curpal]+i);
+		//__m128i d1 = *(__m128i *)(pallets32[curpal]+i);
+		__m128i d1 = *(old+i);
 		__m128i d2 = d1;
 		d1 = _mm_unpacklo_epi8(d1, zero);
 		d2 = _mm_unpackhi_epi8(d2, zero);
@@ -149,14 +166,17 @@ void pallet_step(int step) {
 		s2 = _mm_srli_epi16(s2, 8);
 			
 		s1 = _mm_packs_epu16(s1, s2);
-		*(__m128i *)(active_pal+i) = s1;
+		//*(__m128i *)(active_pal+i) = s1;
+		*(dest + i) = s1;
 		
-		s1 = *(__m128i *)(pallets32[nextpal]+i+4);
+		//s1 = *(__m128i *)(pallets32[nextpal]+i+4);
+		s1 = *(next+i+1);
 		s2 = s1;
 		s1 = _mm_unpacklo_epi8(s1, zero);
 		s2 = _mm_unpackhi_epi8(s2, zero);
 		
-		d1 = *(__m128i *)(pallets32[curpal]+i+4);
+		//d1 = *(__m128i *)(pallets32[curpal]+i+4);
+		d1 = *(old+i+1);
 		d2 = d1;
 		d1 = _mm_unpacklo_epi8(d1, zero);
 		d2 = _mm_unpackhi_epi8(d2, zero);
@@ -174,7 +194,8 @@ void pallet_step(int step) {
 		s2 = _mm_srli_epi16(s2, 8);
 			
 		s1 = _mm_packs_epu16(s1, s2);
-		*(__m128 *)(active_pal+i+4) = s1;
+		//*(__m128 *)(active_pal+i+4) = s1;
+		*(dest + i + 1) = s1;
 	}
 	active_pal[256] = active_pal[255];
 }
@@ -248,14 +269,6 @@ void pallet_step(int step) {
 	_mm_empty();
 }
 #endif
-
-void pallet_start_switch(int next) {
-	if(pallet_changing || next == curpal) return; // haven't finished the last one
-	
-	if(next<0 || next>=num_pallets) return;
-	nextpal = next;
-	pallet_changing = 1;
-}
 
 // pallet must have 257 entries (for easier interpolation on 16 bit indicies)
 // output pix = (pallet[in/256]*(in%256) + pallet[in/256+1]*(255-in%256])/256
