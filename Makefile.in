@@ -25,7 +25,7 @@ LIBS = @LIBS@
 
 
 
-CFLAGS += -D_GNU_SOURCE=1 -mmmx -Wall -fno-strict-aliasing -fsingle-precision-constant
+CFLAGS += -D_GNU_SOURCE=1 -mmmx -msse -Wall -fno-strict-aliasing -fsingle-precision-constant
 CFLGAS +=  -iquote $(shell pwd)/src 
 #	-Wunsafe-loop-optimizations
 
@@ -100,24 +100,24 @@ distclean: clean
 config.mk:
 	touch config.mk
 
-bin/sdl-test: src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
+bin/sdl-test: src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/atomic_tribuf.c src/points.c src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL -DMT_NO_INLINE \
-	src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c \
+	src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/atomic_tribuf.c src/points.c \
 	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
-bin/sdlthread-test: src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
+bin/sdlthread-test: src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/atomic_tribuf.c src/points.c src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL -DMT_NO_INLINE -DTRIBUF_LOCKING \
-	src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c \
+	src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/atomic_tribuf.c src/points.c \
 	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
-bin/dfb-test: src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c src/common.h Makefile config.mk
+bin/dfb-test: src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/atomic_tribuf.c src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_DIRECTFB \
-	src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/tribuf.c \
+	src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/atomic_tribuf.c \
 	$(DFB_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
-bin/audio-test: $(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c src/tribuf.c src/line.c
+bin/audio-test: $(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c src/atomic_tribuf.c src/line.c
 	$(CC) -DFFT_TRIBUF -DUSE_SDL $(CFLAGS) \
-	$(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c src/tribuf.c src/line.c \
+	$(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c src/atomic_tribuf.c src/line.c \
 	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
 %.s: %.c src/*.h Makefile config.mk

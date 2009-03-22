@@ -1,12 +1,5 @@
 #include "../common.h"
-
-#include <unistd.h>
 #include <stdio.h>
-#include <stdlib.h> /* for exit() */
-#include <math.h>
-#include <malloc.h>
-
-#include <SDL.h>
 
 #include "../sdl-misc.h"
 #include "audio.h"
