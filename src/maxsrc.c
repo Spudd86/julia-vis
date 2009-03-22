@@ -39,15 +39,14 @@ void maxsrc_setup(int w, int h)
 	iw = w; ih = h;
 	point_src = setup_point(pnt_w, pnt_h);
 	
-	//prev_src = valloc(2 * w * h * sizeof(uint16_t));
+	//prev_src = valloc(2 * w * h * sizeof(uint16_t)); // doesn't exist on windows
 	prev_src = _mm_malloc(2 * w * h * sizeof(uint16_t), 32);
 	memset(prev_src, 0, 2*w*h*sizeof(uint16_t));
 	next_src = prev_src + w*h;
 }
 
 uint16_t *maxsrc_get(void) {
-	__sync_synchronize();
-	return prev_src; // atomic?
+	return prev_src;
 }
 
 static float tx=0, ty=0, tz=0;
@@ -118,10 +117,11 @@ static void zoom(uint16_t *out, uint16_t *in, int w, int h, float R[3][3])
 
 // MUST NOT be called < frame of consumer apart (only uses double buffering)
 // if it's called too soon consumer may be using the frame we are modifying
-//   Note: this is also true of the triple buffering but for that to break we'd
-//       need to be calling this at least 3 times faster than the consumer is running
-//       which would be just wastful and stupid
-// hmm the double buffering here doesn't quite seem to work.... 
+// we don't use triple buffering because this really doesn't need to run very 
+// often, even below 12 times a second still looks ok, and double buffering means
+// we take up less cache and fewer pages and that means fewer falts, and since almost
+// everything we do either runs fast enough or bottleneeks on memory double 
+// buffering here seems like a good idea
 void maxsrc_update(void)
 {
 	uint16_t *dst = next_src;
@@ -163,9 +163,8 @@ void maxsrc_update(void)
 		float yi = y*zvd*ih*3/4+ih/2 - pnt_h/2;
 		draw_point(dst, xi, yi);
 	}
-	//next_src = __sync_val_compare_and_swap(&prev_src, prev_src, next_src);
 	next_src = prev_src;
-	prev_src = dst; // atomic?
+	prev_src = dst; 
 	
 	tx+=0.02; ty+=0.01; tz-=0.003;
 }
