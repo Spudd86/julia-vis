@@ -11,7 +11,9 @@ static const char *helpstr =
 "\t-a oscolliscope update rate [default 12]\n"
 "\t-s screen update rate [default 30, threaded only]\n"
 "\t-d try to enable double buffering\n"
+#ifdef HAVE_JACK
 "\t-j use jack optionally specify a pattern of ports to connect to\n"
+#endif
 ;
 
 
@@ -50,10 +52,12 @@ void optproc(int argc, char **argv, opt_data *res)
 			case 'p':
 				res->hw_pallet = 1;
 				break;
+			#ifdef HAVE_JACK
 			case 'j':
 				res->use_jack = 1;
 				res->jack_opt = optarg;
 				break;
+			#endif
 			case 's':
 				res->draw_rate = atoi(optarg);
 				break;
