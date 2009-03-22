@@ -38,8 +38,8 @@ void maxsrc_setup(int w, int h)
 	iw = w; ih = h;
 	point_src = setup_point(pnt_w, pnt_h);
 	
-	prev_src = malloc(2 * w * h * sizeof(uint16_t));
 	//prev_src = valloc(2 * w * h * sizeof(uint16_t));
+	prev_src = memalign(sysconf(_SC_PAGESIZE),2 * w * h * sizeof(uint16_t));
 	memset(prev_src, 0, 2*w*h*sizeof(uint16_t));
 	next_src = prev_src + w*h;
 }
