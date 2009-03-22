@@ -20,6 +20,7 @@ static int callback(const void *input,
 	return paContinue;
 }
 
+void audio_stop_pa(void);
 
 int audio_setup_pa()
 {
@@ -54,6 +55,7 @@ int audio_setup_pa()
 	err = Pa_StartStream( stream );
     if( err != paNoError ) goto error;
 	
+	atexit(audio_stop_pa);
 	return 0;
 	
 error:
@@ -64,15 +66,13 @@ error:
 	return -1;
 }
 
-int audio_stop_pa()
+void audio_stop_pa(void)
 {
 	PaError err;
 	err = Pa_StopStream( stream ); if( err != paNoError ) goto error;
 	err = Pa_CloseStream( stream ); if( err != paNoError ) goto error;
 	err = Pa_Terminate(); if( err != paNoError ) goto error;
-	return 0;
 error:
 	printf("Couldn't terminate: PortAudio error: %s\n", Pa_GetErrorText(err));
 	exit(1);
-	return -1;
 }
