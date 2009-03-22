@@ -31,7 +31,7 @@ struct point_data *new_point_data(int dim)
  * @param pd 
  * @param del time since last update in milliseconds
  */
-void update_points(struct point_data *pd, uint64_t passed_time, int retarget)
+void update_points(struct point_data *pd, unsigned int passed_time, int retarget)
 {
 	if(retarget) {
 		for(int i=0; i<pd->dim; i++) 
@@ -47,17 +47,15 @@ void update_points(struct point_data *pd, uint64_t passed_time, int retarget)
 	// stick with it (getting smooth motion with some kind of framerate 
 	//   independance took some time)
 	// also suposed to do at least steps_ps every second
-	uint64_t del = passed_time - pd->done_time;
-	uint64_t dt = del;
+	unsigned int del = (passed_time - pd->done_time);
+	unsigned int dt = del;
 	int steps = 1;
 	if(del > 0) {
-		while(dt > 1000000/steps_ps) dt = dt/2;
+		while(dt > 1000/steps_ps) dt = dt/2;
 		steps = del/dt;
 	} else dt=1;
 	
-	
-	const float delt  = 30*dt/1000000.0f;
-	
+	const float delt  = 30*dt/1000.0f;
 	float tmp[pd->dim];
 	for(int j=0; j<steps; j++) {
 		for(int i=0; i < pd->dim; i++) tmp[i] = pd->t[i] - pd->p[i];

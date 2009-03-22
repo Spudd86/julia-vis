@@ -81,8 +81,8 @@ int main(int argc, char **argv)
 		if(newbeat != beats) pallet_start_switch(newbeat%5);
 		if(newbeat != beats && now - last_beat_time > 1000) {
 			last_beat_time = now;
-			update_points(pd, (now - tick0)*1000, 1);
-		} else update_points(pd, (now - tick0)*1000, 0);
+			update_points(pd, (now - tick0), 1);
+		} else update_points(pd, (now - tick0), 0);
 		beats = newbeat;
 		
 		char buf[32];

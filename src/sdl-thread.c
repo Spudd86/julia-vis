@@ -31,20 +31,14 @@ static int im_w = 0, im_h = 0;
 static int running = 1;
 static float map_fps=0;
 
-#include <pthread.h>
-
 static int run_map_thread(tribuf *tb) 
-{
-	//pthread_setschedprio(pthread_self(), 5);
-	
+{	
 	struct point_data *pd = new_point_data(2);
-	
-	Uint32 tick0, fps_oldtime, frmcnt=0;
+	unsigned int beats = beat_get_count();
+	unsigned int tick0, fps_oldtime, frmcnt=0, last_beat_time = 0;
 	struct timespec tm0;
 	clock_gettime(CLOCK_MONOTONIC, &tm0);
 	tick0 = fps_oldtime = tm0.tv_sec*1000 + tm0.tv_nsec/1000000;
-	int beats = beat_get_count();
-	unsigned int last_beat_time = tick0;
 	
 	struct timespec fpstimes[40]; for(int i=0; i<40; i++) fpstimes[i] = tm0;
 	
@@ -63,24 +57,24 @@ static int run_map_thread(tribuf *tb)
 
 		struct timespec tm;
 		clock_gettime(CLOCK_MONOTONIC, &tm);
-		Uint32 now = tm.tv_sec*1000 + tm.tv_nsec/1000000;
 		
 		float fpsd = (tm.tv_sec - fpstimes[frmcnt%40].tv_sec)+(tm.tv_nsec - fpstimes[frmcnt%40].tv_nsec)/1000000000.0f;
 		fpstimes[frmcnt%40] = tm;
 		map_fps = 40.0f / fpsd;
 		
-		const uint64_t del = (tm.tv_sec - tm0.tv_sec)*1000000 + (tm.tv_nsec - tm0.tv_nsec)/1000;
+		unsigned int now = (tm.tv_sec - tm0.tv_sec)*1000 + (tm.tv_nsec - tm0.tv_nsec)/1000000;
 		int newbeat = beat_get_count();
 		if(newbeat != beats && now - last_beat_time > 1000) {
 			last_beat_time = now;
-			update_points(pd, del, 1);
-		} else update_points(pd, del, 0);
+			update_points(pd, now, 1);
+		} else update_points(pd, now, 0);
 		beats = newbeat;
 		
 		if(map_fps > 250) 
-			SDL_Delay(3); // hard limit ourselves to ~350FPS because 1500FPS is just pointless use of CPU (except of course as bragging rights that we can do it)
-						// high threshhold because we want it high enough that we don't notice if we jitter back
-						// and fourth across it
+			SDL_Delay(3); // hard limit ourselves to ~250FPS because 1500FPS is just pointless use of CPU (except of course to say that we can do it)
+							// also if we run at more that 1000FPS the point motion code might blow up without the microsecond accurate timers...
+							// high threshhold because we want it high enough that we don't notice if we jitter back
+							// and fourth across it
     }
 	return 0;
 }

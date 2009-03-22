@@ -12,6 +12,6 @@ struct point_data {
 };
 
 struct point_data *new_point_data(int dim);
-void update_points(struct point_data *pd, uint64_t passed_time, int retarget);
+void update_points(struct point_data *pd, unsigned int passed_time, int retarget);
 
 #endif
