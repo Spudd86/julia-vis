@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 	
 	uint16_t *map_surf[3];
 	//void *map_surf_mem = valloc(3 * im_w * im_h * sizeof(uint16_t));
-	void *map_surf_mem = _mm_alloc(3 * im_w * im_h * sizeof(uint16_t), 32);
+	void *map_surf_mem = _mm_malloc(3 * im_w * im_h * sizeof(uint16_t), 32);
 	for(int i=0; i<3; i++)
 		map_surf[i] = map_surf_mem + i * im_w * im_h * sizeof(uint16_t);
 	memset(map_surf_mem, 0, 3 * im_w * im_h * sizeof(uint16_t));
