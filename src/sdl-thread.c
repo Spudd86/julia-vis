@@ -1,25 +1,16 @@
-#include <unistd.h>
+#include "common.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <malloc.h>
 #include <time.h>
-
-#include "mtwist/mtwist.h"
-
-#include <mm_malloc.h>
 
 #include <SDL.h>
 #include <SDL_thread.h>
-#include <SDL_ttf.h>
+
+#include <mm_malloc.h>
 
 #include "tribuf.h"
-#include "common.h"
-
 #include "pixmisc.h"
 #include "sdl-misc.h"
 #include "map.h"
-
 #include "audio/audio.h"
 
 #define IM_SIZE (384)
@@ -31,7 +22,7 @@ static int im_w = 0, im_h = 0;
 static int running = 1;
 static float map_fps=0;
 
-static int run_map_thread(tribuf *tb) 
+static int run_map_thread(tribuf *tb) //TODO: go back to SDL_GetTicks() for timing in here (portability to windows)
 {	
 	struct point_data *pd = new_point_data(2);
 	unsigned int beats = beat_get_count();
@@ -130,7 +121,7 @@ int main(int argc, char **argv)
 			SDL_Flip(screen);
 			
 			int newbeat = beat_get_count();
-			if(newbeat != beats) pallet_start_switch(mt_lrand()%5);
+			if(newbeat != beats) pallet_start_switch(newbeat%5);
 			beats = newbeat;
 
 			const int maxsrc_ps = opts.maxsrc_rate;

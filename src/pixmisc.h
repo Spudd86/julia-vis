@@ -1,11 +1,6 @@
 #ifndef PIXMISC_H
 #define PIXMISC_H
 
-#include "config.h"
-
-#include <unistd.h>
-#include <stdint.h>
-
 #ifdef USE_SDL
 #include <SDL.h>
 void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h);

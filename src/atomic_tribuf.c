@@ -1,14 +1,8 @@
-#include "config.h"
 
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <malloc.h>
-#include <stdint.h>
-#include <error.h>
-
-#include "tribuf.h"
 #include "common.h"
+#include "tribuf.h"
+
+#include <stdio.h>
 
 #define tribuf_error(s) do {\
 		fflush(stdout); \
@@ -24,7 +18,7 @@
 #define tb_sanity_check(c, m)
 #endif
 
-#if defined(TRIBBUF_PROFILE) || defined(TB_DEBUG)
+#if (defined(TRIBBUF_PROFILE) || defined(TB_DEBUG)) && defined(HAVE_ATEXIT)
 static unsigned int finish_writes = 0;
 static unsigned int finish_write_trys = 0;
 static unsigned int finish_reads = 0;

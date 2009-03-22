@@ -1,12 +1,9 @@
 #ifndef POINTS_H_
 #define POINTS_H_
 
-#include "common.h"
-#include <stdint.h>
-
 struct point_data {
 	float *p, *v, *t;
-	uint64_t done_time;
+	unsigned int done_time;
 	int dim;
 	
 };

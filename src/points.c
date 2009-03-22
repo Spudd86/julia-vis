@@ -4,8 +4,6 @@
 
 #include "mtwist/mtwist.h"
 
-#include <math.h>
-
 struct point_data *new_point_data(int dim) 
 {
 	struct point_data *pd = xmalloc(sizeof(struct point_data));

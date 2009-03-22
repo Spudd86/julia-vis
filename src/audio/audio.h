@@ -1,8 +1,6 @@
 #ifndef JULIA_AUDIO_H
 #define JULIA_AUDIO_H
 
-#include "../common.h"
-
 typedef struct {
 	int len;
 	float *data;

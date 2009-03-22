@@ -1,20 +1,11 @@
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h> /* for exit() */
-#include <math.h>
-#include <malloc.h>
-
-#include "mtwist/mtwist.h"
-
-#include <SDL.h>
-#include <SDL_ttf.h>
-
-#include "map.h"
 
 #include "common.h"
+#include <stdio.h>
+#include <SDL.h>
+
+#include "map.h"
 #include "sdl-misc.h"
 #include "pixmisc.h"
-
 #include "audio/audio.h"
 
 #define MAP soft_map_interp

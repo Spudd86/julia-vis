@@ -1,10 +1,7 @@
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <getopt.h>
-
 
 #include "common.h"
+#include <stdio.h>
+#include <getopt.h>
 
 static const char *helpstr =
 "Usage: %s [-w width] [-h height] [-s screen updates/second] [-fdp] [-j<pattern>]\n"

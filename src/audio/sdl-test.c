@@ -1,4 +1,4 @@
-#include "../config.h"
+#include "../common.h"
 
 #include <unistd.h>
 #include <stdio.h>
@@ -8,7 +8,6 @@
 
 #include <SDL.h>
 
-#include "../common.h"
 #include "../sdl-misc.h"
 #include "audio.h"
 

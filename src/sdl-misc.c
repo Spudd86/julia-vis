@@ -1,16 +1,11 @@
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-#include <SDL.h>
-#include <SDL_thread.h>
-#include <SDL_ttf.h>
-
 #include "common.h"
+#include <stdio.h>
+
 #include "sdl-misc.h"
 
-static TTF_Font *font = NULL;
+#include <SDL_ttf.h>
 
+static TTF_Font *font = NULL;
 
 // TODO: improve automatic mode selection
 SDL_Surface *sdl_setup(opt_data *opts, int im_size)

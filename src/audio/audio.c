@@ -1,11 +1,8 @@
-#include <unistd.h>
+#include "../common.h"
 #include <fftw3.h>
-#include <math.h>
 #include <string.h>
-#include <malloc.h>
 
 #include "../tribuf.h"
-#include "../common.h"
 #include "audio.h"
 
 int buf_count = 0;
