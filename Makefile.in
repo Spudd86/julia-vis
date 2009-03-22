@@ -25,7 +25,7 @@ LIBS = @LIBS@
 
 
 
-CFLAGS += -D_GNU_SOURCE=1 -mmmx -msse -Wall -fno-strict-aliasing -fsingle-precision-constant
+CFLAGS += -D_GNU_SOURCE=1 -mmmx -Wall -fno-strict-aliasing -fsingle-precision-constant
 CFLGAS +=  -iquote $(shell pwd)/src 
 #	-Wunsafe-loop-optimizations
 

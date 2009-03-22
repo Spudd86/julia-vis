@@ -14,8 +14,6 @@
 
 #define IM_SIZE (384)
 
-#define MAP soft_map_interp
-
 static opt_data opts;
 static int im_w = 0, im_h = 0;
 static int running = 1;
@@ -23,7 +21,7 @@ static float map_fps=0;
 
 static int run_map_thread(tribuf *tb)
 {	
-	struct point_data *pd = new_point_data(2);
+	struct point_data *pd = new_point_data(opts.rational_julia?4:2);
 	unsigned int beats = beat_get_count();
 	unsigned int tick0, fps_oldtime, frmcnt=0, last_beat_time = 0;
 	tick0 = fps_oldtime = SDL_GetTicks();
@@ -31,13 +29,15 @@ static int run_map_thread(tribuf *tb)
 	unsigned int fpstimes[40]; for(int i=0; i<40; i++) fpstimes[i] = 0;
 	
 	uint16_t *map_src = tribuf_get_read_nolock(tb);
-    while(running) 
-	{
+    while(running) {
 		frmcnt++;
 		
 		uint16_t *map_dest = tribuf_get_write(tb);
+		if(!opts.rational_julia) 
+			soft_map_interp(map_dest, map_src, im_w, im_h, pd);
+		else // really want to do maxblend first here, but can't because we'd have to modify map_src and it's shipped off for reading
+			soft_map_rational(map_dest, map_src, im_w, im_h, pd);
 		
-		MAP(map_dest, map_src, im_w, im_h, pd);
 		maxblend(map_dest, maxsrc_get(), im_w, im_h);
 		
 		tribuf_finish_write(tb);
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
 	int lastdrawn=0;
 	int maxfrms = 0;
 	Uint32 tick0 = SDL_GetTicks();
-	Uint32 lastupdate, lasttime; lastupdate = lasttime = tick0;
+	Uint32 lastpalstep, lastupdate, lasttime; lastpalstep = lastupdate = lasttime = tick0;
 	Uint32 fpstimes[opts.draw_rate]; for(int i=0; i<opts.draw_rate; i++) fpstimes[i] = tick0;
 	float scr_fps = 0;
 	
@@ -106,7 +106,12 @@ int main(int argc, char **argv)
 			break;
 		} else if(lastdrawn < nextfrm) {
 			lastdrawn = nextfrm;
-			pallet_step(2);
+			Uint32 now = SDL_GetTicks();
+			if(now - lastpalstep >= 2048/256) { // want pallet switch to take ~2 seconds
+				pallet_step(IMIN((now - lastpalstep)*256/2048, 64));
+				lastpalstep = now;
+			}
+			//pallet_blit_SDL(screen, maxsrc_get(), im_w, im_h);
 			pallet_blit_SDL(screen, tribuf_get_read(map_tb), im_w, im_h);
 			tribuf_finish_read(map_tb);
 			
@@ -116,17 +121,17 @@ int main(int argc, char **argv)
 			SDL_Flip(screen);
 			
 			int newbeat = beat_get_count();
-			if(newbeat != beats) pallet_start_switch(newbeat%5);
+			if(newbeat != beats) pallet_start_switch(newbeat);
 			beats = newbeat;
 
 			const int maxsrc_ps = opts.maxsrc_rate;
-			Uint32 now = SDL_GetTicks();
+			now = SDL_GetTicks();
 			
 			float fpsd = now - fpstimes[frmcnt%opts.draw_rate];
 			fpstimes[frmcnt%opts.draw_rate] = now;
 			scr_fps = opts.draw_rate * 1000.0f/ fpsd;
 			
-			if(tribuf_get_frmnum(map_tb) - prevfrm > 2 && (tick0+(maxfrms*1000)/maxsrc_ps) - now > 1000/maxsrc_ps) {
+			if(tribuf_get_frmnum(map_tb) - prevfrm > 1 && (tick0+(maxfrms*1000)/maxsrc_ps) - now > 1000/maxsrc_ps) {
 				maxsrc_update();
 				maxfrms++;
 				prevfrm = tribuf_get_frmnum(map_tb);

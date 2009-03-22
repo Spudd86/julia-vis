@@ -64,9 +64,9 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 //TODO: make sure these have good alignment
 //~ static uint16_t pallets555[4][256+16] __attribute__((aligned)); // keep aligned
 //~ static uint16_t pallets565[4][256+16] __attribute__((aligned));
-static uint32_t pallets32[NUM_PALLETS][256+8] __attribute__((aligned));
+static uint32_t pallets32[NUM_PALLETS][256] __attribute__((aligned(16)));
 
-static uint32_t active_pal[257] __attribute__((aligned)); 
+static uint32_t active_pal[257] __attribute__((aligned(16))); 
 
 void pallet_init(int bswap) {
 	for(int p=0; p < num_pallets; p++) {
@@ -90,7 +90,7 @@ void pallet_init(int bswap) {
 		} while(static_pallets[p][j].pos != 255);
 		//~ pallets555[p][256] = pallets555[p][255];
 		//~ pallets565[p][256] = pallets565[p][255];
-		pallets32[p][256]  = pallets32[p][255];
+		//pallets32[p][256]  = pallets32[p][255];
 	}
 	
 	memcpy(active_pal, pallets32[1], sizeof(uint32_t)*257);
@@ -104,9 +104,11 @@ static int curpal = 1;
 void pallet_step(int step);
 
 void pallet_start_switch(int next) {
-	if(pallet_changing || next == curpal) return; // haven't finished the last one
+	next = next % num_pallets;
+	if(next<0) return;
+	if(pallet_changing) return; // haven't finished the last one
+	if(next == curpal) next = (next+1) % num_pallets;
 	
-	if(next<0 || next>=num_pallets) return;
 	nextpal = next;
 	pallet_changing = 1;
 }
@@ -373,7 +375,7 @@ static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, ui
 	//~ }
 //~ }
 
-static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
+static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *pbattr src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
@@ -433,7 +435,7 @@ static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, ui
 	}
 }
 
-static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
+static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *pbattr src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
 {	
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
@@ -494,7 +496,7 @@ static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, ui
 	}
 }
 
-static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, uint16_t* restrict src, unsigned int src_stride, int w, int h)
+static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, uint16_t *pbattr src, unsigned int src_stride, int w, int h)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=16) {

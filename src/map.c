@@ -83,7 +83,7 @@ MAP_FUNC_ATTR void soft_map_bl(uint16_t *restrict out, uint16_t *restrict in, in
 
 #define BLOCK_SIZE 8
 
-MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
+MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict __attribute__((aligned (16))) out, uint16_t *restrict __attribute__ ((aligned (16))) in, int w, int h, const struct point_data *pd)
 {
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
 	
@@ -171,7 +171,6 @@ MAP_FUNC_ATTR void soft_map_butterfly(uint16_t *restrict out, uint16_t *restrict
 	}
 }
 
-//MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict in, int w, int h, float cx0, float cy0, float cx1, float cy1 )
 MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
 	//cx1*=2; cy1*=2;

@@ -32,6 +32,8 @@ static void shutdown(void) {
 
 int jack_setup(opt_data *od)
 {
+	printf("Using jack for audio input\n");
+	
 	jack_status_t status;
 	client = jack_client_open("test", JackNoStartServer, &status);
 	if (client == NULL) {

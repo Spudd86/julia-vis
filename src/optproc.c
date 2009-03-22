@@ -5,6 +5,7 @@
 
 static const char *helpstr =
 "Usage: %s [-w width] [-h height] [-s screen updates/second] [-fdp] [-j<pattern>]\n"
+"\t-r use rational map\n"
 "\t-p try to set an 8bpp mode (hardware pallets)\n"
 "\t-f go fullscreen\n"
 "\t-a oscolliscope update rate [default 12]\n"
@@ -26,15 +27,19 @@ void optproc(int argc, char **argv, opt_data *res)
 	res->doublebuf = 0;
 	res->hw_pallet = 0;
 	res->use_jack = 0;
+	res->rational_julia = 0;
 	res->jack_opt = NULL;
 	
-	while((opt = getopt(argc, argv, "w:h:s:a:ftpdj::")) != -1) {
+	while((opt = getopt(argc, argv, "w:h:s:a:rftpdj::")) != -1) {
 		switch(opt) {
 			case 'w':
 				res->w = atoi(optarg);
 				break;
 			case 'h':
 				res->h = atoi(optarg);
+				break;
+			case 'r':
+				res->rational_julia = 1;
 				break;
 			case 'f':
 				res->fullscreen = 1;

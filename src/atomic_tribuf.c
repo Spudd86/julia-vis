@@ -49,13 +49,24 @@ static void __attribute__((constructor)) tb_lock_prof_init(void) {
 #define tb_count_gr_try
 #endif
 
+// only write thread will ever change aw, and only read thread will ever change ar
+// when either thread wants a to put a new buffer into it's 'active' slot
+// it can choose either nw or nr, (whichever is NOT -1) however the read thread
+// will prefer nr and the write thread will prefer nw
+
+// when the read thread is done it will move ar to nw and set ar to -1
+
+// one of our invariants is that ar is -1 except between a matched pair of get_write and finish_write
+// so get_write can just swap nr and ar to get the next read frame (since nr cannot be -1 when ar is)
+// finish read needs to something different depending on where the -1 ended up since get_write (ar always gets -1 here)
+
 typedef union {
 	uint32_t v;
 	struct { // invariant exactly one of these is always -1, likewise for 0, 1, 2
-		int8_t aw; // never allowed to be -1
-		int8_t nw;
+		int8_t aw; // never allowed to be -1 contains the number of the buffer we are currently writing to
+		int8_t nw; // these two are 'available'
 		int8_t nr;
-		int8_t ar;
+		int8_t ar; // contains buffer we are reading from on other side 
 	};
 }frms;
 
@@ -107,7 +118,7 @@ void tribuf_finish_write(tribuf *tb)
 		f.nr = active.aw;
 		f.ar = active.ar;
 		
-		if(active.nw < 0) {
+		if(active.nw < 0) { // only steal nr if we absolutly have to (ie we're running faster than read side can draw)
 			f.aw = active.nr;
 			f.nw = active.nw;
 		} else {
@@ -167,14 +178,13 @@ void* tribuf_get_read(tribuf *tb)
 	return tb->data[f.ar];
 }
 
-void* tribuf_get_read_nolock(tribuf *tb) {
+void* tribuf_get_read_nolock(tribuf *tb) { // should only be used by write side to start up
 	frms active; 	
 	active.v = tb->active.v;
-	//__sync_synchronize();// not sure we need this, (might need it to inhibit compiler optimizations)
 	int r = (active.nr<0)?active.ar:active.nr;
 	return tb->data[r]; 
 }
 
 int tribuf_get_frmnum(tribuf *tb) {
-	return tb->frame; //__sync_add_and_fetch(&tb->frame, 0);
+	return tb->frame;
 }

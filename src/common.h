@@ -28,6 +28,7 @@ typedef struct {
 	int doublebuf;
 	int use_jack;
 	int hw_pallet;
+	int rational_julia;
 	const char *jack_opt;
 }opt_data;
 
@@ -47,5 +48,8 @@ void optproc(int argc, char **argv, opt_data *res);
 #endif
 
 static inline void *xmalloc(size_t s) { void *res = malloc(s); if(!res) abort(); return res; }
+
+#define pbattr restrict __attribute__((aligned (16))) 
+typedef uint16_t * restrict __attribute__ ((aligned (16)))  pixbuf_t;
 
 #endif

@@ -65,11 +65,9 @@ int main(int argc, char **argv)
 {    
 	optproc(argc, argv, &opts);
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
-	int im_w = screen->w - screen->w%8, im_h = screen->h - screen->h%8;
+	int im_w = screen->w, im_h = screen->h ;
 	
 	audio_init(&opts);
-	
-	usleep(1000);
 	
 	Uint32 frmcnt = 0;
 	Uint32 tick0;
@@ -83,6 +81,7 @@ int main(int argc, char **argv)
 	memset(beats, 0, sizeof(uint8_t)*im_w);
 	
 	SDL_Surface *voice_print = SDL_CreateRGBSurface(SDL_HWSURFACE, im_w, im_h/2, screen->format->BitsPerPixel, screen->format->Rmask, screen->format->Gmask, screen->format->Bmask, screen->format->Amask);
+	if(!voice_print) { printf("failed to create voice_print\n"); exit(1); }
 	
 	const int pixbits = screen->format->BitsPerPixel;
 	const int green = (pixbits == 32)?0xff00:(0x3f<<5);

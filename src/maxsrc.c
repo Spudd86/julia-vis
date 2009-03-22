@@ -25,6 +25,36 @@ static uint16_t *setup_point(int w, int h)
 	return max_src;
 }
 
+static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, float R[3][3])
+{
+	float xstep = 2.0f/w, ystep = 2.0f/h;
+	for(int yd = 0; yd < h; yd++) {
+		float v = yd*ystep - 1.0f;
+		for(int xd = 0; xd < w; xd++) {
+			float u = xd*xstep - 1.0f;
+	
+			float d = 0.95f + 0.05*sqrtf(u*u + v*v);
+			float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
+				(u*R[0][0] + v*R[0][1]),
+				(u*R[1][0] + v*R[1][1])*d,
+				(u*R[2][0] + v*R[2][1])*d
+			};
+			
+			// rotate back and shift/scale to [0, 1]
+			float x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
+			float y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
+					
+			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-2)*256);
+			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-2)*256);
+			int x1 = xs>>8, x2 = x1+1, xf = xs&0xFF;
+			int y1 = ys>>8, y2 = y1+1, yf = ys&0xFF;
+			
+			uint16_t r = (((in[y1*w + x1]*(0xff - xf) + in[y1*w + x2]*xf)*(0xff-yf) +
+						(in[y2*w + x1]*(0xff - xf) + in[y2*w + x2]*xf)*yf) >> 16);
+			*(out++) = r;
+		}
+	}
+}
 
 static uint16_t *prev_src;
 static uint16_t *next_src;
@@ -83,37 +113,6 @@ static void draw_point(void *restrict dest, float px, float py)
 	}
 }
 
-static void zoom(uint16_t *out, uint16_t *in, int w, int h, float R[3][3])
-{
-	float xstep = 2.0f/w, ystep = 2.0f/h;
-	for(int yd = 0; yd < h; yd++) {
-		float v = yd*ystep - 1.0f;
-		for(int xd = 0; xd < w; xd++) {
-			float u = xd*xstep - 1.0f;
-	
-			float d = 0.95f + 0.05*sqrtf(u*u + v*v);
-			float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
-				(u*R[0][0] + v*R[0][1]),
-				(u*R[1][0] + v*R[1][1])*d,
-				(u*R[2][0] + v*R[2][1])*d
-			};
-			
-			// rotate back and shift/scale to [0, 1]
-			float x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
-			float y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
-					
-			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-2)*256);
-			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-2)*256);
-			int x1 = xs>>8, x2 = x1+1, xf = xs&0xFF;
-			int y1 = ys>>8, y2 = y1+1, yf = ys&0xFF;
-			
-			uint16_t r = (((in[y1*w + x1]*(0xff - xf) + in[y1*w + x2]*xf)*(0xff-yf) +
-						(in[y2*w + x1]*(0xff - xf) + in[y2*w + x2]*xf)*yf) >> 16);
-			*(out++) = r;
-		}
-	}
-}
-
 
 // MUST NOT be called < frame of consumer apart (only uses double buffering)
 // if it's called too soon consumer may be using the frame we are modifying
@@ -128,11 +127,8 @@ void maxsrc_update(void)
 	
 	audio_data ad;
 	audio_get_samples(&ad);
-	//int samp = IMAX(iw,ih)*3/5;
 	//int samp = IMAX(IMAX(iw,ih)*3/5, 1023);
 	int samp = IMAX(IMAX(iw,ih), 1023);
-	
-	//tx = 0; ty = 0; tz = M_PI_4;
 	
 	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz); 
 	float sx=sinf(tx), sy=sinf(ty), sz=sinf(tz); 

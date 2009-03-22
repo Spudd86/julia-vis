@@ -5,10 +5,15 @@
 #ifdef __SSE__
 #	include <xmmintrin.h>
 #else
-static __inline __m64 __attribute__((__always_inline__))
+// available on athlon (3dnow) but not in the header for it (these are the intel intrinsic function names)
+static __inline __m64 __attribute__((__gnu_inline__, __always_inline__, __artificial__))
 _mm_max_pi16 (__m64 __A, __m64 __B) { return (__m64) __builtin_ia32_pmaxsw ((__v4hi)__A, (__v4hi)__B); }
-static __inline void __attribute__((__always_inline__))
-_mm_stream_pi (__m64 *__P, __m64 __A) { __builtin_ia32_movntq ((unsigned long long *)__P, (unsigned long long)__A); }
+extern __inline __m64 __attribute__((__gnu_inline__, __always_inline__, __artificial__))
+_mm_shuffle_pi16 (__m64 __A, int const __N) { return (__m64) __builtin_ia32_pshufw ((__v4hi)__A, __N); }
+#endif
+
+#ifdef __3dNOW__
+#	include <mm3dnow.h>
 #endif
 
 #endif

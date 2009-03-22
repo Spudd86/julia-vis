@@ -21,11 +21,6 @@ int audio_get_buf_count(void) {
 
 static inline float sqr(float x) { return x*x; }
 
-/* TODO:
- *  handle n != nr_samp in audio_update
- *  add a setup that takes opts from main and calls pa or jack setups
- */
-
 /**
  * take nr_samp frames of audio and do update beat detection
  * http://www.gamedev.net/reference/programming/features/beatdetection/
@@ -34,29 +29,27 @@ static float *do_fft(float *in)
 {
 	memcpy(fft_tmp, in, sizeof(float)*nr_samp);
 	fftwf_execute(p);
-	
-	float *fft;
-	#ifdef FFT_TRIBUF
+	float *fft = fft_tmp;
+#ifdef FFT_TRIBUF
 	fft = tribuf_get_write(fft_tb);
-	#else
-	fft = fft_tmp;
-	#endif
+#endif
+	
+	//const float scl = 1.0f/nr_samp;
 	fft[0] = fabsf(fft_tmp[0])/nr_samp;
 	fft[nr_samp/2] = fabsf(fft_tmp[nr_samp/2])/nr_samp;
-	
 	for(int i=1; i < nr_samp/2; i++)
-		fft[i] = sqrtf(sqr(fft_tmp[i]) + sqr(fft_tmp[nr_samp-i]))/nr_samp;
+		fft[i] = sqrtf(fft_tmp[i]*fft_tmp[i] + fft_tmp[nr_samp-i]*fft_tmp[nr_samp-i])/nr_samp;
 	
-	#ifdef FFT_TRIBUF
+#ifdef FFT_TRIBUF
 	tribuf_finish_write(fft_tb);
-	#endif
+#endif
 	return fft;
 }
 
 static int bufp = 0;
 
 // TODO: double check correctness
-void audio_update(const float *in, int n)
+void audio_update(const float * __attribute__ ((aligned (16))) in, int n)
 {
 	float *samps = tribuf_get_write(samp_tb);
 	int remain = 0;
@@ -97,6 +90,10 @@ static void *fft_data[3];
 #endif
 
 static void *samp_data[3];
+
+// never need more memory than we get here.
+static float samp_bufs[2048*3] __attribute__ ((aligned (16)));
+
 // sr is sample rate
 int audio_setup(int sr)
 {
@@ -109,10 +106,12 @@ int audio_setup(int sr)
 	
 	p = fftwf_plan_r2r_1d(nr_samp, fft_tmp, fft_tmp, FFTW_R2HC, 0);
 	
-	for(int i=0;i<3;i++) {
-		samp_data[i] = xmalloc(sizeof(float) * nr_samp);
-		memset(samp_data[i], 0, sizeof(float) * nr_samp);
-	}
+	//~ float *samp_bufs = fftwf_malloc(sizeof(float) * nr_samp * 3);
+	//~ if(!samp_bufs) {fprintf(stderr, "Memory allocation failed"); exit(1); }
+	samp_data[0] = samp_bufs;
+	samp_data[1] = samp_data[0] + nr_samp;
+	samp_data[2] = samp_data[1] + nr_samp;
+	memset(samp_data[0], 0, sizeof(float) * nr_samp * 3);
 	
 	#ifdef FFT_TRIBUF
 	for(int i=0;i<3;i++) {
@@ -142,13 +141,12 @@ int audio_init(opt_data *od)
 {
 	int rc;
 	#ifdef HAVE_JACK
-	if(od->use_jack) {
-		printf("Starting jack\n");
+	if(od->use_jack) 
 		rc = jack_setup(od);
-	} else
+	else
 	#endif
 		rc = audio_setup_pa();
 	
-	usleep(1000); // wait a bit so we have some audio in the buffer
+	usleep(10000); // wait a bit so we have some audio in the buffer (instead of garbage)
 	return rc;
 }

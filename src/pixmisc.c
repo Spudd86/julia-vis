@@ -8,7 +8,7 @@
 
 //TODO: portable version (no x86 stuff)
 
-void fade_pix(void *restrict buf, int w, int h, uint8_t fade)
+void fade_pix(void *restrict __attribute__((aligned (16))) buf, int w, int h, uint8_t fade)
 {
 	__m64 *mbbuf = buf;
 	const __m64 fd = _mm_set1_pi16(fade<<7);
