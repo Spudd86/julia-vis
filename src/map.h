@@ -1,11 +1,6 @@
 #ifndef MAP_H
 #define MAP_H
 
-#include <unistd.h>
-#include <stdint.h>
-#include <math.h>
-#include <complex.h>
-
 #include "points.h"
 
 //#define MAP_FUNC_ATTR __attribute__((sseregparm,fastcall,nothrow))

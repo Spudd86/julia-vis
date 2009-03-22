@@ -1,7 +1,5 @@
-#include <unistd.h>
-#include <stdlib.h>
+#include "../common.h"
 #include <string.h>
-#include <stdint.h>
 #include <stdio.h>
 
 #include <jack/jack.h>

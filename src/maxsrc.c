@@ -1,7 +1,3 @@
-#include <unistd.h>
-#include <stdint.h>
-#include <malloc.h>
-#include <math.h>
 
 #include "common.h"
 #include "audio/audio.h"

@@ -1,12 +1,8 @@
-#include <unistd.h>
-#include <math.h>
+#include "../common.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include <malloc.h>
 #include <string.h>
 
 #include "audio.h"
-#include "../common.h"
 
 #define BANDS (64)
 // about a seconds worth

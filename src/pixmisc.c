@@ -1,8 +1,6 @@
-#include <unistd.h>
-#include <stdint.h>
 
-#include "pixmisc.h"
 #include "common.h"
+#include "pixmisc.h"
 
 #include "mymm.h"
 

@@ -1,15 +1,7 @@
-#include "config.h"
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-#ifdef HAVE_STDINT_H
-#include <stdint.h>
-#endif
-#include "mymm.h"
-
-#include "pixmisc.h"
 #include "common.h"
+#include "pixmisc.h"
+#include "mymm.h"
 
 struct pallet_colour {
 	unsigned char r, g, b;
