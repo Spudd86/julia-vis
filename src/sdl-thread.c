@@ -1,6 +1,5 @@
 #include "common.h"
 #include <stdio.h>
-#include <time.h>
 
 #include <SDL.h>
 #include <SDL_thread.h>
@@ -22,16 +21,14 @@ static int im_w = 0, im_h = 0;
 static int running = 1;
 static float map_fps=0;
 
-static int run_map_thread(tribuf *tb) //TODO: go back to SDL_GetTicks() for timing in here (portability to windows)
+static int run_map_thread(tribuf *tb)
 {	
 	struct point_data *pd = new_point_data(2);
 	unsigned int beats = beat_get_count();
 	unsigned int tick0, fps_oldtime, frmcnt=0, last_beat_time = 0;
-	struct timespec tm0;
-	clock_gettime(CLOCK_MONOTONIC, &tm0);
-	tick0 = fps_oldtime = tm0.tv_sec*1000 + tm0.tv_nsec/1000000;
+	tick0 = fps_oldtime = SDL_GetTicks();
 	
-	struct timespec fpstimes[40]; for(int i=0; i<40; i++) fpstimes[i] = tm0;
+	unsigned int fpstimes[40]; for(int i=0; i<40; i++) fpstimes[i] = 0;
 	
 	uint16_t *map_src = tribuf_get_read_nolock(tb);
     while(running) 
@@ -45,15 +42,12 @@ static int run_map_thread(tribuf *tb) //TODO: go back to SDL_GetTicks() for timi
 		
 		tribuf_finish_write(tb);
 		map_src=map_dest;
-
-		struct timespec tm;
-		clock_gettime(CLOCK_MONOTONIC, &tm);
 		
-		float fpsd = (tm.tv_sec - fpstimes[frmcnt%40].tv_sec)+(tm.tv_nsec - fpstimes[frmcnt%40].tv_nsec)/1000000000.0f;
-		fpstimes[frmcnt%40] = tm;
+		unsigned int now = SDL_GetTicks() - tick0;
+		float fpsd = (now - fpstimes[frmcnt%40])/1000.0f;
+		fpstimes[frmcnt%40] = now;
 		map_fps = 40.0f / fpsd;
 		
-		unsigned int now = (tm.tv_sec - tm0.tv_sec)*1000 + (tm.tv_nsec - tm0.tv_nsec)/1000000;
 		int newbeat = beat_get_count();
 		if(newbeat != beats && now - last_beat_time > 1000) {
 			last_beat_time = now;
@@ -83,7 +77,8 @@ int main(int argc, char **argv)
 	pallet_init(screen->format->BitsPerPixel == 8);
 	
 	uint16_t *map_surf[3];
-	void *map_surf_mem = valloc(3 * im_w * im_h * sizeof(uint16_t));
+	//void *map_surf_mem = valloc(3 * im_w * im_h * sizeof(uint16_t));
+	void *map_surf_mem = _mm_alloc(3 * im_w * im_h * sizeof(uint16_t), 32);
 	for(int i=0; i<3; i++)
 		map_surf[i] = map_surf_mem + i * im_w * im_h * sizeof(uint16_t);
 	memset(map_surf_mem, 0, 3 * im_w * im_h * sizeof(uint16_t));

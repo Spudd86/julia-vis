@@ -67,7 +67,6 @@ AC_TYPE_UINT16_T
 AC_TYPE_UINT8_T
 
 # Checks for library functions.
-AC_FUNC_MALLOC
 AC_CHECK_FUNCS([atexit])
 
 #AH_BOTTOM(echo 'AC_INCLUDES_DEFAULT')

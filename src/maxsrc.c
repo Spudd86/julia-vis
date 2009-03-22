@@ -3,6 +3,7 @@
 #include "audio/audio.h"
 #include "tribuf.h"
 #include "pixmisc.h"
+#include <mm_malloc.h>
 
 static void initbuf(uint16_t *max_src, int stride, int w, int h) 
 {
@@ -39,7 +40,7 @@ void maxsrc_setup(int w, int h)
 	point_src = setup_point(pnt_w, pnt_h);
 	
 	//prev_src = valloc(2 * w * h * sizeof(uint16_t));
-	prev_src = memalign(sysconf(_SC_PAGESIZE),2 * w * h * sizeof(uint16_t));
+	prev_src = _mm_malloc(2 * w * h * sizeof(uint16_t), 32);
 	memset(prev_src, 0, 2*w*h*sizeof(uint16_t));
 	next_src = prev_src + w*h;
 }

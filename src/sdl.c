@@ -2,6 +2,7 @@
 #include "common.h"
 #include <stdio.h>
 #include <SDL.h>
+#include <mm_malloc.h>
 
 #include "map.h"
 #include "sdl-misc.h"
@@ -27,7 +28,8 @@ int main(int argc, char **argv)
 	pallet_init(screen->format->BitsPerPixel == 8);
 
 	uint16_t *map_surf[2];
-	map_surf[0] = valloc(2 * im_w * im_h * sizeof(uint16_t));
+	map_surf[0] = _mm_malloc(2 * im_w * im_h * sizeof(uint16_t), 32);
+	//map_surf[0] = valloc(2 * im_w * im_h * sizeof(uint16_t));
 	memset(map_surf[0], 0, 2 * im_w * im_h * sizeof(uint16_t));
 	map_surf[1] = map_surf[0] + im_w * im_h;
 	
