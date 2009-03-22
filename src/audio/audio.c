@@ -89,6 +89,7 @@ int audio_get_samples(audio_data *d) {
 int audio_get_fft(audio_data *d) {
 	d->len = nr_samp/2+1;
 	d->data = tribuf_get_read(fft_tb);
+	tribuf_finish_read(fft_tb); // TODO: fix interface so this doesn't need to be here
 	return 0;
 }
 
