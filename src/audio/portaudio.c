@@ -5,8 +5,6 @@
 
 #include "audio.h"
 
-#define SAMPLE_RATE (44100)
-
 static PaStream *stream;
 
 static int callback(const void *input,

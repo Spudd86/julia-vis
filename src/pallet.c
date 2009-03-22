@@ -278,7 +278,7 @@ static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, ui
 	dst_stride /= 4;
 	
 	for(unsigned int y = 0; y < h; y++) {
-		for(unsigned int x = 0; x < w; x+=2) {
+		for(unsigned int x = 0; x < w; x+=4) {
 			int v = src[y*src_stride + x];
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
 			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);

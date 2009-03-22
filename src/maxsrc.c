@@ -103,13 +103,14 @@ static void zoom(uint16_t *out, uint16_t *in, int w, int h, float R[3][3])
 			float x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
 			float y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
 					
-			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
-			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
+			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-2)*256);
+			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-2)*256);
 			int x1 = xs>>8, x2 = x1+1, xf = xs&0xFF;
 			int y1 = ys>>8, y2 = y1+1, yf = ys&0xFF;
 			
-			*(out++) = (((in[y1*w + x1]*(0xff - xf) + in[y1*w + x2]*xf)*(0xff-yf) +
+			uint16_t r = (((in[y1*w + x1]*(0xff - xf) + in[y1*w + x2]*xf)*(0xff-yf) +
 						(in[y2*w + x1]*(0xff - xf) + in[y2*w + x2]*xf)*yf) >> 16);
+			*(out++) = r;
 		}
 	}
 }

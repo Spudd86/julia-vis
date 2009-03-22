@@ -7,7 +7,7 @@
 #define tribuf_error(s) do {\
 		fflush(stdout); \
 		fprintf(stderr, "ERROR: %s:%i ", __FILE__, __LINE__); \
-		fprintf(stderr, "%s\n", s); \
+		fprintf(stderr, "%s\n", s); fflush(stderr); \
 		abort();\
 	} while(0)
 #ifdef TB_DEBUG
