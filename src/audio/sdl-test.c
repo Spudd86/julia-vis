@@ -202,7 +202,8 @@ int main(int argc, char **argv)
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		fps_oldtime = now;
 	}
-
+	
+	SDL_FreeSurface(voice_print);
 	frmcnt++;
     return 0;
 }

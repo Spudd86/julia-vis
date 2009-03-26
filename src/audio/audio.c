@@ -19,7 +19,14 @@ int audio_get_buf_count(void) {
 	return buf_count;
 }
 
-static inline float sqr(float x) { return x*x; }
+void audio_shutdown()
+{
+	printf("audio shutting down\n");
+	//tribuf_destroy(samp_tb);
+	fftwf_free(fft_tmp);
+	fftwf_destroy_plan(p);
+	fft_tmp = NULL;
+}
 
 /**
  * take nr_samp frames of audio and do update beat detection
@@ -124,15 +131,11 @@ int audio_setup(int sr)
 	
 	beat_setup();
 	
+	atexit(audio_shutdown);
+	
 	return 0;
 }
 
-void audio_shutdown()
-{
-	fftwf_free(fft_tmp);
-	fftwf_destroy_plan(p);
-	fft_tmp = NULL;
-}
 
 int audio_setup_pa();
 int jack_setup(opt_data *);

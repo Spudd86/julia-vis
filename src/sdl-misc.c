@@ -18,6 +18,25 @@ SDL_Surface *sdl_setup(opt_data *opts, int im_size)
         exit(-1);
     }
 	atexit(SDL_Quit);
+	if(SDL_WasInit(SDL_INIT_AUDIO)) {
+		SDL_CloseAudio();
+		SDL_QuitSubSystem(SDL_INIT_AUDIO);
+	}
+	
+	SDL_EventState(SDL_MOUSEMOTION, SDL_IGNORE);
+	SDL_EventState(SDL_MOUSEBUTTONDOWN, SDL_IGNORE);
+	SDL_EventState(SDL_MOUSEBUTTONUP, SDL_IGNORE);
+	SDL_EventState(SDL_JOYAXISMOTION, SDL_IGNORE);
+	SDL_EventState(SDL_JOYBALLMOTION, SDL_IGNORE);
+	SDL_EventState(SDL_JOYHATMOTION, SDL_IGNORE);
+	SDL_EventState(SDL_JOYBUTTONDOWN, SDL_IGNORE);
+	SDL_EventState(SDL_JOYBUTTONUP, SDL_IGNORE);
+	SDL_EventState(SDL_VIDEORESIZE, SDL_IGNORE);
+	SDL_EventState(SDL_VIDEOEXPOSE, SDL_IGNORE);
+	SDL_EventState(SDL_USEREVENT, SDL_IGNORE);
+	SDL_EventState(SDL_SYSWMEVENT, SDL_IGNORE);
+	SDL_EventState(SDL_ACTIVEEVENT, SDL_IGNORE);
+	
 	if(TTF_Init()==-1) {
 		printf("TTF_Init: %s\n", TTF_GetError());
 		exit(2);

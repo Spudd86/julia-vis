@@ -152,7 +152,9 @@ int main(int argc, char **argv)
 	
 	int status;
 	SDL_WaitThread(map_thread, &status);
-
+	
+	_mm_free(map_surf_mem);
+	
     return 0;
 }
 
