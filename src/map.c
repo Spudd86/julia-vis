@@ -1,22 +1,9 @@
-#include <unistd.h>
-#include <stdint.h>
-#include <math.h>
-#include <complex.h>
+#include "common.h"
+//#include <complex.h>
 
 
 #include "mymm.h"
-
 #include "map.h"
-
-#include "common.h"
-
-// TODO: do a map for:
-// x0 = reg50*1.5/2.5; in [-0.3, 0.3]?
-// y0 = reg51*1.5/2.5;
-
-// xt=x;
-// x=2.5*sqr(y) - sqrt(abs(x))*sqrt(2.5)/2.5 + x0;
-// y=2.5*sqr(xt) - sqrt(abs(y))*sqrt(2.5)/2.5  + y0;
 
 // also for: (use c99 complex support? get's ugly when expanded...)
 // z = (z^4 + c1)/(z*z + c2)
