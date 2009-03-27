@@ -101,12 +101,12 @@ config.mk:
 	touch config.mk
 
 bin/sdl-test: src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/atomic_tribuf.c src/points.c src/points.h src/common.h Makefile config.mk
-	$(CC) $(CFLAGS) -DUSE_SDL -DMT_NO_INLINE \
+	$(CC) $(CFLAGS) -DUSE_SDL \
 	src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/atomic_tribuf.c src/points.c \
 	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 
 bin/sdlthread-test: src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/atomic_tribuf.c src/points.c src/points.h src/common.h Makefile config.mk
-	$(CC) $(CFLAGS) -DUSE_SDL -DMT_NO_INLINE -DTRIBUF_LOCKING \
+	$(CC) $(CFLAGS) -DUSE_SDL -DTRIBUF_LOCKING \
 	src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/atomic_tribuf.c src/points.c \
 	$(SDL_FLAGS) $(PA_FLAGS) $(JACK_FLAGS) -o $@
 

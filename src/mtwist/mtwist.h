@@ -263,6 +263,30 @@ extern int		mt_loadstate(FILE* statefile);
 #endif
 
 /*
+ * In gcc, inline functions must be declared extern or they'll produce
+ * assembly code (and thus linking errors).  We have to work around
+ * that difficulty with the MT_EXTERN define.
+ *
+ * NOTE: wrong for new gcc, new gcc you need to declare it static
+ */
+#ifndef MT_EXTERN
+#ifdef __cplusplus
+#define MT_EXTERN			/* C++ doesn't need static */
+#else /* __cplusplus */
+#define MT_EXTERN	static 	/* C (at least gcc) needs extern */
+#endif /* __cplusplus */
+#endif /* MT_EXTERN */
+
+/*
+ * Make it possible for mtwist.c to disable the inline keyword.  We
+ * use our own keyword so that we don't interfere with inlining in
+ * C/C++ header files, above.
+ */
+#ifndef MT_INLINE
+#define MT_INLINE	inline		/* Compiler has inlining */
+#endif /* MT_INLINE */
+
+/*
  * Functions for generating random numbers.  The actual code of the
  * functions is given in this file so that it can be declared inline.
  * For compilers that don't have the inline feature, mtwist.c will
@@ -274,30 +298,30 @@ extern int		mt_loadstate(FILE* statefile);
 #undef MT_NO_INLINE			/* C++ definitely has inlining */
 #endif /* __cplusplus */
 
-extern unsigned long	mts_lrand(mt_state* state);
+MT_EXTERN MT_INLINE unsigned long	mts_lrand(mt_state* state);
 					/* Generate 32-bit value, any gen. */
 #ifndef MT_NO_LONGLONG
-extern unsigned long long
+MT_EXTERN MT_INLINE unsigned long long
 			mts_llrand(mt_state* state);
 					/* Generate 64-bit value, any gen. */
 #endif /* MT_NO_LONGLONG */
-extern double		mts_drand(mt_state* state);
+MT_EXTERN MT_INLINE double		mts_drand(mt_state* state);
 					/* Generate floating value, any gen. */
 					/* Fast, with only 32-bit precision */
-extern double		mts_ldrand(mt_state* state);
+MT_EXTERN MT_INLINE double		mts_ldrand(mt_state* state);
 					/* Generate floating value, any gen. */
 					/* Slower, with 64-bit precision */
 
-extern unsigned long	mt_lrand(void);	/* Generate 32-bit random value */
+MT_EXTERN MT_INLINE unsigned long	mt_lrand(void);	/* Generate 32-bit random value */
 #ifndef MT_NO_LONGLONG
-extern unsigned long long
+MT_EXTERN MT_INLINE unsigned long long
 			mt_llrand(void);
 					/* Generate 64-bit random value */
 #endif /* MT_NO_LONGLONG */
-extern double		mt_drand(void);
+MT_EXTERN MT_INLINE double		mt_drand(void);
 					/* Generate floating value */
 					/* Fast, with only 32-bit precision */
-extern double		mt_ldrand(void);
+MT_EXTERN MT_INLINE double		mt_ldrand(void);
 					/* Generate floating value */
 					/* Slower, with 64-bit precision */
 
@@ -354,28 +378,6 @@ extern double		mt_32_to_double;
 					/* Multiplier to convert long to dbl */
 extern double		mt_64_to_double;
 					/* Mult'r to cvt long long to dbl */
-
-/*
- * In gcc, inline functions must be declared extern or they'll produce
- * assembly code (and thus linking errors).  We have to work around
- * that difficulty with the MT_EXTERN define.
- */
-#ifndef MT_EXTERN
-#ifdef __cplusplus
-#define MT_EXTERN			/* C++ doesn't need static */
-#else /* __cplusplus */
-#define MT_EXTERN	extern		/* C (at least gcc) needs extern */
-#endif /* __cplusplus */
-#endif /* MT_EXTERN */
-
-/*
- * Make it possible for mtwist.c to disable the inline keyword.  We
- * use our own keyword so that we don't interfere with inlining in
- * C/C++ header files, above.
- */
-#ifndef MT_INLINE
-#define MT_INLINE	inline		/* Compiler has inlining */
-#endif /* MT_INLINE */
 
 /*
  * Generate a random number in the range 0 to 2^32-1, inclusive, working
