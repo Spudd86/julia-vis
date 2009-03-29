@@ -139,6 +139,7 @@ int audio_setup(int sr)
 
 int audio_setup_pa();
 int jack_setup(opt_data *);
+int pulse_setup();
 
 int audio_init(opt_data *od) 
 {
@@ -146,6 +147,11 @@ int audio_init(opt_data *od)
 	#ifdef HAVE_JACK
 	if(od->use_jack) 
 		rc = jack_setup(od);
+	else
+	#endif
+	#ifdef HAVE_PULSE
+	if(od->use_pulse) 
+		rc = pulse_setup(od);
 	else
 	#endif
 		rc = audio_setup_pa();

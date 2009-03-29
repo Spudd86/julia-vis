@@ -1,4 +1,3 @@
-
 #include "common.h"
 #include <stdio.h>
 #include <getopt.h>
@@ -29,10 +28,11 @@ void optproc(int argc, char **argv, opt_data *res)
 	res->doublebuf = 0;
 	res->hw_pallet = 0;
 	res->use_jack = 0;
+	res->use_pulse = 0;
 	res->rational_julia = 0;
 	res->jack_opt = NULL;
 	
-	while((opt = getopt(argc, argv, "w:h:s:a:rftpdj::")) != -1) {
+	while((opt = getopt(argc, argv, "w:h:s:a:rftpduj::")) != -1) {
 		switch(opt) {
 			case 'w':
 				res->w = atoi(optarg);
@@ -58,6 +58,11 @@ void optproc(int argc, char **argv, opt_data *res)
 				res->jack_opt = optarg;
 				break;
 			#endif
+			//#ifdef HAVE_PULSE
+			case 'u':
+				res->use_pulse = 1;
+				break;
+			//#endif
 			case 's':
 				res->draw_rate = atoi(optarg);
 				break;

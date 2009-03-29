@@ -54,6 +54,18 @@ if test "x$enable_jack" = xyes; then
 	)
 fi
 
+AC_ARG_ENABLE([pulseaudio], AS_HELP_STRING([--enable-pulseaudio], [enable using pulseaudio for audio input (default: disabled)]))
+if test "x$enable_pulseaudio" = xyes; then
+	PKG_CHECK_MODULES([PULSE], [libpulse],
+		[AC_DEFINE([HAVE_PULSE], [1], [Define if pulseaudio is enabled])
+		 AC_SUBST(PULSE_CFLAGS)
+		 AC_SUBST(PULSE_LIBS)
+		 AC_SUBST(HAVE_PULSE)
+		],
+		[AC_MSG_FAILURE([--enable-pulseaudio was given, but test for pulseaudio failed])]
+	)
+fi
+
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_INLINE
 AC_C_RESTRICT

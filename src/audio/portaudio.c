@@ -29,6 +29,14 @@ int audio_setup_pa()
 	
 	const PaDeviceInfo *inf = Pa_GetDeviceInfo(Pa_GetDefaultInputDevice());
 	
+	int numdev = Pa_GetDeviceCount();
+	printf("Portaudio devices:\n");
+	for(int i=0; i<numdev; i++) {
+		PaDeviceInfo *di = Pa_GetDeviceInfo(i);
+		if(i==Pa_GetDefaultInputDevice())printf("*");
+		printf("%i\t%s\n", i, di->name);
+	}
+	
 	/* Open an audio I/O stream. */
     err = Pa_OpenDefaultStream( &stream,
                                 1,          /* 1 input channel */

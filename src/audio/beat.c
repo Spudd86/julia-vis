@@ -57,7 +57,9 @@ static inline float getsamp(float *data, int len, int i, int w) {
 void beat_update(float *fft, int fft_len)
 {
 	for(int b=0; b < BANDS; b++)
-	{
+	{ // TODO: try to make a good beat detector based on slope of log2(fft + 1)/2
+		// since log2(samp+1)/2 should give us a nice linear relation to percived volume 
+		//float tmp = log2f(getsamp(fft, fft_len, b*fft_len/(BANDS*2) , fft_len/(BANDS*4)) + 1.0f)/2;
 		float tmp = getsamp(fft, fft_len, b*fft_len/(BANDS*2) , fft_len/(BANDS*4));
 		float v = 0;
 		for(int i=0; i<HIST; i++) v += sqr(Eh[b][(hi + HIST + i)%(HIST*2)]) - sqr(E[b]);
