@@ -8,7 +8,7 @@
 #include "audio.h"
 
 //TODO: make this whole thing suck less
-
+//TODO: figure out how to force fragment size down (seems like we're not getting audio often enough)
 #include <pulse/pulseaudio.h>
 
 #include <pthread.h>
