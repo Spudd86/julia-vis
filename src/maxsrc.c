@@ -5,24 +5,61 @@
 #include "pixmisc.h"
 #include <mm_malloc.h>
 
-static void initbuf(uint16_t *max_src, int stride, int w, int h)
-{
-	for(int y=0; y < h; y++)  {
-		for(int x=0; x < w; x++) {
-			float u = 2*(x-w*0.5f+0.5f)/w; float v = 2*(y-w*0.5f+0.5f)/h;
-			float d = log2f(sqrtf(u*u + v*v)*M_SQRT1_2 + 1.0f);
-			max_src[y*stride + x] = (uint16_t)(fmaxf(1.0f - d, 0.0f)*UINT16_MAX);
-		}
-	}
-}
-
 static uint16_t *setup_point(int w, int h)
 {
 	uint16_t *buf = malloc((w+1) * (h+1) * sizeof(uint16_t));
 	memset(buf, 0, (w+1)*(h+1)*sizeof(uint16_t));
-	initbuf(buf, w+1, w, h);
-
+	int stride = w+1;
+	for(int y=0; y < h; y++)  {
+		for(int x=0; x < w; x++) {
+			float u = (2*x+1.0f)/w - 1, v = (2*y+1.0f)/h - 1;
+			buf[y*stride + x] = (uint16_t)(expf(-4.5f*(u*u+v*v))*(UINT16_MAX));
+		}
+	}
 	return buf;
+}
+
+static uint16_t *prev_src;
+static uint16_t *next_src;
+static uint16_t *point_src;
+static int pnt_w, pnt_h;
+static int iw, ih;
+
+void maxsrc_setup(int w, int h)
+{
+	pnt_w = IMAX(w/24, 8);
+	pnt_h = IMAX(h/24, 8);
+	iw = w; ih = h;
+	point_src = setup_point(pnt_w, pnt_h);
+
+	prev_src = _mm_malloc(2 * w * h * sizeof(uint16_t), 32);
+	memset(prev_src, 0, 2*w*h*sizeof(uint16_t));
+	next_src = prev_src + w*h;
+}
+
+#define COORD_S (8)
+#define COORD_R (256)
+#define COORD_M (COORD_R-1)
+
+static void draw_point(void *restrict dest, float px, float py)
+{
+	int ipx = lrintf(px*256), ipy = lrintf(py*256);
+	uint yf = ipy&0xff, xf = ipx&0xff;
+	uint a00 = (yf*xf)/2;
+	uint a01 = (yf*(255-xf))/2;
+	uint a10 = ((255-yf)*xf)/2;
+	uint a11 = ((255-yf)*(255-xf))/2;
+
+	unsigned int off = (ipy/256)*iw + ipx/256;
+
+	uint16_t *restrict dst = dest;
+	for(int y=0; y < pnt_h; y++) {
+		for(int x=0; x < pnt_w; x++) {
+			uint32_t res = (point_src[(pnt_w+1)*y+x]*a00 + point_src[(pnt_w+1)*y+x+1]*a01
+					+ point_src[(pnt_w+1)*(y+1)+x]*a10   + point_src[(pnt_w+1)*(y+1)+x+1]*a11)>>15;
+			dst[off+iw*y+x] = IMAX(res, dst[off+iw*y+x]);
+		}
+	}
 }
 
 static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, float R[3][3])
@@ -56,29 +93,6 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 	}
 }
 
-static uint16_t *prev_src;
-static uint16_t *next_src;
-static uint16_t *point_src;
-static int pnt_w, pnt_h;
-static int iw, ih;
-
-void maxsrc_setup(int w, int h)
-{
-	pnt_w = IMAX(w/24, 16);
-	pnt_h = IMAX(h/24, 16);
-	iw = w; ih = h;
-	point_src = setup_point(pnt_w, pnt_h);
-
-	//prev_src = valloc(2 * w * h * sizeof(uint16_t)); // doesn't exist on windows
-	prev_src = _mm_malloc(2 * w * h * sizeof(uint16_t), 32);
-	memset(prev_src, 0, 2*w*h*sizeof(uint16_t));
-	next_src = prev_src + w*h;
-}
-
-uint16_t *maxsrc_get(void) {
-	return prev_src;
-}
-
 static float tx=0, ty=0, tz=0;
 
 static inline float getsamp(audio_data *d, int i, int w) {
@@ -89,28 +103,6 @@ static inline float getsamp(audio_data *d, int i, int w) {
 		res += d->data[i];
 	}
 	return res / (2*w);
-}
-
-static void draw_point(void *restrict dest, float px, float py)
-{
-	float yfrac = fmodf(py, 1.0f);
-	float xfrac = fmodf(px, 1.0f);
-	int a00 = yfrac*xfrac*256;
-	int a01 = yfrac*(1.0f-xfrac)*256;
-	int a10 = (1.0f-yfrac)*xfrac*256;
-	int a11 = (1.0f-yfrac)*(1.0f-xfrac)*256;
-
-	unsigned int off = ((int)py)*iw + (int)px;
-
-	uint16_t *restrict dst = dest;
-	for(int y=0; y < pnt_h; y++) {
-		for(int x=0; x < pnt_w; x++) {
-			int res = point_src[(pnt_w+1)*y+x] * a00     + point_src[(pnt_w+1)*y+x+1] * a01
-					+ point_src[(pnt_w+1)*(y+1)+x] * a10 + point_src[(pnt_w+1)*(y+1)+x+1] * a11;
-
-			dst[off+iw*y+x] = IMAX(dst[off+iw*y+x], res>>8);
-		}
-	}
 }
 
 
@@ -127,9 +119,8 @@ void maxsrc_update(void)
 
 	audio_data ad;
 	audio_get_samples(&ad);
-	//int samp = IMAX(IMAX(iw,ih)*3/5, 1023);
-	int samp = IMAX(IMAX(iw,ih), 1023);
-
+	int samp = IMAX(IMAX(iw,ih)/4, 1023);
+	//samp = 4;
 	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz);
 	float sx=sinf(tx), sy=sinf(ty), sz=sinf(tz);
 
@@ -164,3 +155,9 @@ void maxsrc_update(void)
 
 	tx+=0.02; ty+=0.01; tz-=0.003;
 }
+
+
+uint16_t *maxsrc_get(void) {
+	return prev_src;
+}
+

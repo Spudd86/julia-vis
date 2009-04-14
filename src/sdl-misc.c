@@ -12,7 +12,7 @@ SDL_Surface *sdl_setup(opt_data *opts, int im_size)
 {
 	printf("Initializing SDL.\n");
 	putenv("SDL_NOMOUSE=1");
-	
+
     if((SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER)==-1)) {
         printf("Could not initialize SDL: %s.\n", SDL_GetError());
         exit(-1);
@@ -22,7 +22,7 @@ SDL_Surface *sdl_setup(opt_data *opts, int im_size)
 		SDL_CloseAudio();
 		SDL_QuitSubSystem(SDL_INIT_AUDIO);
 	}
-	
+
 	SDL_EventState(SDL_MOUSEMOTION, SDL_IGNORE);
 	SDL_EventState(SDL_MOUSEBUTTONDOWN, SDL_IGNORE);
 	SDL_EventState(SDL_MOUSEBUTTONUP, SDL_IGNORE);
@@ -36,7 +36,7 @@ SDL_Surface *sdl_setup(opt_data *opts, int im_size)
 	SDL_EventState(SDL_USEREVENT, SDL_IGNORE);
 	SDL_EventState(SDL_SYSWMEVENT, SDL_IGNORE);
 	SDL_EventState(SDL_ACTIVEEVENT, SDL_IGNORE);
-	
+
 	if(TTF_Init()==-1) {
 		printf("TTF_Init: %s\n", TTF_GetError());
 		exit(2);
