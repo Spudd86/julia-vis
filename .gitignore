@@ -10,3 +10,6 @@ config.status
 configure
 stamp-h
 src/config.h
+.cproject
+.project
+.settings

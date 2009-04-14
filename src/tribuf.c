@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <malloc.h>
 
+//#define TRIBUF_LOCKING
+
 #ifdef TRIBUF_LOCKING
 #define TB_LOCK_PROFILE
 
@@ -67,8 +69,8 @@ struct tribuf_s {
 	static unsigned int lock_trys = 0;
 	static unsigned int lock_mins = 0;
 	static unsigned int lock_alts = 0;
-	static void  tb_lock_prof_print(void) { 
-		printf("tribuf lock stats:\n\tfrms: %i\n\tcont: %i\n\ttrys: %i\n\tmins: %i\n\talts: %i\n", lock_frms, lock_contend, lock_trys, lock_mins, lock_alts); 
+	static void  tb_lock_prof_print(void) {
+		printf("tribuf lock stats:\n\tfrms: %i\n\tcont: %i\n\ttrys: %i\n\tmins: %i\n\talts: %i\n", lock_frms, lock_contend, lock_trys, lock_mins, lock_alts);
 		printf("\tpercent contended: %i\n", (lock_contend*100)/lock_trys);
 	}
 	static void __attribute__((constructor)) tb_lock_prof_init(void) {
@@ -81,13 +83,13 @@ struct tribuf_s {
 tribuf* tribuf_new(void **data, int locking)
 {
 	tribuf *tb = xmalloc(sizeof(tribuf));
-	
+
 	tb->data = data;
 	tb->frame = tb->lastmin = 0;
 	tb->next_buf = 2;
-	
+
 	for(int i=0; i<3; i++) tb->frms[i] = i;
-	
+
 #ifdef TRIBUF_LOCKING
 	tb->dolock = locking;
 	tb->lastread = -1;
@@ -145,7 +147,7 @@ void tribuf_finish_write(tribuf *tb)
 	tb->next_buf = tb->lastmin;
 	//tb->frms[tb->lastmin] = __sync_add_and_fetch(&tb->frame, 1);
 	tb->frms[tb->lastmin] = ++tb->frame;
-	
+
 	int a = (tb->lastmin+1)%3, b =  (tb->lastmin+2)%3;
 	int min = (tb->frms[a] < tb->frms[b])? a : b;
 	tb->lastmin = min;
@@ -158,7 +160,7 @@ void* tribuf_get_read(tribuf *tb)
 #ifdef TRIBUF_LOCKING
 	if(tb->dolock) tb_lock(&tb->locks[bufnum]);
 	tb->lastread = bufnum;
-#endif	
+#endif
 	return tb->data[bufnum];
 }
 
@@ -173,7 +175,7 @@ void tribuf_finish_read(tribuf *tb)
 #ifdef TRIBUF_LOCKING
 	if(tb->lastread != -1 && tb->dolock)
 		tb_unlock(&tb->locks[tb->lastread]);
-#endif	
+#endif
 }
 
 int tribuf_get_frmnum(tribuf *tb) {

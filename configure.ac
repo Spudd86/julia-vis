@@ -1,11 +1,11 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.63])
+AC_PREREQ([2.61])
 AC_INIT([julia-opengl], [0.1], [BUG-REPORT-ADDRESS])
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_SRCDIR([src/optproc.c])
-#INCLUDES = `AC_INCLUDES_DEFAULT'
+#INCLUDES = 'AC_INCLUDES_DEFAULT'
 
 USE_LANGUAGES=gnu99
 
@@ -64,6 +64,11 @@ if test "x$enable_pulseaudio" = xyes; then
 		],
 		[AC_MSG_FAILURE([--enable-pulseaudio was given, but test for pulseaudio failed])]
 	)
+fi
+
+AC_ARG_ENABLE([locking-tb], AS_HELP_STRING([--enable-locking-tb], [enable using pthread locks to syncronize tribufs instead of atomic ops (default: disabled)]))
+if test "x$enable_locking_tb" = xyes; then
+	AC_SUBST(LOCKING_TB, [1])
 fi
 
 # Checks for typedefs, structures, and compiler characteristics.
