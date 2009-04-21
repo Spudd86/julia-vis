@@ -34,37 +34,37 @@ AC_SUBST(PORTAUDIO_LIBS)
 AC_ARG_ENABLE([directfb], AS_HELP_STRING([--enable-directfb], [build test-directfb (default: disabled)]))
 if test "x$enable_directfb" = xyes; then
 	PKG_CHECK_MODULES([DIRECTFB], [directfb],
-		[AC_DEFINE([HAVE_DIRECTFB], [1], [Define if directfb is enabled])
-		 AC_SUBST(DIRECTFB_CFLAGS)
-		 AC_SUBST(DIRECTFB_LIBS)
-		],
+		[AC_DEFINE([HAVE_DIRECTFB], [1], [Define if directfb is enabled])],
 		[AC_MSG_FAILURE([--enable-directfb was given, but test for directfb failed])]
 	)
 fi
+AC_SUBST(DIRECTFB_CFLAGS)
+AC_SUBST(DIRECTFB_LIBS)
+AC_SUBST(enable_directfb)
 
 AC_ARG_ENABLE([jack], AS_HELP_STRING([--enable-jack], [enable using jack for audio input (default: disabled)]))
 if test "x$enable_jack" = xyes; then
 	PKG_CHECK_MODULES([JACK], [jack],
-		[AC_DEFINE([HAVE_JACK], [1], [Define if jack is enabled])
-		 AC_SUBST(JACK_CFLAGS)
-		 AC_SUBST(JACK_LIBS)
-		 AC_SUBST(HAVE_JACK)
-		],
+		[AC_DEFINE([HAVE_JACK], [1], [Define if jack is enabled])],
 		[AC_MSG_FAILURE([--enable-jack was given, but test for jack failed])]
 	)
 fi
+AC_SUBST(JACK_CFLAGS)
+AC_SUBST(JACK_LIBS)
+AC_SUBST(enable_jack)
 
 AC_ARG_ENABLE([pulseaudio], AS_HELP_STRING([--enable-pulseaudio], [enable using pulseaudio for audio input (default: disabled)]))
 if test "x$enable_pulseaudio" = xyes; then
 	PKG_CHECK_MODULES([PULSE], [libpulse],
 		[AC_DEFINE([HAVE_PULSE], [1], [Define if pulseaudio is enabled])
-		 AC_SUBST(PULSE_CFLAGS)
-		 AC_SUBST(PULSE_LIBS)
-		 AC_SUBST(HAVE_PULSE)
+		 
 		],
 		[AC_MSG_FAILURE([--enable-pulseaudio was given, but test for pulseaudio failed])]
 	)
 fi
+AC_SUBST(PULSE_CFLAGS)
+AC_SUBST(PULSE_LIBS)
+AC_SUBST(enable_pulse)
 
 AC_ARG_ENABLE([locking-tb], AS_HELP_STRING([--enable-locking-tb], [enable using pthread locks to syncronize tribufs instead of atomic ops (default: disabled)]))
 if test "x$enable_locking_tb" = xyes; then

@@ -2,7 +2,6 @@
 # autoconf tutorial: 
 # http://www.galassi.org/mark//mydocs/autoconf_tutorial_2.html
 
-
 SHELL = /bin/sh
 VPATH = @srcdir@
 
@@ -21,18 +20,19 @@ CPPFLAGS = @CPPFLAGS@
 CFLAGS = $(CPPFLAGS) @CFLAGS@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@
-#INSTALL = @INSTALL@
+INSTALL = @INSTALL@
 
+ENABLE_JACK=@enable_jack@
+ENABLE_PULSE=@enable_pulse@
+ENABLE_DIRECTFB=@enable_directfb@
 
-
-CFLAGS += -D_GNU_SOURCE=1 -mmmx -Wall -fno-strict-aliasing -fsingle-precision-constant
+CFLAGS += -D_GNU_SOURCE=1 -mmmx -Wall -Wextra -Wunsafe-loop-optimizations -fno-strict-aliasing -fsingle-precision-constant
 CFLGAS +=  -iquote $(shell pwd)/src 
-#	-Wunsafe-loop-optimizations
 
 ifdef DEBUG
-	CFLAGS += -ggdb3
+	CFLAGS += -ggdb3 -O0
 else
-	CFLAGS += -O2 -finline-functions -maccumulate-outgoing-args
+	CFLAGS += -ggdb -O2 -finline-functions -maccumulate-outgoing-args
 	CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller -fdelete-null-pointer-checks 
 	CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear -funsafe-loop-optimizations 
 	CFLAGS += -fgcse-las -fgcse-sm -fmodulo-sched 
@@ -40,18 +40,13 @@ else
 
 # on gcc 4.3 set precsicion of FPU to 32 bits (can get speed up for floats)
 # do this since everywhere inside our code we use only floats
-	CFLAGS += -mpc32
-
-# let gcc generate the RCPSS and RSQRTSS instructions (fast recipricol)
-	CFLAGS += -mrecip
-
-#CFLAGS += -fipa-pta  # bugs on ubuntu
+# -mrecip = let gcc generate the RCPSS and RSQRTSS instructions (fast recipricol)
+	CFLAGS += -mpc32 -mrecip
 
 	CFLAGS += -fmodulo-sched-allow-regmoves -fgcse-after-reload -fsee -fipa-cp
 
-	CFLAGS += -fsched-stalled-insns=2 -fsched-stalled-insns-dep=2
-	CFLAGS += -fvect-cost-model -ftracer -ffast-math  -fassociative-math -freciprocal-math -fno-signed-zeros
-
+	CFLAGS += -fsched-stalled-insns=2 -fsched-stalled-insns-dep=2 -fvect-cost-model -ftracer
+	CFLAGS += -ffast-math  -fassociative-math -freciprocal-math -fno-signed-zeros
 endif
 
 CFLAGS += -Wl,--as-needed
@@ -65,13 +60,18 @@ AUDIO_FLAGS = $(PA_FLAGS) $(JACK_FLAGS) $(PULSE_FLAGS)
 SDL_FLAGS = @SDL_CFLAGS@ @SDL_LIBS@ -lSDL_ttf -lm
 DFB_FLAGS = @DIRECTFB_CFLAGS@ @DIRECTFB_LIBS@
 
+ALL_BINS = bin/sdl-test bin/sdlthread-test bin/audio-test
+
 AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/portaudio.c 
 
-ifneq ($(JACK_FLAGS), )
+ifeq ($(ENABLE_JACK),yes)
 AUDIO_SRCS += src/audio/jack.c
 endif
-ifneq ($(PULSE_FLAGS), )
+ifeq ($(ENABLE_PULSE),yes)
 AUDIO_SRCS += src/audio/pulseaudio.c
+endif
+ifeq ($(ENABLE_DIRECTFB),yes)
+ALL_BINS += bin/dfb-test
 endif
 
 ifeq (@LOCKING_TB@,1)
@@ -82,16 +82,7 @@ endif
 
 -include config.mk
 
-#CFLAGS += -Wpointer-arith -Wmissing-prototypes -Wmissing-field-initializers \
-#	-Wunreachable-code
-
-all: bin/sdl-test bin/sdlthread-test bin/audio-test dfb
-
-ifneq ($(DFB_FLAGS), )
-dfb: bin/dfb-test
-else
-dfb:
-endif
+all: $(ALL_BINS)
 
 dfb-run: bin/dfb-test
 	bin/dfb-test
