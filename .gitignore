@@ -9,6 +9,7 @@ config.log
 config.status
 configure
 stamp-h
+stamp-h.in
 src/config.h
 .cproject
 .project
