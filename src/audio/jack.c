@@ -9,16 +9,17 @@
 static jack_port_t *in_port;
 
 
-/*TODO: 
+/*TODO:
  * proper shutdown
  * addd buffer change callback
- */ 
+ */
 
 // jack callback
 static int process (jack_nframes_t nframes, void *arg)
 {
+	(void)arg;
 	float *in = (float *) jack_port_get_buffer (in_port, nframes);
-	
+
 	audio_update(in, nframes);
 
 	return 0;
@@ -33,7 +34,7 @@ static void shutdown(void) {
 int jack_setup(opt_data *od)
 {
 	printf("Using jack for audio input\n");
-	
+
 	jack_status_t status;
 	client = jack_client_open("test", JackNoStartServer, &status);
 	if (client == NULL) {
@@ -43,7 +44,7 @@ int jack_setup(opt_data *od)
 		}
 		exit (1);
 	}
-	
+
 	audio_setup(jack_get_sample_rate(client));
 
 	jack_set_process_callback (client, process, 0);
@@ -54,11 +55,11 @@ int jack_setup(opt_data *od)
 		exit(1);
 	}
 	atexit(&shutdown);
-	
+
 	if(od->jack_opt !=NULL) { // connect to some ports!
 		const char **ports = jack_get_ports(client, od->jack_opt, NULL, JackPortIsOutput);
 		if(ports == NULL) return 0;
-		for(int i=0; ports[i]!=NULL; i++) 
+		for(int i=0; ports[i]!=NULL; i++)
 			jack_connect(client, ports[i], jack_port_name(in_port));
 		free(ports);
 	}

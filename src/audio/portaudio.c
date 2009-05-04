@@ -14,6 +14,7 @@ static int callback(const void *input,
 					PaStreamCallbackFlags statusFlags,
 					void *userData )
 {
+	(void)output; (void)timeInfo; (void)statusFlags; (void)userData; // shut compiler up
 	audio_update(input, frameCount);
 	return paContinue;
 }

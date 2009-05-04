@@ -1,14 +1,9 @@
-
-//#define TRIBUF_LOCKING
-
 #include "config.h"
 
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <malloc.h>
-
-//#define TRIBUF_LOCKING
 
 #ifdef TRIBUF_LOCKING
 #define TB_LOCK_PROFILE
@@ -94,6 +89,8 @@ tribuf* tribuf_new(void **data, int locking)
 	tb->dolock = locking;
 	tb->lastread = -1;
 	if(tb->dolock) for(int i=0; i<3; i++) tb_mutex_init(&tb->locks[i]);
+#else
+	(void)locking;
 #endif
 	return tb;
 }
@@ -175,6 +172,8 @@ void tribuf_finish_read(tribuf *tb)
 #ifdef TRIBUF_LOCKING
 	if(tb->lastread != -1 && tb->dolock)
 		tb_unlock(&tb->locks[tb->lastread]);
+#else
+	(void)tb;
 #endif
 }
 

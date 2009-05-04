@@ -23,7 +23,7 @@
 typedef struct {
 	int w, h;
 	int fullscreen;
-	int maxsrc_rate;
+	unsigned int maxsrc_rate;
 	int draw_rate;
 	int doublebuf;
 	int use_jack;
@@ -50,7 +50,7 @@ void optproc(int argc, char **argv, opt_data *res);
 
 static inline void *xmalloc(size_t s) { void *res = malloc(s); if(!res) abort(); return res; }
 
-#define pbattr restrict __attribute__((aligned (16))) 
+#define pbattr restrict __attribute__((aligned (16)))
 typedef uint16_t * restrict __attribute__ ((aligned (16)))  pixbuf_t;
 
 #endif

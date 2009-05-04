@@ -273,7 +273,7 @@ void pallet_step(int step) {
 //TODO: load pallets from files of some sort
 //		pre-convert pallets to 565/555 if we're in a 16 bit mode (since we don't iterpolate there anyway)
 
-static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
+static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
 {
 	const __m64 zero = _mm_cvtsi32_si64(0ll);
 	const __m64 mask = (__m64)(0x00ff00ff00ff);
@@ -375,7 +375,7 @@ static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, ui
 	//~ }
 //~ }
 
-static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *pbattr src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
+static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
@@ -435,7 +435,7 @@ static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, ui
 	}
 }
 
-static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *pbattr src, unsigned int src_stride, int w, int h, uint32_t *restrict pal)
+static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
@@ -496,7 +496,7 @@ static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, ui
 	}
 }
 
-static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, uint16_t *pbattr src, unsigned int src_stride, int w, int h)
+static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=16) {
