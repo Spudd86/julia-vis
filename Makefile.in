@@ -62,7 +62,7 @@ AUDIO_FLAGS = $(PA_FLAGS) $(JACK_FLAGS) $(PULSE_FLAGS)
 SDL_FLAGS = @SDL_CFLAGS@ @SDL_LIBS@ -lSDL_ttf -lm
 DFB_FLAGS = @DIRECTFB_CFLAGS@ @DIRECTFB_LIBS@
 
-ALL_BINS = bin/sdl-test bin/sdlthread-test bin/audio-test
+ALL_BINS := bin/sdl-test$(EXEEXT) bin/sdlthread-test$(EXEEXT) bin/audio-test$(EXEEXT)
 
 AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/portaudio.c 
 
@@ -73,7 +73,7 @@ ifeq ($(ENABLE_PULSE),yes)
 AUDIO_SRCS += src/audio/pulseaudio.c
 endif
 ifeq ($(ENABLE_DIRECTFB),yes)
-ALL_BINS += bin/dfb-test
+ALL_BINS += bin/dfb-test$(EXEEXT)
 endif
 
 ifeq (@LOCKING_TB@,1)
