@@ -67,9 +67,7 @@ AC_SUBST(PULSE_LIBS)
 AC_SUBST(enable_pulse)
 
 AC_ARG_ENABLE([locking-tb], AS_HELP_STRING([--enable-locking-tb], [enable using pthread locks to syncronize tribufs instead of atomic ops (default: disabled)]))
-if test "x$enable_locking_tb" = xyes; then
-	AC_SUBST(LOCKING_TB, [1])
-fi
+AC_SUBST(enable_locking_tb)
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_INLINE

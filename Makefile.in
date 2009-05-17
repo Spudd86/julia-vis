@@ -76,7 +76,7 @@ ifeq ($(ENABLE_DIRECTFB),yes)
 ALL_BINS += bin/dfb-test$(EXEEXT)
 endif
 
-ifeq (@LOCKING_TB@,1)
+ifneq (@enable_locking_tb@,yes)
 TRIBUF_SRCS = src/atomic_tribuf.c
 else
 TRIBUF_SRCS = src/tribuf.c
