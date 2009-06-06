@@ -30,6 +30,9 @@ ENABLE_DIRECTFB=@enable_directfb@
 
 CFLAGS += -D_GNU_SOURCE=1 -mmmx -Wall -Wextra -Wunsafe-loop-optimizations -fno-strict-aliasing -fsingle-precision-constant
 CFLGAS +=  -iquote $(shell pwd)/src 
+ifeq (@enable_orc@,yes)
+	CFLAGS += @ORC_CFLAGS@ @ORC_LIBS@
+endif
 
 ifdef DEBUG
 	CFLAGS += -ggdb3 -O0

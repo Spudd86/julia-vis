@@ -61,45 +61,36 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 };
 
 
-//TODO: make sure these have good alignment
-//~ static uint16_t pallets555[4][256+16] __attribute__((aligned)); // keep aligned
-//~ static uint16_t pallets565[4][256+16] __attribute__((aligned));
 static uint32_t pallets32[NUM_PALLETS][256] __attribute__((aligned(16)));
 
 static uint32_t active_pal[257] __attribute__((aligned(16)));
 
-void pallet_init(int bswap) {
-	for(int p=0; p < num_pallets; p++) {
+static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, int bswap)
+{
+	int j = 0;
+	do { j++;
+		for(int i = curpal[j-1].pos; i < curpal[j].pos; i++) {
+			int r = (curpal[j-1].r*(curpal[j].pos-i) + curpal[j].r*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
+			int g = (curpal[j-1].g*(curpal[j].pos-i) + curpal[j].g*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
+			int b = (curpal[j-1].b*(curpal[j].pos-i) + curpal[j].b*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
 
-		const struct pallet_colour *curpal = static_pallets[p];
-		int j = 0;
-		do {
-			j++;
-
-			for(int i = curpal[j-1].pos; i < curpal[j].pos; i++) {
-				int r = (curpal[j-1].r*(curpal[j].pos-i) + curpal[j].r*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
-				int g = (curpal[j-1].g*(curpal[j].pos-i) + curpal[j].g*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
-				int b = (curpal[j-1].b*(curpal[j].pos-i) + curpal[j].b*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
-
-				//~ pallets555[p][i] = ((r&0xfa)<<7)|((g&0xfa)<<2)|(b>>3); // not woring right, plus doesn't seem to offer any speedup
-				//~ pallets565[p][i] = ((r&0xfa)<<8)|((g&0xfc)<<3)|(b>>3);
-				if(bswap) pallets32[p][i] = (r)|(g<<8)|(b<<16);
-				else pallets32[p][i] = (r<<16)|(g<<8)|b;
-			}
-
-		} while(static_pallets[p][j].pos != 255);
-		//~ pallets555[p][256] = pallets555[p][255];
-		//~ pallets565[p][256] = pallets565[p][255];
-		//pallets32[p][256]  = pallets32[p][255];
-	}
-
-	memcpy(active_pal, pallets32[1], sizeof(uint32_t)*257);
+			if(bswap) dest[i] = (r)|(g<<8)|(b<<16);
+			else dest[i] = (r<<16)|(g<<8)|b;
+		}
+	} while(curpal[j].pos < 255);
 }
 
 static int pallet_changing = 0;
 static int palpos = 0;
 static int nextpal = 0;
 static int curpal = 1;
+
+void pallet_init(int bswap) {
+	for(int p=0; p < num_pallets; p++)
+		expand_pallet(static_pallets[p], pallets32[p], bswap);
+	memcpy(active_pal, pallets32[curpal], sizeof(uint32_t)*256);
+	active_pal[256] = active_pal[255];
+}
 
 void pallet_step(int step);
 
@@ -113,7 +104,62 @@ void pallet_start_switch(int next) {
 	pallet_changing = 1;
 }
 
-#ifdef __SEE2__
+#ifdef HAVE_ORC
+#include <orc/orc.h>
+void pallet_step(int step) {
+	if(!pallet_changing) return;
+	palpos += step;
+	if(palpos >=256) {
+		pallet_changing = palpos = 0;
+		curpal = nextpal;
+		//memcpy(active_pal, pallets32[nextpal], sizeof(uint32_t)*257);
+		return;
+	}
+
+	static OrcProgram *p = NULL;
+	OrcExecutor _ex;
+	OrcExecutor *ex = &_ex;
+	static int palp, vt;
+	
+	if (p == NULL) {
+		p = orc_program_new_dss(1,1,1);
+#if 1
+		palp = orc_program_add_parameter(p, 2, "palpos");
+		vt = orc_program_add_parameter(p, 2, "vt");
+		orc_program_add_temporary(p, 2, "nx");
+		orc_program_add_temporary(p, 2, "pr");
+		
+		orc_program_append_ds_str(p, "convubw", "nx", "s1");
+		orc_program_append_ds_str(p, "convubw", "pr", "s2");
+		orc_program_append_str(p, "mullw", "nx", "nx", "palpos");
+		orc_program_append_str(p, "mullw", "pr", "pr", "vt");
+		orc_program_append_str(p, "addw", "nx", "nx", "pr");
+		//orc_program_append_str(p, "mulubw", "nx", "s1", "palpos");
+		//orc_program_append_str(p, "mulubw", "pr", "s2", "vt");
+		orc_program_append_ds_str(p, "select1wb", "d1", "nx");
+#else
+		palp = orc_program_add_parameter(p, 1, "palpos");
+		vt = orc_program_add_parameter(p, 1, "vt");
+		orc_program_add_temporary(p, 1, "nx");
+		orc_program_add_temporary(p, 1, "pr");
+		orc_program_append_str(p, "mulhub", "nx", "s1", "palpos");
+		orc_program_append_str(p, "mulhub", "pr", "s2", "vt");
+		orc_program_append_str(p, "addb", "d1", "nx", "pr");		
+#endif
+		orc_program_compile (p); //TODO: check return value here
+	}
+	orc_executor_set_program (ex, p);
+	orc_executor_set_n (ex, 256*4);
+	orc_executor_set_array (ex, ORC_VAR_S1, pallets32[nextpal]);
+	orc_executor_set_array (ex, ORC_VAR_S2, pallets32[curpal]);
+	orc_executor_set_array (ex, ORC_VAR_D1, active_pal);
+	orc_executor_set_param (ex, palp, palpos);
+	orc_executor_set_param (ex, vt, 255-palpos);
+	
+	orc_executor_run (ex);
+	active_pal[256] = active_pal[255];
+}
+#elif defined(__SEE2__)
 #include <emmintrin.h>
 void pallet_step(int step) {
 	if(!pallet_changing) return;
@@ -273,7 +319,7 @@ void pallet_step(int step) {
 //TODO: load pallets from files of some sort
 //		pre-convert pallets to 565/555 if we're in a 16 bit mode (since we don't iterpolate there anyway)
 
-static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
+static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
 {
 	const __m64 zero = _mm_cvtsi32_si64(0ll);
 	const __m64 mask = (__m64)(0x00ff00ff00ff);
@@ -375,7 +421,7 @@ static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, ui
 	//~ }
 //~ }
 
-static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
+static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
@@ -435,7 +481,7 @@ static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, ui
 	}
 }
 
-static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
+static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
@@ -496,7 +542,7 @@ static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, ui
 	}
 }
 
-static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h)
+static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=16) {
@@ -528,7 +574,7 @@ static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, uint16
 
 #include <SDL.h>
 
-void pallet_blit_SDL(SDL_Surface *dst, uint16_t* restrict src, int w, int h)
+void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int h)
 {
 	const int src_stride = w;
 	w = IMIN(w, dst->w);

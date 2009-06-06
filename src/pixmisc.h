@@ -3,7 +3,7 @@
 
 #ifdef USE_SDL
 #include <SDL.h>
-void pallet_blit_SDL(SDL_Surface *dst, uint16_t * restrict src, int w, int h);
+void pallet_blit_SDL(SDL_Surface *dst, const uint16_t * restrict src, int w, int h);
 #endif
 
 // require w%16 == 0

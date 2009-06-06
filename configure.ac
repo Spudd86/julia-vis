@@ -66,6 +66,16 @@ AC_SUBST(PULSE_CFLAGS)
 AC_SUBST(PULSE_LIBS)
 AC_SUBST(enable_pulse)
 
+AC_ARG_ENABLE([orc], AS_HELP_STRING([--enable-orc], [enable using orc (default: disabled)]))
+if test "x$enable_orc" = xyes; then
+	PKG_CHECK_MODULES([ORC], [orc-0.4], 
+		[AC_DEFINE([HAVE_ORC], [1], [Define if we have orc])],
+		[AC_MSG_FAILURE([--enable-orc was given, but test for orc failed])])
+fi
+AC_SUBST(ORC_CFLAGS)
+AC_SUBST(ORC_LIBS)
+AC_SUBST(enable_orc)
+
 AC_ARG_ENABLE([locking-tb], AS_HELP_STRING([--enable-locking-tb], [enable using pthread locks to syncronize tribufs instead of atomic ops (default: disabled)]))
 AC_SUBST(enable_locking_tb)
 

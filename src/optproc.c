@@ -2,6 +2,10 @@
 #include <stdio.h>
 #include <getopt.h>
 
+#ifdef HAVE_ORC
+#include <orc/orc.h>
+#endif
+
 static const char *helpstr =
 "Usage: %s [-w width] [-h height] [-s screen updates/second] [-fdp] [-j<pattern>]\n"
 "\t-r use rational map\n"
@@ -19,6 +23,10 @@ static const char *helpstr =
 //TODO: use getopt_long 
 void optproc(int argc, char **argv, opt_data *res)
 {
+#ifdef HAVE_ORC
+	orc_init();
+#endif
+
 	int opt;
 	
 	res->w = res->h = -1;

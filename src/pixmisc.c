@@ -2,6 +2,49 @@
 #include "common.h"
 #include "pixmisc.h"
 
+#ifdef HAVE_ORC
+
+#include <orc/orc.h>
+void fade_pix(void *restrict __attribute__((aligned (16))) buf, int w, int h, uint8_t fade)
+{
+	static OrcProgram *p = NULL;
+	static int fd;
+	if (p == NULL) {
+		p = orc_program_new();
+		fd = orc_program_add_parameter(p, 2, "fade");
+		orc_program_add_destination(p, 2, "d1");
+		orc_program_append_str(p, "mulhuw", "d1", "d1", "fade");
+		orc_program_compile (p); //TODO: check return value here
+	}
+	
+	OrcExecutor _ex;
+	OrcExecutor *ex = &_ex;
+	orc_executor_set_program (ex, p);
+	orc_executor_set_n (ex, w*h);
+	orc_executor_set_array (ex, ORC_VAR_D1, buf);
+	orc_executor_set_param (ex, fd, fade<<8);
+	
+	orc_executor_run (ex);
+}
+void maxblend(void *restrict dest, void *restrict src, int w, int h)
+{
+	static OrcProgram *p = NULL;
+	if (p == NULL) {
+		p = orc_program_new_ds(2,2);
+		orc_program_append_str(p, "maxuw", "d1", "d1", "s1");
+		orc_program_compile (p);  //TODO: check return value here
+	}
+	
+	OrcExecutor _ex;
+	OrcExecutor *ex = &_ex;
+	orc_executor_set_program (ex, p);
+	orc_executor_set_n (ex, w*h);
+	orc_executor_set_array (ex, ORC_VAR_S1, src);
+	orc_executor_set_array (ex, ORC_VAR_D1, dest);
+	orc_executor_run (ex);
+}
+
+#else
 #include "mymm.h"
 
 #ifndef __SSE2__
@@ -141,6 +184,7 @@ void fade_pix(void *restrict buf, int w, int h, uint8_t fade)
 	}
 }
 
+#endif
 #endif
 
 //~ __attribute__((fastcall)) void maxblend(void *dest, void *src, int w, int h)

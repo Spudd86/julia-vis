@@ -21,6 +21,9 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
+/* Define if we have orc */
+#undef HAVE_ORC
+
 /* Define if pulseaudio is enabled */
 #undef HAVE_PULSE
 
