@@ -248,7 +248,7 @@ void pallet_step(int step) {
 	}
 	active_pal[256] = active_pal[255];
 }
-#else
+#elif defined(__MMX__)
 void pallet_step(int step) {
 	if(!pallet_changing) return;
 	palpos += step;
@@ -316,6 +316,24 @@ void pallet_step(int step) {
 	}
 	active_pal[256] = active_pal[255];
 	_mm_empty();
+}
+#else
+void pallet_step(int step) {
+	if(!pallet_changing) return;
+	palpos += step;
+	if(palpos >=256) {
+		pallet_changing = palpos = 0;
+		curpal = nextpal;
+		//memcpy(active_pal, pallets32[nextpal], sizeof(uint32_t)*257);
+		return;
+	}
+	const uint8_t *restrict next = (char *restrict)pallets32[nextpal], *restrict prev = (char *restrict)pallets32[curpal];
+	uint8_t *restrict d = (char *restrict)active_pal;
+	
+	for(int i=0; i<256*4; i++) {
+		d[i] = (uint8_t)(next[i]*palpos + prev[i]*(255-palpos));
+	}
+	active_pal[256] = active_pal[255];
 }
 #endif
 
