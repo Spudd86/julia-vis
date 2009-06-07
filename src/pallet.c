@@ -600,7 +600,8 @@ void pallet_blit555(uint8_t * restrict dest, unsigned int dst_stride,
 
 //TODO: use liboil here?
 #ifdef __MMX__
-static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h)
+static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, 
+const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=16) {
@@ -630,8 +631,7 @@ static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, const 
 #else
 void pallet_blit8(uint8_t * restrict dest, unsigned int dst_stride, 
 					const uint16_t *restrict src, unsigned int src_stride, 
-					unsigned int w, unsigned int h, 
-					const uint32_t *restrict pal)
+					unsigned int w, unsigned int h)
 {
 	for(int y = 0; y < h; y++)
 		for(int x = 0; x < w; x++) 
@@ -657,7 +657,9 @@ void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int 
 		pallet_blit8(dst->pixels, dst->pitch, src, src_stride, w, h);
 		SDL_SetColors(dst, pal, 0, 256);
 	}
+#ifdef __MMX__
 	_mm_empty();
+#endif
 	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
 }
 #endif
@@ -680,7 +682,9 @@ void pallet_blit_DFB(IDirectFBSurface *dst, uint16_t * restrict src, int w, int 
 	if(dst_format == DSPF_RGB32) pallet_blit32(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
 	else if(dst_format == DSPF_RGB16) pallet_blit565(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
 	else if(dst_format == DSPF_RGB555) pallet_blit555(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
+#ifdef __MMX__
 	_mm_empty();
+#endif
 	dst->Unlock(dst);
 }
 #endif
