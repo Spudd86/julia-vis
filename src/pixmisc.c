@@ -46,7 +46,7 @@ void maxblend(void *restrict dest, void *restrict src, int w, int h)
 #elif defined(__SSE2__)
 #include "mymm.h"
 #include <emmintrin.h>
-//#warning Doing sse2 Compiled program will NOT work on system without it!
+#warning Doing sse2 Compiled program will NOT work on system without it!
 
 // requires w%16 == 0
 void maxblend(void *restrict dest, void *restrict src, int w, int h)
@@ -153,7 +153,6 @@ void fade_pix(void *restrict buf, int w, int h, uint8_t fade)
 #endif
 
 #if defined(__SSE__) || defined(__3dNOW__)
-// requires h*w%32 == 0
 void maxblend(void *restrict dest, void *restrict src, int w, int h)
 {
 	__m64 *mbdst = dest, *mbsrc = src;

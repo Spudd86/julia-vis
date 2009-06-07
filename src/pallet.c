@@ -1,5 +1,6 @@
 
 //TODO: test w/o mmx/sse
+//TODO: test 8/16 bit code paths (32-bit seems to work)
 
 #include "common.h"
 #include "pixmisc.h"
@@ -94,8 +95,6 @@ void pallet_init(int bswap) {
 	active_pal[256] = active_pal[255];
 }
 
-void pallet_step(int step);
-
 void pallet_start_switch(int next) {
 	next = next % num_pallets;
 	if(next<0) return;
@@ -108,16 +107,7 @@ void pallet_start_switch(int next) {
 
 #ifdef HAVE_ORC
 #include <orc/orc.h>
-void pallet_step(int step) {
-	if(!pallet_changing) return;
-	palpos += step;
-	if(palpos >=256) {
-		pallet_changing = palpos = 0;
-		curpal = nextpal;
-		//memcpy(active_pal, pallets32[nextpal], sizeof(uint32_t)*257);
-		return;
-	}
-
+static void do_pallet_step(void) {
 	static OrcProgram *p = NULL;
 	OrcExecutor _ex;
 	OrcExecutor *ex = &_ex;
@@ -125,20 +115,16 @@ void pallet_step(int step) {
 	
 	if (p == NULL) {
 		p = orc_program_new_dss(1,1,1);
-#ifndef __MMX__ //TODO: real define?
+#ifndef __MMX__ // some of the orc stuff used below doesn't work off x86
 		palp = orc_program_add_parameter(p, 1, "palpos");
 		vt = orc_program_add_parameter(p, 1, "vt");
-		
-		//orc_program_add_temporary(p, 2, "nx");
-		//orc_program_add_temporary(p, 2, "pr");
-		//orc_program_append_str(p, "mulubw", "nx", "s1", "palpos");
-		//orc_program_append_str(p, "mulubw", "pr", "s2", "vt");
-		//orc_program_append_str(p, "addw", "nx", "nx", "pr");
 		
 		orc_program_add_temporary(p, 1, "nx");
 		orc_program_add_temporary(p, 1, "pr");
 		orc_program_append_str(p, "mulhub", "nx", "s1", "palpos");
 		orc_program_append_str(p, "mulhub", "pr", "s2", "vt");
+		//orc_program_append_str(p, "mulubw", "nx", "s1", "palpos");
+		//orc_program_append_str(p, "mulubw", "pr", "s2", "vt");
 		orc_program_append_str(p, "addb", "d1", "nx", "pr");
 #else
 		palp = orc_program_add_parameter(p, 2, "palpos");
@@ -151,8 +137,6 @@ void pallet_step(int step) {
 		orc_program_append_str(p, "mullw", "nx", "nx", "palpos");
 		orc_program_append_str(p, "mullw", "pr", "pr", "vt");
 		orc_program_append_str(p, "addw", "nx", "nx", "pr");
-		//orc_program_append_str(p, "mulubw", "nx", "s1", "palpos");
-		//orc_program_append_str(p, "mulubw", "pr", "s2", "vt");
 		orc_program_append_ds_str(p, "select1wb", "d1", "nx");
 #endif
 		orc_program_compile (p); //TODO: check return value here
@@ -166,20 +150,11 @@ void pallet_step(int step) {
 	orc_executor_set_param (ex, vt, 255-palpos);
 	
 	orc_executor_run (ex);
-	active_pal[256] = active_pal[255];
 }
-#elif defined(__SEE2__)
+#elif defined(__SSE2__)
+#warning Doing sse2 Compiled program will NOT work on system without it!
 #include <emmintrin.h>
-void pallet_step(int step) {
-	if(!pallet_changing) return;
-	palpos += step;
-	if(palpos >=256) {
-		pallet_changing = palpos = 0;
-		curpal = nextpal;
-		//memcpy(active_pal, pallets32[nextpal], sizeof(uint32_t)*257);
-		return;
-	}
-
+static void do_pallet_step(void) {
 	__m128i zero = _mm_setzero_si128();
 	__m128i mask = _mm_set1_epi16(0x00ff);
 	__m128i vt = _mm_set1_epi16(palpos); // same for all i
@@ -188,15 +163,12 @@ void pallet_step(int step) {
 	const __m128i * restrict const old  = (__m128i *)pallets32[curpal];
 	__m128i * restrict const dest = (__m128i *)active_pal;
 
-	//for(int i = 0; i < 256; i+=32) {
-	for(int i = 0; i < (256*4)/sizeof(__m128i); i+=2) {
-		//__m128i s1 = *(__m128i *)(pallets32[nextpal]+i);
+	for(unsigned int i = 0; i < (256*4)/sizeof(__m128i); i+=2) {
 		__m128i s1 = *(next+i);
 		__m128i s2 = s1;
 		s1 = _mm_unpacklo_epi8(s1, zero);
 		s2 = _mm_unpackhi_epi8(s2, zero);
 
-		//__m128i d1 = *(__m128i *)(pallets32[curpal]+i);
 		__m128i d1 = *(old+i);
 		__m128i d2 = d1;
 		d1 = _mm_unpacklo_epi8(d1, zero);
@@ -214,17 +186,14 @@ void pallet_step(int step) {
 		s2 = _mm_add_epi16(s2, d2);
 		s2 = _mm_srli_epi16(s2, 8);
 
-		s1 = _mm_packs_epu16(s1, s2);
-		//*(__m128i *)(active_pal+i) = s1;
+		s1 = _mm_packs_epi16(s1, s2);
 		*(dest + i) = s1;
 
-		//s1 = *(__m128i *)(pallets32[nextpal]+i+4);
 		s1 = *(next+i+1);
 		s2 = s1;
 		s1 = _mm_unpacklo_epi8(s1, zero);
 		s2 = _mm_unpackhi_epi8(s2, zero);
 
-		//d1 = *(__m128i *)(pallets32[curpal]+i+4);
 		d1 = *(old+i+1);
 		d2 = d1;
 		d1 = _mm_unpacklo_epi8(d1, zero);
@@ -242,23 +211,13 @@ void pallet_step(int step) {
 		s2 = _mm_add_epi16(s2, d2);
 		s2 = _mm_srli_epi16(s2, 8);
 
-		s1 = _mm_packs_epu16(s1, s2);
-		//*(__m128 *)(active_pal+i+4) = s1;
+		s1 = _mm_packs_epi16(s1, s2);
 		*(dest + i + 1) = s1;
 	}
-	active_pal[256] = active_pal[255];
 }
 #elif defined(__MMX__)
-void pallet_step(int step) {
-	if(!pallet_changing) return;
-	palpos += step;
-	if(palpos >=256) {
-		pallet_changing = palpos = 0;
-		curpal = nextpal;
-		//memcpy(active_pal, pallets32[nextpal], sizeof(uint32_t)*257);
-		return;
-	}
-
+#warning Doing mmx Compiled program will NOT work on system without it!
+static void do_pallet_step(void) {
 	__m64 zero = _mm_cvtsi32_si64(0ll);
 	__m64 mask = (__m64)(0x00ff00ff00ff);
 	__m64 vt = _mm_set1_pi16(palpos); // same for all i
@@ -314,28 +273,30 @@ void pallet_step(int step) {
 		s1 = _mm_packs_pu16(s1, s2);
 		*(__m64 *)(active_pal+i+2) = s1;
 	}
-	active_pal[256] = active_pal[255];
 	_mm_empty();
 }
 #else
+static void do_pallet_step(void) {
+	const uint8_t *restrict next = (uint8_t *restrict)pallets32[nextpal], *restrict prev = (uint8_t *restrict)pallets32[curpal];
+	uint8_t *restrict d = (uint8_t *restrict)active_pal;
+	for(int i=0; i<256*4; i++)
+		d[i] = (uint8_t)(next[i]*palpos + prev[i]*(255-palpos));
+}
+#endif
+
 void pallet_step(int step) {
 	if(!pallet_changing) return;
 	palpos += step;
 	if(palpos >=256) {
 		pallet_changing = palpos = 0;
 		curpal = nextpal;
-		//memcpy(active_pal, pallets32[nextpal], sizeof(uint32_t)*257);
 		return;
 	}
-	const uint8_t *restrict next = (char *restrict)pallets32[nextpal], *restrict prev = (char *restrict)pallets32[curpal];
-	uint8_t *restrict d = (char *restrict)active_pal;
 	
-	for(int i=0; i<256*4; i++) {
-		d[i] = (uint8_t)(next[i]*palpos + prev[i]*(255-palpos));
-	}
+	do_pallet_step();
+	
 	active_pal[256] = active_pal[255];
 }
-#endif
 
 // pallet must have 257 entries (for easier interpolation on 16 bit indicies)
 // output pix = (pallet[in/256]*(in%256) + pallet[in/256+1]*(255-in%256])/256
@@ -346,7 +307,7 @@ void pallet_step(int step) {
 //TODO: load pallets from files of some sort
 
 #ifdef __MMX__
-static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
+static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
 {
 	const __m64 zero = _mm_cvtsi32_si64(0ll);
 	const __m64 mask = (__m64)(0x00ff00ff00ff);
@@ -429,22 +390,17 @@ static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, co
 	}
 }
 #else
-void pallet_blit32(	uint8_t * restrict dest, unsigned int dst_stride, 
-					const uint16_t *restrict src, unsigned int src_stride, 
-					unsigned int w, unsigned int h, 
-					const uint32_t *restrict pal)
+void pallet_blit32(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
 {
-	for(int y = 0; y < h; y++)
-		for(int x = 0; x < w; x++)
+	for(unsigned int y = 0; y < h; y++)
+		for(unsigned int x = 0; x < w; x++)
 			*(uint32_t *)(dest + y*dst_stride + x*4) = pal[src[y*src_stride + x]>>8];
 }
 #endif
 
-
 // needs _mm_shuffle_pi16 no other sse/3dnow stuff used
 #if defined(__SSE__) || defined(__3dNOW__) 
-
-static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
+static void pallet_blit565(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
@@ -504,7 +460,7 @@ static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, co
 	}
 }
 
-static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
+static void pallet_blit555(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
@@ -564,8 +520,7 @@ static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, co
 		}
 	}
 }
-#else
-
+#else //TODO: test these
 void pallet_blit565(uint8_t * restrict dest, unsigned int dst_stride, 
 					const uint16_t *restrict src, unsigned int src_stride, 
 					unsigned int w, unsigned int h, 
@@ -598,10 +553,9 @@ void pallet_blit555(uint8_t * restrict dest, unsigned int dst_stride,
 }
 #endif
 
-//TODO: use liboil here?
-#ifdef __MMX__
+#if defined(__MMX__)
 static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, 
-const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h)
+		const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=16) {
