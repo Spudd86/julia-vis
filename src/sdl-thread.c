@@ -48,7 +48,7 @@ static int run_map_thread(tribuf *tb)
 		fpstimes[frmcnt%40] = now;
 		map_fps = 40.0f / fpsd;
 
-		int newbeat = beat_get_count();
+		unsigned int newbeat = beat_get_count();
 		if(newbeat != beats && now - last_beat_time > 1000) {
 			last_beat_time = now;
 			update_points(pd, now, 1);
@@ -124,7 +124,7 @@ int main(int argc, char **argv)
 			if(newbeat != beats) pallet_start_switch(newbeat);
 			beats = newbeat;
 
-			const int maxsrc_ps = opts.maxsrc_rate;
+			const unsigned int maxsrc_ps = opts.maxsrc_rate;
 			now = SDL_GetTicks();
 
 			if(tribuf_get_frmnum(map_tb) - prevfrm > 1 && (tick0+(maxfrms*1000)/maxsrc_ps) - now > 1000/maxsrc_ps) {

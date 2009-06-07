@@ -9,6 +9,23 @@ AC_CONFIG_SRCDIR([src/optproc.c])
 
 USE_LANGUAGES=gnu99
 
+AC_ARG_ENABLE([mmx], AS_HELP_STRING([--enable-mmx], [enable use of mmx instructions (default: disabled)]))
+if test "x$enable_mmx" = xyes; then
+	CFLAGS="$CFLAGS -mmmx"
+fi
+AC_ARG_ENABLE([sse], AS_HELP_STRING([--enable-sse], [enable use of sse instructions (default: disabled)]))
+if test "x$enable_sse" = xyes; then
+	CFLAGS="$CFLAGS -mmmx -msse"
+fi
+AC_ARG_ENABLE([sse2], AS_HELP_STRING([--enable-sse2], [enable use of sse2 instructions (default: disabled)]))
+if test "x$enable_sse2" = xyes; then
+	CFLAGS="$CFLAGS -mmmx -msse -msse2"
+fi
+AC_ARG_ENABLE([3dnow], AS_HELP_STRING([--enable-3dnow], [enable use of 3dnow instructions (default: disabled)]))
+if test "x$enable_3dnow" = xyes; then
+	CFLAGS="$CFLAGS -mmmx -m3dnow"
+fi
+
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_CC_C99

@@ -20,6 +20,13 @@
 #define IMIN(x,y) (((x)<(y))?(x):(y))
 #define IMAX(x,y) (((x)>(y))?(x):(y))
 
+#ifndef MAX
+#define MAX(a,b) IMAX(a,b)
+#endif
+#ifndef MIN
+#define MIN(a,b) IMIN(a,b)
+#endif
+
 typedef struct {
 	int w, h;
 	int fullscreen;

@@ -28,17 +28,20 @@ ENABLE_JACK=@enable_jack@
 ENABLE_PULSE=@enable_pulse@
 ENABLE_DIRECTFB=@enable_directfb@
 
-CFLAGS += -D_GNU_SOURCE=1 -mmmx -Wall -Wextra -Wunsafe-loop-optimizations -fno-strict-aliasing -fsingle-precision-constant
+CFLAGS += -D_GNU_SOURCE=1 -Wall -Wextra -fno-strict-aliasing -fsingle-precision-constant
+#-Wunsafe-loop-optimizations 
 CFLGAS +=  -iquote $(shell pwd)/src 
+
+#TODO: split orc flags out like everyting else
 ifeq (@enable_orc@,yes)
 	CFLAGS += @ORC_CFLAGS@ @ORC_LIBS@
 endif
 
 ifdef DEBUG
-	CFLAGS += -ggdb3 -O0
+	CFLAGS += -ggdb -O0
 else
-	CFLAGS += -ggdb -O2 -finline-functions -maccumulate-outgoing-args
-	CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller -fdelete-null-pointer-checks 
+	CFLAGS += -ggdb -O2 -finline-functions -maccumulate-outgoing-args -fdelete-null-pointer-checks 
+	CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller
 	CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear -funsafe-loop-optimizations 
 	CFLAGS += -fgcse-las -fgcse-sm -fmodulo-sched 
 	CFLAGS += -fmerge-all-constants
@@ -49,7 +52,6 @@ else
 	CFLAGS += -mpc32 -mrecip
 
 	CFLAGS += -fmodulo-sched-allow-regmoves -fgcse-after-reload -fsee -fipa-cp
-
 	CFLAGS += -fsched-stalled-insns=2 -fsched-stalled-insns-dep=2 -fvect-cost-model -ftracer
 	CFLAGS += -ffast-math  -fassociative-math -freciprocal-math -fno-signed-zeros
 endif

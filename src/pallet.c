@@ -1,4 +1,6 @@
 
+//TODO: test w/o mmx/sse
+
 #include "common.h"
 #include "pixmisc.h"
 #include "mymm.h"
@@ -123,7 +125,22 @@ void pallet_step(int step) {
 	
 	if (p == NULL) {
 		p = orc_program_new_dss(1,1,1);
-#if 1
+#ifndef __MMX__ //TODO: real define?
+		palp = orc_program_add_parameter(p, 1, "palpos");
+		vt = orc_program_add_parameter(p, 1, "vt");
+		
+		//orc_program_add_temporary(p, 2, "nx");
+		//orc_program_add_temporary(p, 2, "pr");
+		//orc_program_append_str(p, "mulubw", "nx", "s1", "palpos");
+		//orc_program_append_str(p, "mulubw", "pr", "s2", "vt");
+		//orc_program_append_str(p, "addw", "nx", "nx", "pr");
+		
+		orc_program_add_temporary(p, 1, "nx");
+		orc_program_add_temporary(p, 1, "pr");
+		orc_program_append_str(p, "mulhub", "nx", "s1", "palpos");
+		orc_program_append_str(p, "mulhub", "pr", "s2", "vt");
+		orc_program_append_str(p, "addb", "d1", "nx", "pr");
+#else
 		palp = orc_program_add_parameter(p, 2, "palpos");
 		vt = orc_program_add_parameter(p, 2, "vt");
 		orc_program_add_temporary(p, 2, "nx");
@@ -137,14 +154,6 @@ void pallet_step(int step) {
 		//orc_program_append_str(p, "mulubw", "nx", "s1", "palpos");
 		//orc_program_append_str(p, "mulubw", "pr", "s2", "vt");
 		orc_program_append_ds_str(p, "select1wb", "d1", "nx");
-#else
-		palp = orc_program_add_parameter(p, 1, "palpos");
-		vt = orc_program_add_parameter(p, 1, "vt");
-		orc_program_add_temporary(p, 1, "nx");
-		orc_program_add_temporary(p, 1, "pr");
-		orc_program_append_str(p, "mulhub", "nx", "s1", "palpos");
-		orc_program_append_str(p, "mulhub", "pr", "s2", "vt");
-		orc_program_append_str(p, "addb", "d1", "nx", "pr");		
 #endif
 		orc_program_compile (p); //TODO: check return value here
 	}
@@ -317,8 +326,8 @@ void pallet_step(int step) {
 // the above is not done in 16 bit modes they just do out = pallet[in/256] (and conver the pallet)
 
 //TODO: load pallets from files of some sort
-//		pre-convert pallets to 565/555 if we're in a 16 bit mode (since we don't iterpolate there anyway)
 
+#ifdef __MMX__
 static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
 {
 	const __m64 zero = _mm_cvtsi32_si64(0ll);
@@ -401,25 +410,21 @@ static void pallet_blit32(uint32_t  * restrict dest, unsigned int dst_stride, co
 		}
 	}
 }
+#else
+void pallet_blit32(	uint8_t * restrict dest, unsigned int dst_stride, 
+					const uint16_t *restrict src, unsigned int src_stride, 
+					unsigned int w, unsigned int h, 
+					const uint32_t *restrict pal)
+{
+	for(int y = 0; y < h; y++)
+		for(int x = 0; x < w; x++)
+			*(uint32_t *)(dest + y*dst_stride + x*4) = pal[src[y*src_stride + x]>>8];
+}
+#endif
 
-//~ static void pallet_blit16(uint8_t  * restrict dest, unsigned int dst_stride, uint16_t *restrict src, unsigned int src_stride, int w, int h, uint16_t *restrict pal)
-//~ {
-	//~ for(unsigned int y = 0; y < h; y++) {
-		//~ for(unsigned int x = 0; x < w; x+=4) {
-			//~ __builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
-			//~ __builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
 
-			//~ int v = src[y*src_stride + x];
-			//~ *(uint16_t *)(dest + y*dst_stride + x*2) = pal[v/256];
-			//~ v = src[y*src_stride + x+1];
-			//~ *(uint16_t *)(dest + y*dst_stride + (x+1)*2) = pal[v/256];
-			//~ v = src[y*src_stride + x+2];
-			//~ *(uint16_t *)(dest + y*dst_stride + (x+2)*2) = pal[v/256];
-			//~ v = src[y*src_stride + x+3];
-			//~ *(uint16_t *)(dest + y*dst_stride + (x+3)*2) = pal[v/256];
-		//~ }
-	//~ }
-//~ }
+// needs _mm_shuffle_pi16 no other sse/3dnow stuff used
+#if defined(__SSE__) || defined(__3dNOW__) 
 
 static void pallet_blit565(uint8_t  * restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
 {
@@ -541,7 +546,42 @@ static void pallet_blit555(uint8_t  * restrict dest, unsigned int dst_stride, co
 		}
 	}
 }
+#else
 
+void pallet_blit565(uint8_t * restrict dest, unsigned int dst_stride, 
+					const uint16_t *restrict src, unsigned int src_stride, 
+					unsigned int w, unsigned int h, 
+					const uint32_t *restrict pal)
+{
+	for(int y = 0; y < h; y++) {
+		for(int x = 0; x < w; x++) {
+			uint32_t cl = pal[src[y*src_stride + x]>>8];
+			uint16_t px = (cl>>3)&0x1f;
+			px = px | (((cl>>10)&0x3f)<<5);
+			px = px | (((cl>>19)&0x1f)<<11);
+			*(uint16_t *)(dest + y*dst_stride + x*4) = px;
+		}
+	}
+}
+void pallet_blit555(uint8_t * restrict dest, unsigned int dst_stride, 
+					const uint16_t *restrict src, unsigned int src_stride, 
+					unsigned int w, unsigned int h, 
+					const uint32_t *restrict pal)
+{
+	for(int y = 0; y < h; y++) {
+		for(int x = 0; x < w; x++) {
+			uint32_t cl = pal[src[y*src_stride + x]>>8];
+			uint16_t px = (cl>>3)&0x1f;
+			px = px | (((cl>>11)&0x1f)<<5);
+			px = px | (((cl>>19)&0x1f)<<10);
+			*(uint16_t *)(dest + y*dst_stride + x*4) = px;
+		}
+	}
+}
+#endif
+
+//TODO: use liboil here?
+#ifdef __MMX__
 static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h)
 {
 	for(unsigned int y = 0; y < h; y++) {
@@ -569,11 +609,20 @@ static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, const 
 		}
 	}
 }
+#else
+void pallet_blit8(uint8_t * restrict dest, unsigned int dst_stride, 
+					const uint16_t *restrict src, unsigned int src_stride, 
+					unsigned int w, unsigned int h, 
+					const uint32_t *restrict pal)
+{
+	for(int y = 0; y < h; y++)
+		for(int x = 0; x < w; x++) 
+			*(dest + y*dst_stride + x*4) = src[y*src_stride + x]>>8;
+}
+#endif
 
 #ifdef USE_SDL
-
 #include <SDL.h>
-
 void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int h)
 {
 	const int src_stride = w;
@@ -584,8 +633,6 @@ void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int 
 
 	if((SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) || w < 0 || h < 0) return;
 	if(dst->format->BitsPerPixel == 32) pallet_blit32(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
-	//~ else if(dst->format->BitsPerPixel == 16 || dst->format->BitsPerPixel == 15)
-		//~ pallet_blit16(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
 	else if(dst->format->BitsPerPixel == 16) pallet_blit565(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
 	else if(dst->format->BitsPerPixel == 15) pallet_blit555(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
 	else if(dst->format->BitsPerPixel == 8) { // need to set surface's pallet
@@ -595,13 +642,10 @@ void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int 
 	_mm_empty();
 	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
 }
-
 #endif
 
 #ifdef HAVE_DIRECTFB
-
 #include <directfb.h>
-
 void pallet_blit_DFB(IDirectFBSurface *dst, uint16_t * restrict src, int w, int h, uint32_t *restrict pal)
 {
 	const int src_stride = w;
@@ -622,47 +666,4 @@ void pallet_blit_DFB(IDirectFBSurface *dst, uint16_t * restrict src, int w, int 
 	dst->Unlock(dst);
 }
 #endif
-
-// stride is for dest
-//~ void pallet_blit(void *dest, int dst_stride, uint16_t *src, int w, int h, uint32_t *pal)
-//~ {
-	//~ for(int y = 0; y < h; y++)
-		//~ for(int x = 0; x < w; x++)
-			//~ *(int32_t *)(dest + y*dst_stride + x*4) = pal[src[y*w + x]>>8];
-//~ }
-
-
-// this one is sort of what I'd like to do but there is no 8 bit mmx mul :(
-//~ void pallet_blitSDL(SDL_Surface *dst, uint16_t *src, int w, int h, uint32_t *pal)
-//~ {
-	//~ if(SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) return;
-
-	//~ int dst_stride = dst->pitch/4;
-	//~ uint32_t *dest = dst->pixels;
-	//~ w = IMIN(w, dst->w);
-	//~ h = IMIN(h, dst->h);
-
-	//~ for(int y = 0; y < h; y++) {
-		//~ for(int x = 0; x < w; x+=2) {
-			//~ int v = src[y*src_stride + x];
-			//~ int v2 = src[y*src_stride + x+1];
-			//~ __m64 col1, col2;
-			//~ col1 = col2 = (__m64)*(uint64_t *)(pal+(v>>8));
-			//~ __m64 tmp   = (__m64)*(uint64_t *)(pal+(v2>>8));
-			//~ col1 = _mm_unpacklo_pi32(col1, tmp);
-			//~ col2 = _mm_unpackhi_pi32(col2, tmp);
-			//~ tmp = _mm_unpacklo_pi32(_mm_set1_pi8(v & 0xff), _mm_set1_pi8(v2 & 0xff));
-			//~ col1 = _mm_mulhi_pi8(col1, tmp);
-			//~ tmp = _mm_andnot_si64(tmp, mask)
-			//~ col2 = _mm_mulhi_pi8(col2, tmp);
-    		//~ col1 = _mm_add_pi8(col1, col2);
-
-			//~ _mm_stream_pi((__m64 *)(dest + y*dst_stride + x), tmp);
-		//~ }
-	//~ }
-	//~ _mm_empty();
-	//~ if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
-	//~ SDL_UpdateRect(dst, 0, 0, w, h);
-//~ }
-
 

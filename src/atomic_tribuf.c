@@ -77,7 +77,7 @@ struct tribuf_s {
 };
 
 tribuf* tribuf_new(void **data, int locking)
-{
+{ (void)locking;
 	tribuf *tb = xmalloc(sizeof(tribuf));
 	
 	tb->data = data;
