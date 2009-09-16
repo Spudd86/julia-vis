@@ -72,7 +72,7 @@ static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, in
 {
 	int j = 0;
 	do { j++;
-		for(int i = curpal[j-1].pos; i < curpal[j].pos; i++) {
+		for(int i = curpal[j-1].pos; i <= curpal[j].pos; i++) {
 			int r = (curpal[j-1].r*(curpal[j].pos-i) + curpal[j].r*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
 			int g = (curpal[j-1].g*(curpal[j].pos-i) + curpal[j].g*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
 			int b = (curpal[j-1].b*(curpal[j].pos-i) + curpal[j].b*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
