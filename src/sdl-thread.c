@@ -19,6 +19,8 @@ static int im_w = 0, im_h = 0;
 static int running = 1;
 static float map_fps=0;
 
+MAP_FUNC_ATTR void soft_map_line_buff(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd);
+
 static int run_map_thread(tribuf *tb)
 {
 	struct point_data *pd = new_point_data(opts.rational_julia?4:2);
@@ -34,6 +36,7 @@ static int run_map_thread(tribuf *tb)
 
 		uint16_t *map_dest = tribuf_get_write(tb);
 		if(!opts.rational_julia)
+//			soft_map_line_buff(map_dest, map_src, im_w, im_h, pd);
 			soft_map_interp(map_dest, map_src, im_w, im_h, pd);
 		else // really want to do maxblend first here, but can't because we'd have to modify map_src and it's shipped off for reading
 			soft_map_rational(map_dest, map_src, im_w, im_h, pd);

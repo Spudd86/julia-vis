@@ -68,6 +68,10 @@ static uint32_t pallets32[NUM_PALLETS][256] __attribute__((aligned(16)));
 
 static uint32_t active_pal[257] __attribute__((aligned(16)));
 
+uint32_t *get_active_pal(void) {
+	return active_pal;
+}
+
 static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, int bswap)
 {
 	int j = 0;
@@ -79,6 +83,7 @@ static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, in
 
 			if(bswap) dest[i] = (r)|(g<<8)|(b<<16);
 			else dest[i] = (r<<16)|(g<<8)|b;
+			dest[i] |= 255<<24;
 		}
 	} while(curpal[j].pos < 255);
 }
@@ -112,13 +117,13 @@ static void do_pallet_step(void) {
 	OrcExecutor _ex;
 	OrcExecutor *ex = &_ex;
 	static int palp, vt;
-	
+
 	if (p == NULL) {
 		p = orc_program_new_dss(1,1,1);
 #ifndef __MMX__ // some of the orc stuff used below doesn't work off x86
 		palp = orc_program_add_parameter(p, 1, "palpos");
 		vt = orc_program_add_parameter(p, 1, "vt");
-		
+
 		orc_program_add_temporary(p, 1, "nx");
 		orc_program_add_temporary(p, 1, "pr");
 		orc_program_append_str(p, "mulhub", "nx", "s1", "palpos");
@@ -131,7 +136,7 @@ static void do_pallet_step(void) {
 		vt = orc_program_add_parameter(p, 2, "vt");
 		orc_program_add_temporary(p, 2, "nx");
 		orc_program_add_temporary(p, 2, "pr");
-		
+
 		orc_program_append_ds_str(p, "convubw", "nx", "s1");
 		orc_program_append_ds_str(p, "convubw", "pr", "s2");
 		orc_program_append_str(p, "mullw", "nx", "nx", "palpos");
@@ -148,12 +153,15 @@ static void do_pallet_step(void) {
 	orc_executor_set_array (ex, ORC_VAR_D1, active_pal);
 	orc_executor_set_param (ex, palp, palpos);
 	orc_executor_set_param (ex, vt, 255-palpos);
-	
+
 	orc_executor_run (ex);
 }
 #elif defined(__SSE2__)
 #warning Doing sse2 Compiled program will NOT work on system without it!
 #include <emmintrin.h>
+//TODO: decide if it's worth maintainig this... MMX version is probably plenty fast... and
+//      it's not like 1k of uint8's is all that much work or data... so is sse really helping
+//      (or for that matter is mmx?)
 static void do_pallet_step(void) {
 	__m128i zero = _mm_setzero_si128();
 	__m128i mask = _mm_set1_epi16(0x00ff);
@@ -290,11 +298,11 @@ void pallet_step(int step) {
 	if(palpos >=256) {
 		pallet_changing = palpos = 0;
 		curpal = nextpal;
+		memcpy(active_pal, pallets32[nextpal], 256);
 		return;
-	}
-	
-	do_pallet_step();
-	
+	} else
+		do_pallet_step();
+
 	active_pal[256] = active_pal[255];
 }
 
@@ -399,7 +407,7 @@ void pallet_blit32(uint8_t *restrict dest, unsigned int dst_stride, const uint16
 #endif
 
 // needs _mm_shuffle_pi16 no other sse/3dnow stuff used
-#if defined(__SSE__) || defined(__3dNOW__) 
+#if defined(__SSE__) || defined(__3dNOW__)
 static void pallet_blit565(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++) {
@@ -521,9 +529,12 @@ static void pallet_blit555(uint8_t *restrict dest, unsigned int dst_stride, cons
 	}
 }
 #else //TODO: test these
-void pallet_blit565(uint8_t * restrict dest, unsigned int dst_stride, 
-					const uint16_t *restrict src, unsigned int src_stride, 
-					unsigned int w, unsigned int h, 
+#ifdef __MMX__
+#warning no mmx for 16-bit modes (needs extras added in 3dnow or SSE)!
+#endif
+void pallet_blit565(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
 					const uint32_t *restrict pal)
 {
 	for(int y = 0; y < h; y++) {
@@ -536,9 +547,9 @@ void pallet_blit565(uint8_t * restrict dest, unsigned int dst_stride,
 		}
 	}
 }
-void pallet_blit555(uint8_t * restrict dest, unsigned int dst_stride, 
-					const uint16_t *restrict src, unsigned int src_stride, 
-					unsigned int w, unsigned int h, 
+void pallet_blit555(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
 					const uint32_t *restrict pal)
 {
 	for(int y = 0; y < h; y++) {
@@ -554,7 +565,7 @@ void pallet_blit555(uint8_t * restrict dest, unsigned int dst_stride,
 #endif
 
 #if defined(__MMX__)
-static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride, 
+static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride,
 		const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h)
 {
 	for(unsigned int y = 0; y < h; y++) {
@@ -583,15 +594,34 @@ static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride,
 	}
 }
 #else
-void pallet_blit8(uint8_t * restrict dest, unsigned int dst_stride, 
-					const uint16_t *restrict src, unsigned int src_stride, 
+void pallet_blit8(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h)
 {
 	for(int y = 0; y < h; y++)
-		for(int x = 0; x < w; x++) 
+		for(int x = 0; x < w; x++)
 			*(dest + y*dst_stride + x*4) = src[y*src_stride + x]>>8;
 }
 #endif
+
+void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h)
+{
+	const int src_stride = w;
+	w = IMIN(w, dst->w);
+	h = IMIN(h, dst->h);
+
+	void *pal = active_pal;
+
+	if(dst->bpp == 32) pallet_blit32(dst->data, dst->pitch, src, src_stride, w, h, pal);
+	else if(dst->bpp == 16) pallet_blit565(dst->data, dst->pitch, src, src_stride, w, h, pal);
+	else if(dst->bpp == 15) pallet_blit555(dst->data, dst->pitch, src, src_stride, w, h, pal);
+	else if(dst->bpp == 8) { // need to set surface's pallet
+		pallet_blit8(dst->data, dst->pitch, src, src_stride, w, h);
+	}
+#ifdef __MMX__
+	_mm_empty();
+#endif
+}
 
 #ifdef USE_SDL
 #include <SDL.h>

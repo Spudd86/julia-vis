@@ -28,9 +28,11 @@ ENABLE_JACK=@enable_jack@
 ENABLE_PULSE=@enable_pulse@
 ENABLE_DIRECTFB=@enable_directfb@
 
+-include config.mk
+
 CFLAGS += -D_GNU_SOURCE=1 -Wall -Wextra -fno-strict-aliasing -fsingle-precision-constant
 #-Wunsafe-loop-optimizations 
-CFLGAS +=  -iquote $(shell pwd)/src 
+CFLAGS += -I "./src" 
 
 #TODO: split orc flags out like everyting else
 ifeq (@enable_orc@,yes)
@@ -58,7 +60,7 @@ endif
 
 CFLAGS += -Wl,--as-needed
 
-CFLAGS := $(shell ./gcc-optioncheck $(CFLAGS))
+#CFLAGS := $(shell ./gcc-optioncheck $(CFLAGS))
 
 PA_FLAGS = @PORTAUDIO_CFLAGS@ @PORTAUDIO_LIBS@ @FFTW_CFLAGS@ @FFTW_LIBS@
 JACK_FLAGS = @JACK_CFLAGS@ @JACK_LIBS@
@@ -67,7 +69,7 @@ AUDIO_FLAGS = $(PA_FLAGS) $(JACK_FLAGS) $(PULSE_FLAGS)
 SDL_FLAGS = @SDL_CFLAGS@ @SDL_LIBS@ -lSDL_ttf -lm
 DFB_FLAGS = @DIRECTFB_CFLAGS@ @DIRECTFB_LIBS@
 
-ALL_BINS := bin/sdl-test$(EXEEXT) bin/sdlthread-test$(EXEEXT) bin/audio-test$(EXEEXT)
+ALL_BINS := bin/sdl-test$(EXEEXT) bin/sdlthread-test$(EXEEXT) bin/audio-test$(EXEEXT) bin/glsl-test$(EXEEXT)
 
 AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/portaudio.c 
 
@@ -86,8 +88,6 @@ TRIBUF_SRCS = src/atomic_tribuf.c
 else
 TRIBUF_SRCS = src/tribuf.c
 endif 
-
--include config.mk
 
 all: $(ALL_BINS)
 
@@ -113,6 +113,16 @@ bin/sdl-test$(EXEEXT): src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS
 	$(CC) $(CFLAGS) -DUSE_SDL \
 	src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
+
+bin/gl-test$(EXEEXT): src/opengl/opengl_fix.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c src/points.h src/common.h Makefile config.mk
+	$(CC) $(CFLAGS) -DUSE_SDL \
+	src/opengl/opengl_fix.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c \
+	$(SDL_FLAGS) $(AUDIO_FLAGS) -L/usr/X11R6/lib -lGL -lGLU -lGLEW -o $@
+
+bin/glsl-test$(EXEEXT): src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/pallet.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c src/points.h src/common.h Makefile config.mk
+	$(CC) $(CFLAGS) -DUSE_SDL \
+	src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/pallet.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/optproc.c src/points.c \
+	$(SDL_FLAGS) $(AUDIO_FLAGS) -L/usr/X11R6/lib -lGL -lGLU -lGLEW -o $@
 
 bin/sdlthread-test$(EXEEXT): src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL -DTRIBUF_LOCKING \

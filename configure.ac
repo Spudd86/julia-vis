@@ -48,6 +48,10 @@ PKG_CHECK_MODULES([PORTAUDIO], [portaudio-2.0])
 AC_SUBST(PORTAUDIO_CFLAGS)
 AC_SUBST(PORTAUDIO_LIBS)
 
+#PKG_CHECK_MODULES([GL], [gl])
+#AC_SUBST(GL_CFLAGS)
+#AC_SUBST(GL_LIBS)
+
 AC_ARG_ENABLE([directfb], AS_HELP_STRING([--enable-directfb], [build test-directfb (default: disabled)]))
 if test "x$enable_directfb" = xyes; then
 	PKG_CHECK_MODULES([DIRECTFB], [directfb],

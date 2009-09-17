@@ -40,13 +40,13 @@ static float *do_fft(float *in)
 #ifdef FFT_TRIBUF
 	fft = tribuf_get_write(fft_tb);
 #endif
-	
+
 	//const float scl = 1.0f/nr_samp;
 	fft[0] = fabsf(fft_tmp[0])/nr_samp;
 	fft[nr_samp/2] = fabsf(fft_tmp[nr_samp/2])/nr_samp;
 	for(int i=1; i < nr_samp/2; i++)
 		fft[i] = sqrtf(fft_tmp[i]*fft_tmp[i] + fft_tmp[nr_samp-i]*fft_tmp[nr_samp-i])/nr_samp;
-	
+
 #ifdef FFT_TRIBUF
 	tribuf_finish_write(fft_tb);
 #endif
@@ -60,7 +60,7 @@ void audio_update(const float * __attribute__ ((aligned (16))) in, int n)
 {
 	float *samps = tribuf_get_write(samp_tb);
 	int remain = 0;
-	
+
 	if(bufp == 0 && n == nr_samp) {
 		memcpy(samps, in, sizeof(float)*nr_samp);
 	} else {
@@ -71,11 +71,11 @@ void audio_update(const float * __attribute__ ((aligned (16))) in, int n)
 		bufp = (bufp + cpy)%nr_samp;
 	}
 	if(bufp != 0) return;
-	
+
 	tribuf_finish_write(samp_tb);
 	buf_count++;
 	beat_update(do_fft(samps), nr_samp/2);
-	
+
 	if(remain > 0) audio_update(in, remain);
 }
 
@@ -105,21 +105,21 @@ static float samp_bufs[2048*3] __attribute__ ((aligned (16)));
 int audio_setup(int sr)
 {
 	nr_samp = (sr<50000)?1024:2048;
-	
+
 	printf("Sample Rate %i\nUsing %i samples/buffer\n", sr, nr_samp);
-	
+
 	fft_tmp = fftwf_malloc(sizeof(float) * nr_samp); // do xform in place
 	if(!fft_tmp) abort();
-	
+
 	p = fftwf_plan_r2r_1d(nr_samp, fft_tmp, fft_tmp, FFTW_R2HC, 0);
-	
+
 	//~ float *samp_bufs = fftwf_malloc(sizeof(float) * nr_samp * 3);
 	//~ if(!samp_bufs) {fprintf(stderr, "Memory allocation failed"); exit(1); }
 	samp_data[0] = samp_bufs;
 	samp_data[1] = samp_data[0] + nr_samp;
 	samp_data[2] = samp_data[1] + nr_samp;
 	memset(samp_data[0], 0, sizeof(float) * nr_samp * 3);
-	
+
 	#ifdef FFT_TRIBUF
 	for(int i=0;i<3;i++) {
 		fft_data[i] = xmalloc(sizeof(float) * (nr_samp/2+1));
@@ -128,11 +128,11 @@ int audio_setup(int sr)
 	fft_tb = tribuf_new(fft_data, 0);
 	#endif
 	samp_tb = tribuf_new(samp_data, 0);
-	
+
 	beat_setup();
-	
+
 	atexit(audio_shutdown);
-	
+
 	return 0;
 }
 
@@ -141,21 +141,21 @@ int audio_setup_pa();
 int jack_setup(opt_data *);
 int pulse_setup();
 
-int audio_init(opt_data *od) 
+int audio_init(opt_data *od)
 {
 	int rc;
 	#ifdef HAVE_JACK
-	if(od->use_jack) 
+	if(od->use_jack)
 		rc = jack_setup(od);
 	else
 	#endif
 	#ifdef HAVE_PULSE
-	if(od->use_pulse) 
+	if(od->use_pulse)
 		rc = pulse_setup(od);
 	else
 	#endif
 		rc = audio_setup_pa();
-	
+
 	usleep(10000); // wait a bit so we have some audio in the buffer (instead of garbage)
 	return rc;
 }

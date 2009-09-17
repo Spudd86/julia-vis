@@ -65,6 +65,161 @@ MAP_FUNC_ATTR void soft_map_bl(uint16_t *restrict out, uint16_t *restrict in, in
 
 #define BLOCK_SIZE 8
 
+#include "mymm.h"
+
+MAP_FUNC_ATTR void soft_map_line_buff(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
+{
+	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
+	const float x0 = pd->p[0]*0.25f + 0.5f, y0=pd->p[1]*0.25f + 0.5f;
+	const int buf_w = w/BLOCK_SIZE;
+#ifndef  __SSE2__
+//#if 1
+	void fill_line_buff(const float v, int *line) {
+		float u = -1.0f;
+		for(int x=0; x<buf_w; x++, u+=ustep) {
+			float xt, yt;
+			xt = u*u - v*v + x0;
+			yt = 2*u*v + y0;
+			line[x] = IMIN(IMAX(lrintf(xt*w*256), 0), (w-1)*256);
+			line[x+buf_w] = IMIN(IMAX(lrintf(yt*h*256), 0), (h-1)*256);
+//			*(line++) = IMIN(IMAX(lrintf(xt*w*256), 0), (w-1)*256);
+//			*(line++) = IMIN(IMAX(lrintf(yt*h*256), 0), (h-1)*256);
+		}
+	}
+#else
+	const __m128 uvecs = _mm_set1_ps(ustep);
+	const __m128 x0vec = _mm_set1_ps(x0), y0vec = _mm_set1_ps(y0);
+	const __m128 xmul = _mm_set1_ps(w*256), ymul = _mm_set1_ps(h*256);
+	const __m128 xmax = _mm_set1_ps((w-1)*256), ymax = _mm_set1_ps((h-1)*256);
+	const __m128 zvec = _mm_setzero_ps();
+	_MM_SET_ROUNDING_MODE(_MM_ROUND_NEAREST);
+	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
+	void fill_line_buff(float v, int *line) {
+		__m128i *ln = line;
+//		__m128 uvec = _mm_set_ps(-1.0f, 1*ustep-1.0f, 2*ustep-1.0f, 3*ustep-1.0f);
+		for(int x=0; x<buf_w; x+=4) {
+			const __m128 vvec = _mm_set1_ps(v);
+			const __m128 uvec = _mm_setr_ps(ustep*(x+0)-1.0f, ustep*(x+1)-1.0f, ustep*(x+2)-1.0f, ustep*(x+3)-1.0f);
+			__m128 tmp1 = uvec;
+			__m128 tmp2 = vvec;
+			tmp1 = _mm_mul_ps(tmp1, tmp1);
+			tmp2 = _mm_mul_ps(tmp2, tmp2);
+			tmp1 = _mm_sub_ps(tmp1, tmp2);
+			tmp1 = _mm_add_ps(tmp1, x0vec);
+
+			tmp2 = uvec;
+			tmp2 = _mm_mul_ps(tmp2, vvec);
+			tmp2 = _mm_add_ps(tmp2, tmp2);
+			tmp2 = _mm_add_ps(tmp2, y0vec);
+
+			tmp1 = _mm_mul_ps(tmp1, xmul); tmp1 = _mm_max_ps(tmp1, zvec); tmp1 = _mm_min_ps(tmp1, xmax);
+			tmp2 = _mm_mul_ps(tmp2, ymul); tmp2 = _mm_max_ps(tmp2, zvec); tmp2 = _mm_min_ps(tmp2, ymax);
+
+//			float t[4]; _mm_storeu_ps(t, tmp1);
+//			line[x+0] = IMIN(IMAX(lrintf(t[0]*w*256), 0), (w-1)*256); line[x+1] = IMIN(IMAX(lrintf(t[1]*w*256), 0), (w-1)*256);
+//			line[x+2] = IMIN(IMAX(lrintf(t[2]*w*256), 0), (w-1)*256); line[x+3] = IMIN(IMAX(lrintf(t[3]*w*256), 0), (w-1)*256);
+//			_mm_storeu_ps(t, tmp2);
+//			line[x+buf_w+0] = IMIN(IMAX(lrintf(t[0]*h*256), 0), (h-1)*256);
+//			line[x+buf_w+1] = IMIN(IMAX(lrintf(t[1]*h*256), 0), (h-1)*256);
+//			line[x+buf_w+2] = IMIN(IMAX(lrintf(t[2]*h*256), 0), (h-1)*256);
+//			line[x+buf_w+3] = IMIN(IMAX(lrintf(t[3]*h*256), 0), (h-1)*256);
+			_mm_stream_si128(ln+x/4, _mm_cvtps_epi32(tmp1));
+			_mm_stream_si128(ln+(x+buf_w)/4, _mm_cvtps_epi32(tmp2));
+
+//			__m128 st1, st2;
+//			st1 = _mm_shuffle_ps(tmp1, tmp2, 0xbb);
+//			st1 = _mm_shuffle_ps(st1, st1, 0x72);
+//
+//			st2 = _mm_shuffle_ps(tmp1, tmp2, 0x11);
+//			st2 = _mm_shuffle_ps(st2, st2, 0x72);
+//
+//			_mm_stream_si128(ln+x*2, _mm_cvtps_epi32(st2));
+//			_mm_stream_si128(ln+x*2+1, _mm_cvtps_epi32(st1));
+		}
+	}
+#endif
+
+#if 0
+	typedef union { float f[8]; __m128 vec[2]; } vecflt2;
+	static const union vecflt2 alph = {7.0f/7, 6.0f/7, 5.0f/7, 4.0f/7, 4.0f/7, 3.0f/7, 2.0f/7, 1.0f/7, 0 };
+	const __m128 ones = _mm_set1_ps(1.0f);
+	inline void interp_vecs(const __m128 a, const __m128 b, float out[8]) {
+		__m128 *res = (__m128 *)out;
+		res[0] = _mm_mul_ps(a, alph.vec[0]);
+		res[1] = _mm_mul_ps(a, alph.vec[1]);
+		__m128 tmp = _mm_sub_ps(ones, alph.vec[0]);
+		res[0] = _mm_add_ps(res[0], _mm_mul_ps(b, tmp));
+		tmp = _mm_sub_ps(ones, alph.vec[1]);
+		res[1] = _mm_add_ps(res[1], _mm_mul_ps(b, tmp));
+
+	}
+	void do_interp(const int *restrict line1, const int *restrict line2, int yd) {
+		for(int xi = 0; xi < buf_w; xi++) {
+			vecflt2 x0, y0;
+			const __m128 x00 = _mm_set1_ps(line1[xi]);
+			const __m128 y00 = _mm_set1_ps(line1[xi+buf_w]);
+			res[0] = _mm_mul_ps(a, alph.vec[0]);
+			res[0] = _mm_mul_ps(b, alph.vec[1]);
+
+		}
+	}
+#endif
+
+	void inline __attribute__((always_inline)) do_interp(const int *restrict line1, const int *restrict line2, int yd) {
+		for(int xi = 1; xi < buf_w; xi++) {
+//			const int x00 = line1[(xi-1)*2], y00 = line1[(xi-1)*2+1];
+//			const int x01 = line2[(xi-1)*2], y01 = line2[(xi-1)*2+1];
+//			const int x10 = line1[xi*2], y10 = line1[xi*2+1];
+//			const int x11 = line2[xi*2], y11 = line2[xi*2+1];
+			const int x00 = line1[xi-1], y00 = line1[xi-1+buf_w];
+			const int x01 = line2[xi-1], y01 = line2[xi-1+buf_w];
+			const int x10 = line1[xi],   y10 = line1[xi+buf_w];
+			const int x11 = line2[xi],   y11 = line2[xi+buf_w];
+
+			int x0 = x00, y0 = y00;
+			int x1 = x10, y1 = y10;
+			const int x0s = (x01 - x00)/BLOCK_SIZE;
+			const int x1s = (x11 - x10)/BLOCK_SIZE;
+			const int y0s = (y01 - y00)/BLOCK_SIZE;
+			const int y1s = (y11 - y10)/BLOCK_SIZE;
+
+			int xd = xi*BLOCK_SIZE;
+			for(int yt=0; yt<BLOCK_SIZE; yt++, x0+=x0s, y0+=y0s, x1+=x1s, y1+=y1s) {
+				int x = x0, y = y0;
+				int xst = (x1 - x0)/BLOCK_SIZE;
+				int yst = (y1 - y0)/BLOCK_SIZE;
+				for(int xt=0; xt<BLOCK_SIZE; xt++, x+=xst, y+=yst) {
+					int xs=x/256, ys=y/256;
+					int xf=x&0xFF, yf=y&0xFF;
+
+					int xi1 = xs;
+					int yi1 = ys*w;
+					int xi2 = IMIN(xi1+1,w-1);
+					int yi2 = IMIN(yi1+w,(h-1)*w);
+
+					out[(yd+yt)*w+xd+xt] = ((in[yi1 + xi1]*(255 - xf) + in[yi1 + xi2]*xf)*(255-yf) +
+								(in[yi2 + xi1]*(255 - xf) + in[yi2 + xi2]*xf)*yf) >> 16;
+
+				}
+			}
+		}
+	}
+
+	__m128i foo;
+	int line_buff1[buf_w*2];
+	int line_buff2[buf_w*2];
+
+	fill_line_buff(-1.0f, line_buff1);
+	float v = -1.0f;
+	for(int yd = 0; yd < h; yd+=BLOCK_SIZE) {
+		fill_line_buff(vstep*(yd/BLOCK_SIZE)-1.0f, line_buff2);
+		do_interp(line_buff1, line_buff2, yd);
+		yd+=BLOCK_SIZE;
+		v+=vstep; fill_line_buff(vstep*(yd/BLOCK_SIZE)-1.0f, line_buff1);
+		do_interp(line_buff2, line_buff1, yd);
+	}
+}
+
 MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict __attribute__((aligned (16))) out, uint16_t *restrict __attribute__ ((aligned (16))) in, int w, int h, const struct point_data *pd)
 {
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;

@@ -75,33 +75,25 @@ void maxblend(void *restrict dest, void *restrict src, int w, int h)
 void fade_pix(void *restrict buf, int w, int h, uint8_t fade)
 {
 	__m128i *mbbuf = buf;
-	//const __m128i fd = _mm_set1_epi16(fade<<7);
 	const __m128i fd = _mm_set1_epi16(fade<<8);
+	const int n = 2*w*h/sizeof(__m128i);
+	unsigned int i=(n%4);
 
-	for(unsigned int i=0; i < 2*w*h/sizeof(__m128i); i+=2) { // TODO see if the prefeting is helping
-		__builtin_prefetch(mbbuf+i+2, 1, 0);
-		__m128i v1, v2;//,t;
-		//FIXME: loses two bits!
-		//~ v1 = mbbuf[i];
-		//~ v1 = _mm_srli_epi16(v1, 1);
-		//~ v1 = _mm_mulhi_epi16(v1, fd);
-		//~ v1 = _mm_slli_epi16(v1, 2);
-		//~ mbbuf[i]=v1;
-
-		//~ v2 = mbbuf[i+1];
-		//~ v2 = _mm_srli_epi16(v2, 1);
-		//~ v2 = _mm_mulhi_epi16(v2, fd);
-		//~ v2 = _mm_slli_epi16(v2, 2);
-		//~ mbbuf[i+1]=v2;
-
-		v1 = mbbuf[i];
-		v1 = _mm_mulhi_epu16(v1, fd); // do we always have this?
-		mbbuf[i]=v1;
-
-		v2 = mbbuf[i+1];
-		v2 = _mm_mulhi_epu16(v2, fd);
-		mbbuf[i+1]=v2;
+	switch(i){
+		case 0: mbbuf[i] = _mm_mulhi_epu16(mbbuf[i], fd); i++;
+		case 3: mbbuf[i] = _mm_mulhi_epu16(mbbuf[i], fd); i++;
+		case 2: mbbuf[i] = _mm_mulhi_epu16(mbbuf[i], fd); i++;
+		case 1: mbbuf[i] = _mm_mulhi_epu16(mbbuf[i], fd); i++;
 	}
+	do { 
+		__builtin_prefetch(mbbuf+i+4, 1, 0);
+	
+		mbbuf[i] = _mm_mulhi_epu16(mbbuf[i], fd);
+		mbbuf[i+1] = _mm_mulhi_epu16(mbbuf[i+1], fd);
+		mbbuf[i+2] = _mm_mulhi_epu16(mbbuf[i+2], fd);
+		mbbuf[i+3] = _mm_mulhi_epu16(mbbuf[i+3], fd);
+		i+=4; 
+	} while(i < n);
 }
 #else
 

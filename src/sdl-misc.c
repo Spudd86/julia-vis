@@ -7,8 +7,18 @@
 
 static TTF_Font *font = NULL;
 
+static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl);
+
+SDL_Surface *sdl_setup(opt_data *opts, int im_size) {
+	return real_sdl_setup(opts, im_size, 0);
+}
+
+SDL_Surface *sdl_setup_gl(opt_data *opts, int im_size) {
+	return real_sdl_setup(opts, im_size, 1);
+}
+
 // TODO: improve automatic mode selection
-SDL_Surface *sdl_setup(opt_data *opts, int im_size)
+static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl)
 {
 	printf("Initializing SDL.\n");
 	putenv("SDL_NOMOUSE=1");
@@ -45,13 +55,25 @@ SDL_Surface *sdl_setup(opt_data *opts, int im_size)
 
     printf("SDL initialized.\n");
 
-	const int vidflags = SDL_HWSURFACE | SDL_HWACCEL | SDL_ASYNCBLIT | SDL_ANYFORMAT | SDL_HWPALETTE | ((opts->doublebuf)?(SDL_DOUBLEBUF):0);
-	const SDL_VideoInfo *vid_info = SDL_GetVideoInfo();
+    const SDL_VideoInfo *vid_info = SDL_GetVideoInfo();
+
+	int vidflags = SDL_ASYNCBLIT | SDL_ANYFORMAT | SDL_HWPALETTE;
+	if(opts->doublebuf) vidflags |= SDL_DOUBLEBUF;
+	if(vid_info->hw_available) vidflags |= SDL_HWSURFACE;
+	if(vid_info->blit_hw) vidflags |= SDL_HWACCEL;
+	if(opts->hw_pallet) vidflags |= SDL_HWPALETTE;
+
+	if(enable_gl) {
+		vidflags |= SDL_OPENGL;
+	}
+
 	SDL_Rect **modes = SDL_ListModes(vid_info->vfmt, vidflags);
 	if (modes == (SDL_Rect**)0) {
 		printf("No modes available!\n");
 		exit(-1);
 	}
+
+	SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1);
 
 	SDL_Surface *screen;
 	if (modes == (SDL_Rect**)-1) {
@@ -96,5 +118,11 @@ void DrawText(SDL_Surface* screen, const char* text)
 
 	SDL_BlitSurface(text_surface, NULL, screen, NULL);
 	SDL_FreeSurface(text_surface);
+}
+
+SDL_Surface *DrawTextGL(const char* text)
+{
+    SDL_Surface *text_surface = TTF_RenderText_Solid(font, text, (SDL_Color){255,255,255});
+    return text_surface;
 }
 

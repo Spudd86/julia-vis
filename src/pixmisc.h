@@ -16,9 +16,10 @@ uint16_t *maxsrc_get(void);
 void maxsrc_setup(int w, int h);
 void maxsrc_update(void);
 
-void pallet_init(int);
+void pallet_init(int bswap);
 void pallet_step(int step);
 void pallet_start_switch(int nextpal);
 
+void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h);
 
 #endif
