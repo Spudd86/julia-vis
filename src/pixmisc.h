@@ -19,6 +19,7 @@ void maxsrc_update(void);
 void pallet_init(int bswap);
 void pallet_step(int step);
 void pallet_start_switch(int nextpal);
+int get_pallet_changing(void);
 
 void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h);
 

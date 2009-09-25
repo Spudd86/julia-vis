@@ -292,6 +292,7 @@ static void do_pallet_step(void) {
 }
 #endif
 
+int get_pallet_changing(void) { return pallet_changing; }
 void pallet_step(int step) {
 	if(!pallet_changing) return;
 	palpos += step;

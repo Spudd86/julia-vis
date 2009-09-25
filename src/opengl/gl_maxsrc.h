@@ -7,7 +7,7 @@
 #define GL_MAXSRC_H_
 
 void gl_maxsrc_init(int width, int height);
-void gl_maxsrc_update(void);
+void gl_maxsrc_update(Uint32 now);
 GLuint gl_maxsrc_get();
 
 #endif /* include guard */
