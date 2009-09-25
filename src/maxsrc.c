@@ -70,7 +70,7 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 		for(int xd = 0; xd < w; xd++) {
 			float u = xd*xstep - 1.0f;
 
-			float d = 0.95f + 0.05*sqrtf(u*u + v*v);
+			float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
 			float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 				(u*R[0][0] + v*R[0][1]),
 				(u*R[1][0] + v*R[1][1])*d,
@@ -135,7 +135,7 @@ void maxsrc_update(void)
 
 	for(int i=0; i<samp; i++) {
 		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
-		s=copysignf(logf(fabsf(s)*3+1)/2, s);
+		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
 		float xt = (i - samp/2)*1.0f/samp;
 		float yt = 0.2f*s;
