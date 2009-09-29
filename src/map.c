@@ -165,7 +165,7 @@ MAP_FUNC_ATTR void soft_map_line_buff(uint16_t *restrict out, uint16_t *restrict
 	}
 #endif
 
-	void inline __attribute__((always_inline)) do_interp(const int *restrict line1, const int *restrict line2, int yd) {
+	inline __attribute__((always_inline)) void  do_interp(const int *restrict line1, const int *restrict line2, int yd) {
 		for(int xi = 1; xi < buf_w; xi++) {
 //			const int x00 = line1[(xi-1)*2], y00 = line1[(xi-1)*2+1];
 //			const int x01 = line2[(xi-1)*2], y01 = line2[(xi-1)*2+1];

@@ -5,6 +5,8 @@
 
 //TODO: depth textures? (more bits!) GL_ARB_depth_texture (also use the depth texture as a shadow texture)
 
+#define GL_GLEXT_PROTOTYPES
+
 #include "common.h"
 
 #include <SDL.h>
@@ -88,7 +90,7 @@ static void setup_map_fbo(int width, int height) {
 //		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,  width, height, 0, GL_RGBA, GL_UNSIGNED_INT_10_10_10_2, NULL);
 		if(GLEW_ARB_half_float_pixel) { printf("using half float pixels in map fbo\n");
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F_ARB,  width, height, 0, GL_RGB, GL_HALF_FLOAT_ARB, NULL);
-		}if(GLEW_ARB_color_buffer_float)
+		} else if(GLEW_ARB_color_buffer_float)
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F_ARB,  width, height, 0, GL_RGB, GL_FLOAT, NULL);
 		else
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
@@ -128,7 +130,7 @@ static void do_frame(int src_tex, int draw_tex, int im_w, int im_h, struct point
 		glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
 
 		glUseProgramObjectARB(map_prog);
-		glUniform2fARB(glGetUniformLocationARB(map_prog, "c"), pd->p[0]*0.3f + 0.5f, pd->p[1]*0.25f + 0.5f);
+		glUniform2fARB(glGetUniformLocationARB(map_prog, "c"), (pd->p[0]-0.5f)*0.25f + 0.5f, pd->p[1]*0.25f + 0.5f);
 		glUniform1iARB(glGetUniformLocationARB(map_prog, "maxsrc"), 0);
 		glUniform1iARB(glGetUniformLocationARB(map_prog, "prev"), 1);
 		glBegin(GL_QUADS);
@@ -167,6 +169,71 @@ static void do_frame(int src_tex, int draw_tex, int im_w, int im_h, struct point
 	glPopAttrib();
 }
 
+#include <complex.h>
+
+static Pixbuf *mandel_surf;
+static GLuint mandel_tex;
+
+void init_mandel()
+{
+	mandel_surf = malloc(sizeof(Pixbuf));
+	mandel_surf->bpp  = 8; mandel_surf->w = mandel_surf->h = 256;
+	mandel_surf->pitch = mandel_surf->w*sizeof(uint8_t);
+	uint8_t *data = mandel_surf->data = malloc(mandel_surf->w * mandel_surf->h * sizeof(uint8_t));
+
+	for(int y=0; y < mandel_surf->h; y++) {
+		for(int x=0; x < mandel_surf->w; x++) {
+			double complex z0 = x*2.0f/mandel_surf->w - 1.5 + (y*2.0f/mandel_surf->h - 1)*I;
+			double complex z = z0;
+			int i=0; while(cabs(z) < 2 && i < 255) {
+				i++;
+				z = z*z + z0;
+			}
+			data[y*mandel_surf->w + x] = 255 - i;
+		}
+	}
+	glPushAttrib(GL_TEXTURE_BIT);
+	glGenTextures(1, &mandel_tex);
+	glBindTexture(GL_TEXTURE_2D, mandel_tex);
+	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_LUMINANCE, mandel_surf->w, mandel_surf->h, GL_LUMINANCE, GL_UNSIGNED_BYTE, mandel_surf->data);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glPopAttrib();
+}
+
+void render_mandel(struct point_data *pd)
+{
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+	glBindTexture(GL_TEXTURE_2D, mandel_tex);
+	glBegin(GL_QUADS);
+//		glTexCoord2d(0.0,1.0); glVertex2f(0.5f,  1.0f);
+//		glTexCoord2d(1.0,1.0); glVertex2f(1.0f,  1.0f);
+//		glTexCoord2d(1.0,0.0); glVertex2f(1.0f,  0.5f);
+//		glTexCoord2d(0.0,0.0); glVertex2f(0.5f,  0.5f);
+		glTexCoord2d(0.0,1.0); glVertex2f(0.0f,  1.0f);
+		glTexCoord2d(1.0,1.0); glVertex2f(1.0f,  1.0f);
+		glTexCoord2d(1.0,0.0); glVertex2f(1.0f,  0.0f);
+		glTexCoord2d(0.0,0.0); glVertex2f(0.0f,  0.0f);
+	glEnd();
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glPointSize(2);
+	glBegin(GL_POINTS);
+		glColor3f(0.0f, 1.0f, 0.0f);
+		glVertex2d((pd->p[0]+1.0)*0.5, 1-(pd->p[1]+1)*0.5);
+//		glVertex2d((pd->p[0]+1.0)*0.25+0.5, 1-(pd->p[1]+1)*0.25);
+	glEnd();
+	glBegin(GL_POINTS);
+		glColor3f(1.0f, 0.0f, 0.0f);
+		glVertex2d((pd->t[0]+1.0)*0.5, 1-(pd->t[1]+1)*0.5);
+//		glVertex2d((pd->t[0]+1.0)*0.25+0.5, 1-(pd->t[1]+1)*0.25);
+	glEnd();
+	glPopAttrib();
+}
+
 int main(int argc, char **argv)
 {
 	optproc(argc, argv, &opts);
@@ -189,8 +256,6 @@ int main(int argc, char **argv)
 		printf("Have half float pixels!\n");
 	}
 	if(GLEW_ARB_vertex_shader && GLEW_ARB_fragment_shader) {
-		if(!GLEW_ARB_vertex_shader) printf("no vertex shaders\n");
-		if(!GLEW_ARB_fragment_shader) printf("no frag shaders\n");
 		printf("Ready for GLSL\n");
 	} else {
 		printf("No GLSL support\n");
@@ -199,6 +264,7 @@ int main(int argc, char **argv)
 
 	pallet_init(1);
 	init_pal_tex();
+	init_mandel();
 	audio_init(&opts);
 
 	setup_opengl(im_w, im_h);
@@ -222,15 +288,17 @@ int main(int argc, char **argv)
 
 	Uint32 src_tex = 0, dst_tex = 1;
 
-	int debug_maxsrc = 0, debug_pal = 0;
+	int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0;
 
 	while(SDL_PollEvent(&event) >= 0) {
 		if(event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) break;
 		if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F1)) debug_maxsrc = !debug_maxsrc;
 		if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F2)) debug_pal = !debug_pal;
+		if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F3)) show_mandel = !show_mandel;
 
 		gl_maxsrc_update(now);
 		do_frame(src_tex, dst_tex, im_w, im_h, pd);
+		if(show_mandel) render_mandel(pd); //TODO: enable click to change target
 
 		if(debug_pal) {
 			glPushAttrib(GL_TEXTURE_BIT);
@@ -298,7 +366,7 @@ int main(int argc, char **argv)
 		beats = newbeat;
 
 		now = SDL_GetTicks();
-		if(now - fps_oldtime < 1) SDL_Delay(1); // stay below 1000FPS
+		if(now - fps_oldtime < 2) SDL_Delay(2); // stay below 500FPS
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		fps_oldtime = now;
 		cnt++;

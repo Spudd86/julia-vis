@@ -2,6 +2,8 @@
  * glmisc.c
  *
  */
+#define GL_GLEXT_PROTOTYPES
+
 
 #include "common.h"
 
@@ -26,7 +28,7 @@ static GLboolean do_shader_compile(GLhandleARB shader, const char *source) {
 }
 
 GLhandleARB compile_program(const char *vert_shader, const char *frag_shader) {
-	GLhandleARB vert, frag;
+	GLhandleARB vert=0, frag=0;
 
 	if(vert_shader != NULL) {
 		vert = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
@@ -79,3 +81,22 @@ void pixbuf_to_texture(Pixbuf *src, GLuint *tex, GLint clamp_mode, int rgb) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glPopAttrib();
 }
+
+//void drawString3D(const char *str, float pos[3], float color[4], void *font)
+//{
+//    glPushAttrib(GL_LIGHTING_BIT | GL_CURRENT_BIT); // lighting and color mask
+//    glDisable(GL_LIGHTING);     // need to disable lighting for proper text color
+//
+//    glColor4fv(color);          // set text color
+//    glRasterPos3fv(pos);        // place text position
+//
+//    // loop all characters in the string
+//    while(*str)
+//    {
+//        glutBitmapCharacter(font, *str);
+//        ++str;
+//    }
+//
+//    glEnable(GL_LIGHTING);
+//    glPopAttrib();
+//}

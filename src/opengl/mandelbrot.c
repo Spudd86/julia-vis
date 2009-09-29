@@ -1,0 +1,71 @@
+/**
+ * mandelbrot.c
+ *
+ */
+
+#include "common.h"
+
+#include <GL/glew.h>
+#include <GL/glut.h>
+
+#include "glmisc.h"
+
+#include <complex.h>
+
+static Pixbuf *mandel_surf;
+static GLuint mandel_tex;
+
+void init_mandel()
+{
+	mandel_surf = malloc(sizeof(Pixbuf));
+	mandel_surf->bpp  = 8; mandel_surf->w = mandel_surf->h = 512;
+	mandel_surf->pitch = mandel_surf->w*sizeof(uint8_t);
+	uint8_t *data = mandel_surf->data = malloc(mandel_surf->w * mandel_surf->h * sizeof(uint8_t));
+
+	for(int y=0; y < mandel_surf->h; y++) {
+		for(int x=0; x < mandel_surf->w; x++) {
+			double complex z0 = x*2.0f/mandel_surf->w - 1.5 + (y*2.0f/mandel_surf->h - 1)*I;
+			double complex z = z0;
+			int i=0; while(cabs(z) < 2 && i < 255) {
+				i++;
+				z = z*z + z0;
+			}
+			data[y*mandel_surf->w + x] = 255 - i;
+		}
+	}
+	glPushAttrib(GL_TEXTURE_BIT);
+	glGenTextures(1, &mandel_tex);
+	glBindTexture(GL_TEXTURE_2D, mandel_tex);
+	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_LUMINANCE, mandel_surf->w, mandel_surf->h, GL_LUMINANCE, GL_UNSIGNED_BYTE, mandel_surf->data);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glPopAttrib();
+}
+
+void render_mandel(struct point_data *pd)
+{
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+	glBindTexture(GL_TEXTURE_2D, mandel_tex);
+	glBegin(GL_QUADS);
+		glTexCoord2d(0.0,1.0); glVertex2f(0.5f,  1.0f);
+		glTexCoord2d(1.0,1.0); glVertex2f(1.0f,  1.0f);
+		glTexCoord2d(1.0,0.0); glVertex2f(1.0f,  0.5f);
+		glTexCoord2d(0.0,0.0); glVertex2f(0.5f,  0.5f);
+	glEnd();
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glPointSize(1.5f);
+	glBegin(GL_POINTS);
+		glColor3f(0.0f, 1.0f, 0.0f);
+		glVertex2d((pd->p[0]+1.0)*0.25+0.5, 1-(pd->p[1]+1)*0.25);
+	glEnd();
+	glBegin(GL_POINTS);
+		glColor3f(1.0f, 0.0f, 0.0f);
+		glVertex2d((pd->t[0]+1.0)*0.25+0.5, 1-(pd->t[1]+1)*0.25);
+	glEnd();
+	glPopAttrib();
+}
+

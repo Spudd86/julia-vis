@@ -48,9 +48,9 @@ static void setup_max_fbo(int width, int height) {
 		glBindTexture(GL_TEXTURE_2D, max_fbo_tex[i]);
 //		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,  width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, NULL);
 //		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,  width, height, 0, GL_RGBA, GL_UNSIGNED_INT_10_10_10_2, NULL);
-		if(GLEW_ARB_half_float_pixel) { printf("using half float pixels in max fbo\n");
+		if(GLEW_ARB_half_float_pixel)
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F_ARB,  width, height, 0, GL_RGB, GL_HALF_FLOAT_ARB, NULL);
-		}if(GLEW_ARB_color_buffer_float)
+		else if(GLEW_ARB_color_buffer_float)
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F_ARB,  width, height, 0, GL_RGB, GL_FLOAT, NULL);
 		else
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
@@ -81,14 +81,15 @@ static inline float getsamp(audio_data *d, int i, int w) {
 static Pixbuf *pnt;
 static GLuint pnt_tex;
 static GLhandleARB shader_prog;
-//TODO: ARB_fragment_program version
+//TODO: ARB_vertex_program version (fallback if no GLSL)
+//TODO: fallback to fixed_map if no shaders at all
 static const char *frag_src =
 	"uniform sampler2D prev;"
 	"uniform mat3 R;" //TODO: change R into one mat3x2 and one mat2x3
 	"void main() {"
 	"	vec2 uv = gl_TexCoord[0].st;"
 	"	float d = 0.97f + 0.03f*length(uv);"
-//	"	vec3 p=vec3((uv.x*R[0][0] + uv.y*R[0][1])," //TODO: optimize this to use real matrix, move to vertex shader
+//	"	vec3 p=vec3((uv.x*R[0][0] + uv.y*R[0][1]),"
 //	"				(uv.x*R[1][0] + uv.y*R[1][1])*d,"
 //	"				(uv.x*R[2][0] + uv.y*R[2][1])*d);"
 //	"	uv = vec2(	p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0],"
@@ -98,6 +99,8 @@ static const char *frag_src =
 	"	uv = (vec2(p) + 1)*0.5f;"
 	"	gl_FragData[0] = texture2D(prev, uv)*(126/128.0f);"
 	"}";
+
+//TODO: fallback to glCopyTexImage2D/glCopyTexSubImage2D if no FBO's
 
 void gl_maxsrc_init(int width, int height) {
 	iw=width, ih=height;

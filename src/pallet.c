@@ -11,7 +11,7 @@ struct pallet_colour {
 	unsigned char pos;
 };
 
-#define NUM_PALLETS 5
+#define NUM_PALLETS 4
 static const int num_pallets = NUM_PALLETS;
 static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 
@@ -21,7 +21,7 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 		{ 111, 111, 255, 125},
 		{ 111, 230, 255, 152},
 		{ 255, 216, 111, 185},
-		{ 255, 111, 111, 211},
+		{ 255, 111, 111, 240},
 		{ 255, 255, 255, 255}
 	},
 
@@ -29,7 +29,7 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 		{   0,   0,   0,   0},
 		{   0,   0, 128,  60},
 		{ 255, 128,  64, 137},
-		{ 255, 255, 255, 230},
+		{ 255, 255, 255, 240},
 		{   0,   0, 255, 255}
 	},
 
@@ -38,23 +38,23 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 		{ 255,   0, 128,  52},
 		{ 196,   0,   0,  86},
 		{   0,   0,   0, 175},
-		{ 255,   0, 128, 231},
+		{ 255,   0, 128, 240},
 		{ 255, 255, 255, 255}
 	},
 
 	{	//  r    g    b  pos
 		{   0,   0,   0,   0},
 		{   0,   0,   0,  29},
-		{ 115, 230,   0, 195},
+		{ 115, 230,   0, 240},
 		{  45, 255, 255, 255}
 	},
 
 	{	//  r    g    b  pos
 		{   0,   0,   0,   0}, // TODO tweak this
 		{ 196,  23,   0,  10},
-		{ 255, 255, 255,  25},
-		{  32,  96,   0,  50},
-		{ 115, 230,   0, 200},
+		{ 255, 255, 255,  40},
+		{  32,  96,   0,  70},
+		{ 115, 230,   0, 240},
 		{  45, 255, 255, 255}
 	}
 
@@ -156,7 +156,7 @@ static void do_pallet_step(void) {
 
 	orc_executor_run (ex);
 }
-#elif defined(__SSE2__)
+#elif  defined(__SSE2__)
 #warning Doing sse2 Compiled program will NOT work on system without it!
 #include <emmintrin.h>
 //TODO: decide if it's worth maintainig this... MMX version is probably plenty fast... and

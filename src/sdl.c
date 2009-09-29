@@ -66,8 +66,8 @@ int main(int argc, char **argv)
 			soft_map_rational(map_surf[m], map_surf[(m+1)&0x1], im_w, im_h,  pd);
 		}
 
-		if(now - lastpalstep >= 2048/256) { // want pallet switch to take ~2 seconds
-			pallet_step(IMIN((now - lastpalstep)*256/2048, 32));
+		if((now - lastpalstep)*256/1024 >= 1) { // want pallet switch to take ~2 seconds
+			pallet_step(IMIN((now - lastpalstep)*256/1024, 32));
 			lastpalstep = now;
 		}
 		pallet_blit_SDL(screen, map_surf[m], im_w, im_h);
@@ -79,7 +79,7 @@ int main(int argc, char **argv)
 
 		now = SDL_GetTicks();
 		int newbeat = beat_get_count();
-		if(newbeat != beats) {
+		if(newbeat != beats && !get_pallet_changing()) {
 			pallet_start_switch(newbeat);
 		}
 		if(newbeat != beats && now - last_beat_time > 1000) {
