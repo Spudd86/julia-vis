@@ -85,7 +85,7 @@ if test "x$enable_pulseaudio" = xyes; then
 fi
 AC_SUBST(PULSE_CFLAGS)
 AC_SUBST(PULSE_LIBS)
-AC_SUBST(enable_pulse)
+AC_SUBST(enable_pulseaudio)
 
 AC_ARG_ENABLE([orc], AS_HELP_STRING([--enable-orc], [enable using orc (default: disabled)]))
 if test "x$enable_orc" = xyes; then

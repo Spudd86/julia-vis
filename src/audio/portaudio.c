@@ -21,32 +21,33 @@ static int callback(const void *input,
 
 void audio_stop_pa(void);
 
-int audio_setup_pa()
+int audio_setup_pa(opt_data *od)
 {
 	printf("Using PortAudio\n");
 
 	PaError err = Pa_Initialize();
 	if( err != paNoError ) { fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err)); exit(1); }
 
-	const PaDeviceInfo *inf = Pa_GetDeviceInfo(Pa_GetDefaultInputDevice());
+	int usedev = (od->audiodev < 0)?Pa_GetDefaultInputDevice():od->audiodev;
+	if(usedev >= Pa_GetDeviceCount()) {
+		fprintf(stderr, "bad device number %i\n", od->audiodev);
+		return -1;
+	}
 
 	int numdev = Pa_GetDeviceCount();
 	printf("Portaudio devices:\n");
 	for(int i=0; i<numdev; i++) {
 		const PaDeviceInfo *di = Pa_GetDeviceInfo(i);
-		if(i==Pa_GetDefaultInputDevice())printf("*");
+		if(i==usedev) printf("*");
 		printf("%i\t%s\n", i, di->name);
 	}
 
-	/* Open an audio I/O stream. */
-    err = Pa_OpenDefaultStream( &stream,
-                                1,          /* 1 input channel */
-                                0,          /* no output */
-                                paFloat32,
-                                inf->defaultSampleRate,
-                                paFramesPerBufferUnspecified,
-                                &callback,
-                                NULL );
+	const PaDeviceInfo *inf = Pa_GetDeviceInfo(usedev);
+	PaStreamParameters parms = { usedev, 1, paFloat32, inf->defaultLowInputLatency, NULL};
+	err = Pa_OpenStream(&stream, &parms, NULL, inf->defaultSampleRate,
+						paFramesPerBufferUnspecified,
+						paClipOff | paDitherOff,
+						&callback, NULL);
     if( err != paNoError ) goto error;
 
 	const PaStreamInfo *si = Pa_GetStreamInfo (stream);

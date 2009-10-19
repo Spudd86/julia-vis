@@ -34,7 +34,6 @@ static void init_pal_tex(void) {
 	glBindTexture(GL_TEXTURE_1D, pal_tex);
 	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, active_pal);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glPopAttrib();
@@ -83,28 +82,23 @@ static void setup_map_fbo(int width, int height) {
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	for(int i=0; i<2; i++) {
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, map_fbo);
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, map_fbo_tex[i], 0);
 		glBindTexture(GL_TEXTURE_2D, map_fbo_tex[i]);
-//		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,  width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, NULL);
-//		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,  width, height, 0, GL_RGBA, GL_UNSIGNED_INT_10_10_10_2, NULL);
-		if(GLEW_ARB_half_float_pixel) { printf("using half float pixels in map fbo\n");
+//		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F_ARB,  width, height, 0, GL_RGB, GL_HALF_FLOAT_ARB, NULL);
+//		if(glGetError() != GL_NONE) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F_ARB,  width, height, 0, GL_RGB, GL_FLOAT, NULL);
+//		if(glGetError() != GL_NONE) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		if(GLEW_ARB_half_float_pixel && GLEW_ARB_texture_float) { printf("using half float pixels in map fbo\n");
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F_ARB,  width, height, 0, GL_RGB, GL_HALF_FLOAT_ARB, NULL);
-		} else if(GLEW_ARB_color_buffer_float)
+		} else if(GLEW_ARB_color_buffer_float && GLEW_ARB_texture_float) { printf("float pixels in map fbo\n");
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F_ARB,  width, height, 0, GL_RGB, GL_FLOAT, NULL);
-		else
+		} else
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 		static float foo[] = {0.0, 0.0, 0.0 };
 		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, foo);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, map_fbo_tex[i], 0);
-		glViewport(0,0,width, height);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	}
 	glPopAttrib();
 }
@@ -169,70 +163,8 @@ static void do_frame(int src_tex, int draw_tex, int im_w, int im_h, struct point
 	glPopAttrib();
 }
 
-#include <complex.h>
-
-static Pixbuf *mandel_surf;
-static GLuint mandel_tex;
-
-void init_mandel()
-{
-	mandel_surf = malloc(sizeof(Pixbuf));
-	mandel_surf->bpp  = 8; mandel_surf->w = mandel_surf->h = 256;
-	mandel_surf->pitch = mandel_surf->w*sizeof(uint8_t);
-	uint8_t *data = mandel_surf->data = malloc(mandel_surf->w * mandel_surf->h * sizeof(uint8_t));
-
-	for(int y=0; y < mandel_surf->h; y++) {
-		for(int x=0; x < mandel_surf->w; x++) {
-			double complex z0 = x*2.0f/mandel_surf->w - 1.5 + (y*2.0f/mandel_surf->h - 1)*I;
-			double complex z = z0;
-			int i=0; while(cabs(z) < 2 && i < 255) {
-				i++;
-				z = z*z + z0;
-			}
-			data[y*mandel_surf->w + x] = 255 - i;
-		}
-	}
-	glPushAttrib(GL_TEXTURE_BIT);
-	glGenTextures(1, &mandel_tex);
-	glBindTexture(GL_TEXTURE_2D, mandel_tex);
-	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_LUMINANCE, mandel_surf->w, mandel_surf->h, GL_LUMINANCE, GL_UNSIGNED_BYTE, mandel_surf->data);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glPopAttrib();
-}
-
-void render_mandel(struct point_data *pd)
-{
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-	glBindTexture(GL_TEXTURE_2D, mandel_tex);
-	glBegin(GL_QUADS);
-//		glTexCoord2d(0.0,1.0); glVertex2f(0.5f,  1.0f);
-//		glTexCoord2d(1.0,1.0); glVertex2f(1.0f,  1.0f);
-//		glTexCoord2d(1.0,0.0); glVertex2f(1.0f,  0.5f);
-//		glTexCoord2d(0.0,0.0); glVertex2f(0.5f,  0.5f);
-		glTexCoord2d(0.0,1.0); glVertex2f(0.0f,  1.0f);
-		glTexCoord2d(1.0,1.0); glVertex2f(1.0f,  1.0f);
-		glTexCoord2d(1.0,0.0); glVertex2f(1.0f,  0.0f);
-		glTexCoord2d(0.0,0.0); glVertex2f(0.0f,  0.0f);
-	glEnd();
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glPointSize(2);
-	glBegin(GL_POINTS);
-		glColor3f(0.0f, 1.0f, 0.0f);
-		glVertex2d((pd->p[0]+1.0)*0.5, 1-(pd->p[1]+1)*0.5);
-//		glVertex2d((pd->p[0]+1.0)*0.25+0.5, 1-(pd->p[1]+1)*0.25);
-	glEnd();
-	glBegin(GL_POINTS);
-		glColor3f(1.0f, 0.0f, 0.0f);
-		glVertex2d((pd->t[0]+1.0)*0.5, 1-(pd->t[1]+1)*0.5);
-//		glVertex2d((pd->t[0]+1.0)*0.25+0.5, 1-(pd->t[1]+1)*0.25);
-	glEnd();
-	glPopAttrib();
-}
+void init_mandel();
+void render_mandel(struct point_data *pd);
 
 int main(int argc, char **argv)
 {
@@ -245,7 +177,7 @@ int main(int argc, char **argv)
 	printf("GL_VERSION: %s\n", glGetString(GL_VERSION));
 	printf("GL_SL_VERSION: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 	printf("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
-	printf("GL_EXTENSIONS: %s\n", glGetString(GL_EXTENSIONS));
+//	printf("GL_EXTENSIONS: %s\n", glGetString(GL_EXTENSIONS));
 	printf("\n\n");
 
 
@@ -266,7 +198,6 @@ int main(int argc, char **argv)
 	init_pal_tex();
 	init_mandel();
 	audio_init(&opts);
-
 	setup_opengl(im_w, im_h);
 	gl_maxsrc_init(IMIN(im_w/2, 512), IMIN(im_h/2, 512));
 	setup_map_fbo(im_w, im_h);

@@ -137,7 +137,7 @@ int audio_setup(int sr)
 }
 
 
-int audio_setup_pa();
+int audio_setup_pa(opt_data *od);
 int jack_setup(opt_data *);
 int pulse_setup();
 
@@ -154,7 +154,7 @@ int audio_init(opt_data *od)
 		rc = pulse_setup(od);
 	else
 	#endif
-		rc = audio_setup_pa();
+		rc = audio_setup_pa(od);
 
 	usleep(10000); // wait a bit so we have some audio in the buffer (instead of garbage)
 	return rc;

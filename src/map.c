@@ -22,7 +22,7 @@
 MAP_FUNC_ATTR void soft_map(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
 	const float xstep = 2.0f/w, ystep = 2.0f/h;
-	const float x0 = pd->p[0]*0.25f + 0.5f, y0=pd->p[1]*0.25f + 0.5f;
+	const float x0 = (pd->p[0]-0.5f)*0.25f + 0.5f, y0=pd->p[1]*0.25f + 0.5f;
 	for(int yd = 0; yd < h; yd++) {
 		float v = yd*ystep - 1.0f;
 		for(int xd = 0; xd < w; xd++) {
@@ -44,7 +44,7 @@ MAP_FUNC_ATTR void soft_map(uint16_t *restrict out, uint16_t *restrict in, int w
 MAP_FUNC_ATTR void soft_map_bl(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
 	const float xstep = 2.0f/w, ystep = 2.0f/h;
-	const float x0 = pd->p[0]*0.25f + 0.5f, y0=pd->p[1]*0.25f + 0.5f;
+	const float x0 = (pd->p[0]-0.5f)*0.25f + 0.5f, y0=pd->p[1]*0.25f + 0.5f;
 	for(int yd = 0; yd < h; yd++) {
 		float v = yd*ystep - 1.0f;
 		for(int xd = 0; xd < w; xd++) {
@@ -70,7 +70,7 @@ MAP_FUNC_ATTR void soft_map_bl(uint16_t *restrict out, uint16_t *restrict in, in
 MAP_FUNC_ATTR void soft_map_line_buff(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
-	const float x0 = pd->p[0]*0.25f + 0.5f, y0=pd->p[1]*0.25f + 0.5f;
+	const float x0 = (pd->p[0]-0.5f)*0.25f + 0.5f, y0=pd->p[1]*0.25f + 0.5f;
 	const int buf_w = w/BLOCK_SIZE;
 #ifndef  __SSE2__
 //#if 1
@@ -223,7 +223,7 @@ MAP_FUNC_ATTR void soft_map_line_buff(uint16_t *restrict out, uint16_t *restrict
 MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict __attribute__((aligned (16))) out, uint16_t *restrict __attribute__ ((aligned (16))) in, int w, int h, const struct point_data *pd)
 {
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
-	const float x0 = pd->p[0]*0.25f + 0.5f, y0=pd->p[1]*0.25f + 0.5f;
+	const float x0 = (pd->p[0]-0.5f)*0.25f + 0.5f, y0=pd->p[1]*0.25f + 0.5f;
 
 	float v0 = -1.0f;
 	for(int yd = 0; yd < h; yd+=BLOCK_SIZE) {

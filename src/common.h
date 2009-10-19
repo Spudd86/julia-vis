@@ -27,6 +27,8 @@
 #define MIN(a,b) IMIN(a,b)
 #endif
 
+typedef enum { AUDIO_PORTAUDIO, AUDIO_PULSE, AUDIO_JACK } opt_audio_drv;
+
 typedef struct {
 	int w, h;
 	int fullscreen;
@@ -38,6 +40,10 @@ typedef struct {
 	int hw_pallet;
 	int rational_julia;
 	const char *jack_opt;
+	int audiodev;
+
+	opt_audio_drv audio_driver;
+	const char *audio_opts;
 }opt_data;
 
 void optproc(int argc, char **argv, opt_data *res);

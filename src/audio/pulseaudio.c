@@ -8,7 +8,6 @@
 #include "audio.h"
 
 //TODO: make this whole thing suck less
-//TODO: figure out how to force fragment size down (seems like we're not getting audio often enough)
 #include <pulse/pulseaudio.h>
 
 #include <pthread.h>
@@ -60,7 +59,10 @@ static void context_state_callback(pa_context *c, void *userdata) {
             stream = pa_stream_new(c, "foo", &sample_spec, NULL);
             pa_stream_set_state_callback(stream, stream_state_callback, NULL);
             pa_stream_set_read_callback(stream, stream_read_callback, NULL);
-			pa_stream_connect_record(stream, NULL, NULL, 0);
+
+            pa_buffer_attr buf_attr = { -1, -1, -1, -1, 1024*2 }; //TODO: adjust latency
+			pa_stream_connect_record(stream, NULL, &buf_attr, PA_STREAM_ADJUST_LATENCY);
+			// TODO use PA_STREAM_FIX_RATE
             break;
         }
 
@@ -75,41 +77,41 @@ static void context_state_callback(pa_context *c, void *userdata) {
     }
 }
 
-static int pulse_run() 
+static int pulse_run()
 {
 	int ret;
 	if (pa_mainloop_run(pulse_ml, &ret) < 0) {
         fprintf(stderr, "pa_mainloop_run() failed.\n");
 		abort();
-    }	
+    }
 	return ret;
 }
 
 static pthread_t pulse_thread;
 
-int pulse_setup() 
-{	
+int pulse_setup()
+{
 	setenv("PULSE_PROP_application.name", "Fractal Visualizer", 1);
 
 	audio_setup(44100);
 	pulse_ml = pa_mainloop_new();
 	mainloop_api = pa_mainloop_get_api(pulse_ml);
-	
+
 	if (!(context = pa_context_new(mainloop_api, "fractal_test"))) {
         fprintf(stderr, "pa_context_new() failed.\n");
         goto quit;
     }
 	pa_context_set_state_callback(context, context_state_callback, NULL);
-	
+
     if (pa_context_connect(context, NULL, PA_CONTEXT_NOAUTOSPAWN, NULL) < 0) {
         fprintf(stderr, "pa_context_connect() failed: %s", pa_strerror(pa_context_errno(context)));
         goto quit;
     }
-	
+
 	pthread_create(&pulse_thread, NULL, &pulse_run, NULL);
-	
+
 	return 0;
-	
+
 quit:
 	if (stream)
         pa_stream_unref(stream);
