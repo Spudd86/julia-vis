@@ -147,7 +147,7 @@ void gl_maxsrc_update(Uint32 now) {
 	glBindTexture(GL_TEXTURE_2D, max_fbo_tex[cur_tex]);
 	glUseProgramObjectARB(shader_prog);
 	glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0);
-	glUniformMatrix3fvARB(glGetUniformLocationARB(shader_prog, "R"), 1, 0, R);
+	glUniformMatrix3fvARB(glGetUniformLocationARB(shader_prog, "R"), 1, 0, (float *)R);
 	glBegin(GL_QUADS);
 		glTexCoord2d(-1,-1); glVertex2d( 1,  1);
 		glTexCoord2d( 1,-1); glVertex2d(-1,  1);
@@ -182,6 +182,7 @@ void gl_maxsrc_update(Uint32 now) {
 		glTexCoord2d(0.0,0.0); glVertex3f(x-pw, y+ph, z);
 	} glEnd();
 
+	audio_finish_samples();
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glPopClientAttrib();
 	glPopAttrib();

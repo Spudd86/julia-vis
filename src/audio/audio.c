@@ -15,12 +15,17 @@ static tribuf *samp_tb = NULL;
 static tribuf *fft_tb = NULL;
 #endif
 
+typedef void (*audio_drv_shutdown_t)();
+audio_drv_shutdown_t audio_drv_shutdown = NULL;
+
 int audio_get_buf_count(void) {
 	return buf_count;
 }
 
 void audio_shutdown()
 {
+	if(audio_drv_shutdown != NULL) audio_drv_shutdown();
+
 	printf("audio shutting down\n");
 	//tribuf_destroy(samp_tb);
 	fftwf_free(fft_tmp);
@@ -82,16 +87,17 @@ void audio_update(const float * __attribute__ ((aligned (16))) in, int n)
 int audio_get_samples(audio_data *d) {
 	d->len = nr_samp;
 	d->data = tribuf_get_read(samp_tb);
-	tribuf_finish_read(samp_tb); // TODO: fix interface so this doesn't need to be here
 	return 0;
 }
+void audio_finish_samples(void) { tribuf_finish_read(samp_tb); }
+
 #ifdef FFT_TRIBUF
 int audio_get_fft(audio_data *d) {
 	d->len = nr_samp/2+1;
 	d->data = tribuf_get_read(fft_tb);
-	tribuf_finish_read(fft_tb); // TODO: fix interface so this doesn't need to be here
 	return 0;
 }
+void audio_fft_finsih_read(void) { tribuf_finish_read(fft_tb); }
 
 static void *fft_data[3];
 #endif
@@ -113,8 +119,6 @@ int audio_setup(int sr)
 
 	p = fftwf_plan_r2r_1d(nr_samp, fft_tmp, fft_tmp, FFTW_R2HC, 0);
 
-	//~ float *samp_bufs = fftwf_malloc(sizeof(float) * nr_samp * 3);
-	//~ if(!samp_bufs) {fprintf(stderr, "Memory allocation failed"); exit(1); }
 	samp_data[0] = samp_bufs;
 	samp_data[1] = samp_data[0] + nr_samp;
 	samp_data[2] = samp_data[1] + nr_samp;
@@ -131,30 +135,42 @@ int audio_setup(int sr)
 
 	beat_setup();
 
-	atexit(audio_shutdown);
-
 	return 0;
 }
 
 
 int audio_setup_pa(opt_data *od);
+void audio_stop_pa();
 int jack_setup(opt_data *);
-int pulse_setup();
+void jack_shutdown();
+int pulse_setup(opt_data *);
+void pulse_shutdown();
 
 int audio_init(opt_data *od)
 {
 	int rc;
+	switch(od->audio_driver) {
 	#ifdef HAVE_JACK
-	if(od->use_jack)
-		rc = jack_setup(od);
-	else
+		case AUDIO_JACK:
+			rc = jack_setup(od);
+			audio_drv_shutdown = jack_shutdown;
+			break;
 	#endif
 	#ifdef HAVE_PULSE
-	if(od->use_pulse)
-		rc = pulse_setup(od);
-	else
+		case AUDIO_PULSE:
+			rc = pulse_setup(od);
+			audio_drv_shutdown = pulse_shutdown;
+			break;
 	#endif
-		rc = audio_setup_pa(od);
+		case AUDIO_PORTAUDIO:
+			rc = audio_setup_pa(od);
+			audio_drv_shutdown = audio_stop_pa;
+			break;
+		default:
+			rc = -1;
+	}
+
+	atexit(audio_shutdown);
 
 	usleep(10000); // wait a bit so we have some audio in the buffer (instead of garbage)
 	return rc;

@@ -1,6 +1,7 @@
 #include "common.h"
 #include <stdio.h>
 #include <getopt.h>
+#include <string.h>
 
 #ifdef HAVE_ORC
 #include <orc/orc.h>
@@ -16,13 +17,13 @@ static const char *helpstr =
 "\t-d try to enable double buffering\n"
 
 "\t-i <driver>[:opts] select audio input driver\n"
-
-"\t-z [num] select audio device\n"
+"\t\tdrivers:\n"
+"\t\t  portaudio: default, optionally specify a device number (they are listed at startup)\n"
 #ifdef HAVE_JACK
-"\t-j use jack optionally specify a pattern of ports to connect to\n"
+"\t\t  jack: optionally specify a pattern of ports to connect to\n"
 #endif
 #ifdef HAVE_PULSE
-"\t-u use pulseaudio for audio input"
+"\t\t  pulse: use pulseaudio no options\n"
 #endif
 ;
 //TODO: change audio input selection to be something like -i <driver>:<driver_opts>
@@ -42,17 +43,13 @@ void optproc(int argc, char **argv, opt_data *res)
 	res->maxsrc_rate = 12;
 	res->doublebuf = 0;
 	res->hw_pallet = 0;
-	res->use_jack = 0;
-	res->use_pulse = 0;
 	res->rational_julia = 0;
-	res->jack_opt = NULL;
-	res->audiodev = -1;
 
 	res->audio_driver = AUDIO_PORTAUDIO;
 	res->audio_opts = NULL;
 
-//	while((opt = getopt(argc, argv, "w:h:s:a:i:rftpd")) != -1) {
-	while((opt = getopt(argc, argv, "w:h:s:a:z:urftpdj::")) != -1) {
+	while((opt = getopt(argc, argv, "w:h:s:a:i:rftpd")) != -1) {
+//	while((opt = getopt(argc, argv, "w:h:s:a:z:urftpdj::")) != -1) {
 		switch(opt) {
 			case 'w':
 				res->w = atoi(optarg);
@@ -72,34 +69,21 @@ void optproc(int argc, char **argv, opt_data *res)
 			case 'p':
 				res->hw_pallet = 1;
 				break;
-//			case 'i': {
-//				char *drvstr = strdup(optarg);
-//				char *drvopt = strchr(drvstr, ':');
-//				if(drvopt != NULL) { *drvopt = '\0'; drvopt++;}
-//				res->audio_opts = drvopt;
-//				if(!strcmp(drvstr, "portaudio")) ;
-//#ifdef HAVE_PULSE
-//				else if(!strcmp(drvstr, "pulse")) res->audio_driver = AUDIO_PULSE;
-//#endif
-//#ifdef HAVE_JACK
-//				else if(!strcmp(drvstr, "jack")) res->audio_driver = AUDIO_JACK;
-//#endif
-//				else fprintf(stderr, "Bad audio driver name %s, using portaudio\n", drvstr);
-//			} break;
-			#ifdef HAVE_JACK
-			case 'j':
-				res->use_jack = 1;
-				res->jack_opt = optarg;
-				break;
-			#endif
-			#ifdef HAVE_PULSE
-			case 'u':
-				res->use_pulse = 1;
-				break;
-			#endif
-			case 'z':
-				res->audiodev = atoi(optarg);
-				break;
+			case 'i': {
+				char *drvstr = strdup(optarg);
+				char *drvopt = strchr(drvstr, ':');
+				if(drvopt != NULL) { *drvopt = '\0'; drvopt++;}
+//				printf("driver = '%s'\n", drvstr);
+				res->audio_opts = drvopt;
+				if(!strcmp(drvstr, "portaudio")) ;
+#ifdef HAVE_PULSE
+				else if(!strcmp(drvstr, "pulse")) {res->audio_driver = AUDIO_PULSE; }
+#endif
+#ifdef HAVE_JACK
+				else if(!strcmp(drvstr, "jack")) res->audio_driver = AUDIO_JACK;
+#endif
+				else fprintf(stderr, "Bad audio driver name %s, using portaudio\n", drvstr);
+			} break;
 			case 's':
 				res->draw_rate = atoi(optarg);
 				break;

@@ -87,7 +87,7 @@ MAP_FUNC_ATTR void soft_map_line_buff(uint16_t *restrict out, uint16_t *restrict
 		}
 	}
 #else
-	const __m128 uvecs = _mm_set1_ps(ustep);
+//	const __m128 uvecs = _mm_set1_ps(ustep);
 	const __m128 x0vec = _mm_set1_ps(x0), y0vec = _mm_set1_ps(y0);
 	const __m128 xmul = _mm_set1_ps(w*256), ymul = _mm_set1_ps(h*256);
 	const __m128 xmax = _mm_set1_ps((w-1)*256), ymax = _mm_set1_ps((h-1)*256);
@@ -95,7 +95,7 @@ MAP_FUNC_ATTR void soft_map_line_buff(uint16_t *restrict out, uint16_t *restrict
 	_MM_SET_ROUNDING_MODE(_MM_ROUND_NEAREST);
 	_MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
 	void fill_line_buff(float v, int *line) {
-		__m128i *ln = line;
+		__m128i *ln = (__m128i *)line;
 //		__m128 uvec = _mm_set_ps(-1.0f, 1*ustep-1.0f, 2*ustep-1.0f, 3*ustep-1.0f);
 		for(int x=0; x<buf_w; x+=4) {
 			const __m128 vvec = _mm_set1_ps(v);
@@ -205,7 +205,7 @@ MAP_FUNC_ATTR void soft_map_line_buff(uint16_t *restrict out, uint16_t *restrict
 		}
 	}
 
-	__m128i foo;
+//	__m128i foo;
 	int line_buff1[buf_w*2];
 	int line_buff2[buf_w*2];
 

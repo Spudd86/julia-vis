@@ -11,7 +11,7 @@ typedef struct {
 	int have_vbos;
 	union {
 		struct {GLint indbo, vertbo, texbo; };
-		GLint bos[3];
+		GLuint bos[3];
 	};
 }MapMesh;
 

@@ -32,11 +32,13 @@ void beat_update(float *fft, int fft_len);
 
 int audio_init(opt_data *);
 int audio_setup(int sr);
+void audio_shutdown();
 void audio_update(const float *in, int n);
 int audio_get_buf_count(void);
 
 int audio_get_samples(audio_data *d);
 void audio_finish_samples(void);
 int audio_get_fft(audio_data *d);
+void audio_fft_finsih_read(void);
 
 #endif

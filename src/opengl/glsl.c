@@ -166,11 +166,18 @@ static void do_frame(int src_tex, int draw_tex, int im_w, int im_h, struct point
 void init_mandel();
 void render_mandel(struct point_data *pd);
 
+static int make_pow2(int x) {
+	int t = x, n = 0;
+	while(t != 1) { t = t>>1; n++; }
+	if(x == 1<<n ) return x;
+	else return 1<<(n+1);
+}
+
 int main(int argc, char **argv)
 {
 	optproc(argc, argv, &opts);
 	SDL_Surface *screen = sdl_setup_gl(&opts, IM_SIZE);
-	int im_w = screen->w, im_h = screen->h;
+	int im_w = make_pow2(IMAX(screen->w, screen->h)), im_h = im_w; //TODO: nearest power of two
 	glewInit();
 
 	printf("GL_VENDOR: %s\n", glGetString(GL_VENDOR));
@@ -198,7 +205,7 @@ int main(int argc, char **argv)
 	init_pal_tex();
 	init_mandel();
 	audio_init(&opts);
-	setup_opengl(im_w, im_h);
+	setup_opengl(screen->w, screen->h);
 	gl_maxsrc_init(IMIN(im_w/2, 512), IMIN(im_h/2, 512));
 	setup_map_fbo(im_w, im_h);
 	map_prog = compile_program(NULL, map_frag_shader);
@@ -215,7 +222,7 @@ int main(int argc, char **argv)
 	int cnt = 0;
 	int beats = beat_get_count();
 	Uint32 last_beat_time = tick0, lastpalstep = tick0;
-	Uint32  maxfrms = 0;
+//	Uint32  maxfrms = 0;
 
 	Uint32 src_tex = 0, dst_tex = 1;
 

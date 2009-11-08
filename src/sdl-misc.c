@@ -113,16 +113,11 @@ static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl)
 
 void DrawText(SDL_Surface* screen, const char* text)
 {
-    SDL_Surface *text_surface = TTF_RenderText_Solid(font, text, (SDL_Color){255,255,255});
+    SDL_Surface *text_surface = TTF_RenderText_Solid(font, text, (SDL_Color){255,255,255,255});
     if (text_surface == NULL) return;
 
 	SDL_BlitSurface(text_surface, NULL, screen, NULL);
 	SDL_FreeSurface(text_surface);
 }
 
-SDL_Surface *DrawTextGL(const char* text)
-{
-    SDL_Surface *text_surface = TTF_RenderText_Solid(font, text, (SDL_Color){255,255,255});
-    return text_surface;
-}
 

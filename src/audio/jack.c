@@ -27,7 +27,7 @@ static int process (jack_nframes_t nframes, void *arg)
 
 static jack_client_t *client;
 
-static void shutdown(void) {
+void jack_shutdown(void) {
 	jack_client_close (client);
 }
 
@@ -54,10 +54,9 @@ int jack_setup(opt_data *od)
 		fprintf (stderr, "cannot activate client");
 		exit(1);
 	}
-	atexit(&shutdown);
 
-	if(od->jack_opt !=NULL) { // connect to some ports!
-		const char **ports = jack_get_ports(client, od->jack_opt, NULL, JackPortIsOutput);
+	if(od->audio_opts !=NULL) { // connect to some ports!
+		const char **ports = jack_get_ports(client, od->audio_opts, NULL, JackPortIsOutput);
 		if(ports == NULL) return 0;
 		for(int i=0; ports[i]!=NULL; i++)
 			jack_connect(client, ports[i], jack_port_name(in_port));

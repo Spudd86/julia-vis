@@ -78,10 +78,12 @@ int scope_init(int width, int height)
 	glPopAttrib();
 
 	scope_init_done= 1;
+
+	return 0;
 }
 
 
-static float tx=0, ty=0, tz=0;
+//static float tx=0, ty=0, tz=0;
 static inline float getsamp(audio_data *d, int i, int w) {
 	float res = 0;
 	int l = IMAX(i-w, 0);
@@ -97,7 +99,7 @@ static inline float getsamp(audio_data *d, int i, int w) {
 void render_scope()
 {
 	if(!scope_init_done) abort();
-	GLenum err = GL_NONE;
+//	GLenum err = GL_NONE;
 
 	audio_data ad;
 	audio_get_samples(&ad);
@@ -142,6 +144,7 @@ void render_scope()
 //	glTexCoord2d(1.0,0.0); glVertex3f(x+pw, y-ph, 0);
 //	glEnd();
 
+	audio_finish_samples();
 	glPopClientAttrib();
 	glPopAttrib();
 
@@ -187,6 +190,7 @@ void render_scope()
 ////	glVertexPointer(2, GL_FLOAT, 2*sizeof(float), verts);
 ////	glDrawElements(GL_POINTS, samp, GL_UNSIGNED_SHORT, index);
 //	if((err=glGetError()) != GL_NONE) printf("Error\n");
+//	audio_finish_samples();
 //	glPopClientAttrib();
 //	glPopAttrib();
 }

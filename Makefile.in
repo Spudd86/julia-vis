@@ -79,6 +79,9 @@ endif
 ifeq ($(ENABLE_PULSE),yes)
 AUDIO_SRCS += src/audio/pulseaudio.c
 endif
+
+AUDIO_OBJS = $(AUDIO_SRCS:.c=.o)
+
 ifeq ($(ENABLE_DIRECTFB),yes)
 ALL_BINS += bin/dfb-test$(EXEEXT)
 endif
@@ -139,6 +142,10 @@ bin/audio-test$(EXEEXT): $(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/o
 	$(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c $(TRIBUF_SRCS) src/line.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
 
+
+src/audio/%.o: src/audio/%.c Makefile config.mk
+	$(CC) $(CFLAGS) $(AUDIO_FLAGS) -c $< -o $@
+	
 %.s: %.c src/*.h Makefile config.mk
 	$(CC) $< $(CFLAGS) -S -o $@
 

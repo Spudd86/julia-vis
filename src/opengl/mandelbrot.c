@@ -21,7 +21,7 @@ static inline __attribute__((always_inline)) double sqrd(double x) {return x*x;}
 void init_mandel()
 {
 	mandel_surf = malloc(sizeof(Pixbuf));
-	mandel_surf->w = mandel_surf->h = 1024;
+	mandel_surf->w = mandel_surf->h = 512;
 	mandel_surf->pitch = mandel_surf->w*sizeof(uint8_t);
 	mandel_surf->bpp  = 8; uint8_t *data = mandel_surf->data = malloc(mandel_surf->w * mandel_surf->h * sizeof(*data));
 

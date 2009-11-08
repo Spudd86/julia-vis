@@ -35,12 +35,8 @@ typedef struct {
 	unsigned int maxsrc_rate;
 	int draw_rate;
 	int doublebuf;
-	int use_jack;
-	int use_pulse;
 	int hw_pallet;
 	int rational_julia;
-	const char *jack_opt;
-	int audiodev;
 
 	opt_audio_drv audio_driver;
 	const char *audio_opts;
@@ -72,5 +68,9 @@ typedef struct {
 	int bpp;
 	void *data;
 }Pixbuf;
+
+typedef struct {
+	uint16_t w, h;
+} ivec;
 
 #endif

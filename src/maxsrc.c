@@ -150,6 +150,7 @@ void maxsrc_update(void)
 		float yi = y*zvd*ih*3/4+ih/2 - pnt_h/2;
 		draw_point(dst, xi, yi);
 	}
+	audio_finish_samples();
 	next_src = prev_src;
 	prev_src = dst;
 
