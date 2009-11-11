@@ -26,6 +26,10 @@ if test "x$enable_3dnow" = xyes; then
 	CFLAGS="$CFLAGS -mmmx -m3dnow"
 fi
 
+enable_opengl=yes
+AC_ARG_ENABLE([opengl], AS_HELP_STRING([--enable-opengl], [enable opengl based versions (default: enabled)]))
+AC_SUBST(enable_opengl)
+
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_CC_C99

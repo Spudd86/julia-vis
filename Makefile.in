@@ -27,6 +27,7 @@ INSTALL = @INSTALL@
 ENABLE_JACK=@enable_jack@
 ENABLE_PULSE=@enable_pulseaudio@
 ENABLE_DIRECTFB=@enable_directfb@
+ENABLE_OPENGL=@enable_opengl@
 
 -include config.mk
 
@@ -69,7 +70,10 @@ AUDIO_FLAGS = $(PA_FLAGS) $(JACK_FLAGS) $(PULSE_FLAGS)
 SDL_FLAGS = @SDL_CFLAGS@ @SDL_LIBS@ -lSDL_ttf -lm
 DFB_FLAGS = @DIRECTFB_CFLAGS@ @DIRECTFB_LIBS@
 
-ALL_BINS := bin/sdl-test$(EXEEXT) bin/sdlthread-test$(EXEEXT) bin/audio-test$(EXEEXT) bin/glsl-test$(EXEEXT) bin/gl-test$(EXEEXT)
+ALL_BINS := bin/sdl-test$(EXEEXT) bin/sdlthread-test$(EXEEXT) bin/audio-test$(EXEEXT)
+ifeq ($(ENABLE_OPENGL),yes) 
+	ALL_BINS += bin/glsl-test$(EXEEXT) bin/gl-test$(EXEEXT)
+endif
 
 AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/portaudio.c 
 
@@ -117,6 +121,7 @@ bin/sdl-test$(EXEEXT): src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS
 	src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
 
+ifeq ($(ENABLE_OPENGL),yes)
 bin/gl-test$(EXEEXT): src/opengl/opengl_fix.c src/opengl/drawscope.c src/opengl/fixed_map.c src/opengl/glmisc.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
 	src/opengl/opengl_fix.c src/opengl/drawscope.c src/opengl/fixed_map.c src/opengl/glmisc.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c \
@@ -126,6 +131,7 @@ bin/glsl-test$(EXEEXT): src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxs
 	$(CC) $(CFLAGS) -DUSE_SDL \
 	src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/mandelbrot.c src/pallet.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/optproc.c src/points.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -L/usr/X11R6/lib -lGL -lGLU -lGLEW -o $@
+endif
 
 bin/sdlthread-test$(EXEEXT): src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL -DTRIBUF_LOCKING \
