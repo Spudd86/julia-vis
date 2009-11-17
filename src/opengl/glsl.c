@@ -176,7 +176,7 @@ int main(int argc, char **argv)
 {
 	optproc(argc, argv, &opts);
 	SDL_Surface *screen = sdl_setup_gl(&opts, IM_SIZE);
-	int im_w = make_pow2(IMAX(screen->w, screen->h)), im_h = im_w; //TODO: nearest power of two
+	int im_w = IMAX(make_pow2(IMAX(screen->w, screen->h)), 128), im_h = im_w; //TODO: nearest power of two
 	glewInit();
 
 	printf("GL_VENDOR: %s\n", glGetString(GL_VENDOR));
