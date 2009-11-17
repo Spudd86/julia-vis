@@ -303,7 +303,7 @@ int main(int argc, char **argv)
 		beats = newbeat;
 
 		now = SDL_GetTicks();
-		if(now - fps_oldtime < 2) SDL_Delay(2); // stay below 500FPS
+		if(now - fps_oldtime < 8) SDL_Delay(9 - (now-fps_oldtime)); // stay below ~125 FPS
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		fps_oldtime = now;
 		cnt++;
