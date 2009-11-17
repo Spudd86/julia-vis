@@ -55,9 +55,9 @@ static const char *map_frag_shader =
 	"uniform sampler2D maxsrc;"
 	"uniform vec2 c;"
 	"void main() {"
-	"	float u = gl_TexCoord[1].s, v = gl_TexCoord[1].t;"
+	"	vec2 t = gl_TexCoord[1].st * gl_TexCoord[1].st;"
 	"	gl_FragData[0] = max("
-	"			texture2D(prev, vec2(u*u - v*v + c.x, 2*u*v + c.y)),"
+	"			texture2D(prev, vec2(t.x - t.y, 2*gl_TexCoord[1].x*gl_TexCoord[1].y) + c),"
 	"			texture2D(maxsrc, gl_TexCoord[0].st));"
 	"}";
 
@@ -65,8 +65,7 @@ static const char *pal_frag_shader =
 	"uniform sampler2D src;"
 	"uniform sampler1D pal;"
 	"void main() {"
-	"	float s = float(texture2D(src, vec2(gl_TexCoord[0])));"
-	"	gl_FragColor = texture1D(pal, s);"
+	"	gl_FragColor = texture1D(pal, float(texture2D(src, vec2(gl_TexCoord[0]))));"
 	"}";
 
 GLuint disp_texture;

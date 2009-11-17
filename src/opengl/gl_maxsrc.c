@@ -80,19 +80,19 @@ static GLhandleARB shader_prog;
 //TODO: fallback to fixed_map if no shaders at all
 static const char *frag_src =
 	"uniform sampler2D prev;"
-	"uniform mat3 R;" //TODO: change R into one mat3x2 and one mat2x3
+	"uniform mat3 R;"
 	"void main() {"
 	"	vec2 uv = gl_TexCoord[0].st;"
-	"	float d = 0.97f + 0.03f*length(uv);"
-//	"	vec3 p=vec3((uv.x*R[0][0] + uv.y*R[0][1]),"
-//	"				(uv.x*R[1][0] + uv.y*R[1][1])*d,"
-//	"				(uv.x*R[2][0] + uv.y*R[2][1])*d);"
+	"	float d = 0.95f + 0.05f*length(uv);"
+	"	vec3 p=vec3((uv.x*R[0][0] + uv.y*R[0][1]),"
+	"				(uv.x*R[1][0] + uv.y*R[1][1])*d,"
+	"				(uv.x*R[2][0] + uv.y*R[2][1])*d);"
 //	"	uv = vec2(	p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0],"
 //	"				p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]);"
-//	"	uv = (uv + 1)*0.5f;"
-	"	vec3 p = R*(vec3(uv, 0)*R*-vec3(1, d, d));" //TODO: figure out if this is actually faster...
-	"	uv = (vec2(p) + 1)*0.5f;"
-	"	gl_FragData[0] = texture2D(prev, uv)*(126/128.0f);"
+//	"	vec3 p = R*(vec3(uv, 0)*R*-vec3(1, d, d));"
+	"	vec4 c = texture2D(prev, vec2(R*p)*0.5f + 0.5f);"
+	"	gl_FragData[0].x = (c.x - max(0.5f/256.0f, c.x*(1/128.0f)));" //TODO: only do this if tex format not precise enough
+//	"	gl_FragData[0] = texture2D(prev, (vec2(p) + 1)*0.5f)*(63/64.0f);"
 	"}";
 
 //TODO: fallback to glCopyTexImage2D/glCopyTexSubImage2D if no FBO's
@@ -168,6 +168,7 @@ void gl_maxsrc_update(Uint32 now) {
 	float pw = 0.5f*fmaxf(1.0f/38, 10.0f/iw), ph = 0.5f*fmaxf(1.0f/38, 10.0f/ih);
 	glBindTexture(GL_TEXTURE_2D, pnt_tex);
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
 	glBegin(GL_QUADS); for(int i=0; i<samp; i++) {
 		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
