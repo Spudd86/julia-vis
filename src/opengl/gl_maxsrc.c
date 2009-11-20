@@ -15,6 +15,8 @@
 
 #include "gl_maxsrc.h"
 
+#include <assert.h>
+
 static GLuint max_fbo, max_fbo_tex[2];
 static int cur_tex = 0;
 static int iw, ih;
@@ -78,21 +80,29 @@ static GLuint pnt_tex;
 static GLhandleARB shader_prog;
 //TODO: ARB_vertex_program version (fallback if no GLSL)
 //TODO: fallback to fixed_map if no shaders at all
+
+//TODO: use 2 basis vectors to find p instead of matrix op
+// ie, uniform vec3 a,b; 
+//     where a = <1,0,0>*R, b = <0, 1, 0>*R
+// then vec3 p = (uv.x*a + uv.y*b)*vec3(1,d,d);
+// and final co-ords are still R*p, except we can make R a mat3x2 and maybe save some MAD's
+
 static const char *frag_src =
+	"#version 120\n"
 	"uniform sampler2D prev;"
-	"uniform mat3 R;"
+	"invariant uniform mat2x3 R;"
 	"void main() {"
-	"	vec2 uv = gl_TexCoord[0].st;"
-	"	float d = 0.95f + 0.05f*length(uv);"
-	"	vec3 p=vec3((uv.x*R[0][0] + uv.y*R[0][1]),"
-	"				(uv.x*R[1][0] + uv.y*R[1][1])*d,"
-	"				(uv.x*R[2][0] + uv.y*R[2][1])*d);"
-//	"	uv = vec2(	p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0],"
-//	"				p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]);"
-//	"	vec3 p = R*(vec3(uv, 0)*R*-vec3(1, d, d));"
-	"	vec4 c = texture2D(prev, vec2(R*p)*0.5f + 0.5f);"
-	"	gl_FragData[0].x = (c.x - max(0.5f/256.0f, c.x*(1/128.0f)));" //TODO: only do this if tex format not precise enough
-//	"	gl_FragData[0] = texture2D(prev, (vec2(p) + 1)*0.5f)*(63/64.0f);"
+	"	vec3 p = vec3(0.5f);"
+	"	{"
+	"		vec2 uv = gl_TexCoord[0].st;"
+	"		float d = 0.97f*0.5f + (0.03f*0.5f)*length(uv);"
+	"		p.yz = vec2(d); p = (uv.x*R[0] + uv.y*R[1])*p;" //NOTE: on mesa 7.6's compiler p*= generates more code for some reason
+	"	}"
+	"	vec4 c = texture2D(prev, p*R + 0.5f);"
+	"	gl_FragData[0].x = (c.x - max(3/256.0f, c.x*(6.0f/256)));" //TODO: only do this if tex format not precise enough
+//	"	gl_FragData[0].x = (c.x - c.x*(2/128.0f));
+//	"	gl_FragData[0] = texture2D(prev, vec2(p*R)*0.5f + 0.5f)*(63/64.0f);"
+//	"	gl_FragData[0] = (texture2D(prev, vec2(p*R)*0.5f + 0.5f) - (2/256.0f));"
 	"}";
 
 //TODO: fallback to glCopyTexImage2D/glCopyTexSubImage2D if no FBO's
@@ -118,22 +128,10 @@ void gl_maxsrc_update(Uint32 now) {
 	int next_tex = (cur_tex+1)%2;
 	float dt = 1;
 	if(lastupdate != -1) {
-		dt = (now - lastupdate)*0.05f;
+//		dt = (now - lastupdate)*0.05f;
 		if(now - lastupdate < 20) return; // limit to 100FPS
 	}
 	lastupdate = now;
-
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
-	glActiveTexture(GL_TEXTURE0);
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, max_fbo);
-	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, max_fbo_tex[next_tex], 0);
-	glViewport(0,0, iw, ih);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
 
 	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz);
 	float sx=sinf(tx), sy=sinf(ty), sz=sinf(tz);
@@ -144,26 +142,43 @@ void gl_maxsrc_update(Uint32 now) {
 		{cx*sy         ,    -sx,  cy*cx}
 	};
 
+	float Rt[][3] = {
+		{R[0][0], R[1][0], R[2][0]},
+		{R[0][1], R[1][1], R[2][1]},
+		{R[0][2], R[1][2], R[2][2]}
+	};
+
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, max_fbo);
+	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, max_fbo_tex[next_tex], 0);
+	glViewport(0,0, iw, ih);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, max_fbo_tex[cur_tex]);
 	glUseProgramObjectARB(shader_prog);
 	glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0);
-	glUniformMatrix3fvARB(glGetUniformLocationARB(shader_prog, "R"), 1, 0, (float *)R);
+	glUniformMatrix2x3fv(glGetUniformLocationARB(shader_prog, "R"), 1, 0, (float *)Rt);
 	glBegin(GL_QUADS);
-		glTexCoord2d(-1,-1); glVertex2d( 1,  1);
-		glTexCoord2d( 1,-1); glVertex2d(-1,  1);
-		glTexCoord2d( 1, 1); glVertex2d(-1, -1);
-		glTexCoord2d(-1, 1); glVertex2d( 1, -1);
+		glTexCoord2d(-1,-1); glVertex2d(-1, -1);
+		glTexCoord2d( 1,-1); glVertex2d( 1, -1);
+		glTexCoord2d( 1, 1); glVertex2d( 1,  1);
+		glTexCoord2d(-1, 1); glVertex2d(-1,  1);
 	glEnd();
 	glUseProgramObjectARB(0);
 
 	audio_data ad;
 	audio_get_samples(&ad);
-	int samp = IMAX(iw,ih)/2;
+	int samp = IMAX(iw,ih);
 
 	glEnable(GL_BLEND);
-	glBlendEquation(GL_MAX);
+	glBlendEquationEXT(GL_MAX_EXT);
 
-	//TODO: use GL_MODELVIEW matrix to do transform
 	//TODO: use vertex array or VBO
 	float pw = 0.5f*fmaxf(1.0f/38, 10.0f/iw), ph = 0.5f*fmaxf(1.0f/38, 10.0f/ih);
 	glBindTexture(GL_TEXTURE_2D, pnt_tex);
