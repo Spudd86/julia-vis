@@ -30,7 +30,7 @@ ENABLE_DIRECTFB=@enable_directfb@
 
 -include config.mk
 
-CFLAGS += -D_GNU_SOURCE=1 -Wall -Wextra -fno-strict-aliasing -fsingle-precision-constant
+CFLAGS += -D_GNU_SOURCE=1 -Wall -Wextra -fno-strict-aliasing -fsingle-precision-constant 
 #-Wunsafe-loop-optimizations 
 CFLAGS += -I "./src" 
 
@@ -56,6 +56,8 @@ else
 	CFLAGS += -fmodulo-sched-allow-regmoves -fgcse-after-reload -fsee -fipa-cp
 	CFLAGS += -fsched-stalled-insns=2 -fsched-stalled-insns-dep=2 -fvect-cost-model -ftracer
 	CFLAGS += -ffast-math  -fassociative-math -freciprocal-math -fno-signed-zeros
+	
+	CFLAGS += -Wl,-O1 -Wl,--sort-common -Wl,--as-needed
 endif
 
 CFLAGS += -Wl,--as-needed
@@ -127,7 +129,7 @@ bin/gl-test$(EXEEXT): src/opengl/opengl_fix.c src/opengl/drawscope.c src/opengl/
 
 bin/glsl-test$(EXEEXT): src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/mandelbrot.c src/pallet.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
-	src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/mandelbrot.c src/pallet.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/optproc.c src/points.c \
+	src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/mandelbrot.c src/pallet.c src/sdl-misc.c src/mtwist/mtwist.c src/opengl/terminusIBM.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/optproc.c src/points.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -L/usr/X11R6/lib -lGL -lGLU -lGLEW -o $@
 
 bin/sdlthread-test$(EXEEXT): src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c src/points.h src/common.h Makefile config.mk

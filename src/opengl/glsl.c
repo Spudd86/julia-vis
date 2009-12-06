@@ -22,6 +22,34 @@
 
 #define IM_SIZE (512)
 
+#include "terminusIBM.h"
+
+
+static void draw_string(const char *str)
+{
+	glPushClientAttrib( GL_CLIENT_PIXEL_STORE_BIT );
+	glPixelStorei( GL_UNPACK_SWAP_BYTES,  GL_FALSE );
+	glPixelStorei( GL_UNPACK_LSB_FIRST,   GL_FALSE );
+	glPixelStorei( GL_UNPACK_ROW_LENGTH,  0        );
+	glPixelStorei( GL_UNPACK_SKIP_ROWS,   0        );
+	glPixelStorei( GL_UNPACK_SKIP_PIXELS, 0        );
+	glPixelStorei( GL_UNPACK_ALIGNMENT,   1        );
+
+	const char *c = str;
+	while(*c) {
+			//TODO: fix the font
+
+			char tmp[16]; const char *src = terminusIBM + 16 * *c;
+			for(int i = 0; i<16; i++) {
+				tmp[i] = src[15-i];
+			}
+
+			glBitmap(8, 16, 0,0, 8, 0, tmp);
+			c++;
+		}
+	glPopClientAttrib();
+}
+
 uint32_t *get_active_pal(void);
 
 static uint32_t *active_pal;
@@ -51,22 +79,32 @@ static void update_pal_tex(void) {
 static GLhandleARB pal_prog;
 static GLhandleARB map_prog;
 static const char *map_frag_shader =
+	"#version 120\n"
 	"uniform sampler2D prev;"
 	"uniform sampler2D maxsrc;"
-	"uniform vec2 c;"
+	"invariant uniform vec2 c;"
 	"void main() {"
 	"	vec2 t = gl_TexCoord[1].st * gl_TexCoord[1].st;"
+//	"	vec4 c1 = texture2D(prev, vec2(t.x - t.y, 2*gl_TexCoord[1].x*gl_TexCoord[1].y) + c);"
+//	"	vec4 c2 = texture2D(maxsrc, gl_TexCoord[0].st);"
+//	"	float cl = max( dot(vec2(c1), vec2(255,1 - 1.0f/256)), dot(vec2(c2), vec2(255,1 - 1.0f/256)) );"
+//	"	gl_FragData[0].xy = vec2(cl/255, fract(cl));"
 	"	gl_FragData[0] = max("
-	"			texture2D(prev, vec2(t.x - t.y, 2*gl_TexCoord[1].x*gl_TexCoord[1].y) + c),"
+	"			texture2D(prev, vec2(t.x - t.y, 2*gl_TexCoord[1].x*gl_TexCoord[1].y) + c)*(253/256.0f),"
 	"			texture2D(maxsrc, gl_TexCoord[0].st));"
 	"}";
 
 static const char *pal_frag_shader =
+	"#version 120\n"
 	"uniform sampler2D src;"
 	"uniform sampler1D pal;"
 	"void main() {"
-	"	gl_FragColor = texture1D(pal, float(texture2D(src, vec2(gl_TexCoord[0]))));"
+	"	gl_FragColor = texture1D(pal, texture2D(src, gl_TexCoord[0].xy).x);"
 	"}";
+//	"	vec2 c = texture2D(src, vec2(gl_TexCoord[0])).xy;"
+//	"	gl_FragColor = texture1D(pal, dot(vec2(c), vec2(255,1-1.0f/256)/255)-0.5/256);"
+//	"}";
+
 
 GLuint disp_texture;
 
@@ -89,8 +127,16 @@ static void setup_map_fbo(int width, int height) {
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F_ARB,  width, height, 0, GL_RGB, GL_HALF_FLOAT_ARB, NULL);
 		} else if(GLEW_ARB_color_buffer_float && GLEW_ARB_texture_float) { printf("float pixels in map fbo\n");
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F_ARB,  width, height, 0, GL_RGB, GL_FLOAT, NULL);
-		} else
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		} else {
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB10,  width, height, 0, GL_RGB, GL_UNSIGNED_SHORT, NULL);
+			//TODO: make sure that this works
+		}
+
+		//GL_RGB10_EXT
+		//TODO: accum buffer supports 16 bit per component.... can I use this instead of colour buffer?
+		// perhaps use depth textures?
+
+		//TODO: check for errors to be sure we can actually use GL_RGB10 here (possibly also testing that we can render to it)
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
@@ -110,6 +156,8 @@ static void set_viewport(int w, int h) {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 }
+
+static float mix = 0;
 
 static void do_frame(int src_tex, int draw_tex, int im_w, int im_h, struct point_data *pd) {
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -199,13 +247,20 @@ int main(int argc, char **argv)
 		printf("No GLSL support\n");
 		exit(1);
 	}
+	
+	if(GLEW_EXT_blend_minmax) {
+		printf("Have blend_minmax!\n");
+	} else {
+		printf("missing GL_EXE_blend_minmax!\n");
+		exit(1);
+	}
 
 	pallet_init(1);
 	init_pal_tex();
 	init_mandel();
 	audio_init(&opts);
 	setup_opengl(screen->w, screen->h);
-	gl_maxsrc_init(IMIN(im_w/2, 512), IMIN(im_h/2, 512));
+	gl_maxsrc_init(IMAX(im_w/2, 128), IMAX(im_h/2, 128));
 	setup_map_fbo(im_w, im_h);
 	map_prog = compile_program(NULL, map_frag_shader);
 	pal_prog = compile_program(NULL, pal_frag_shader);
@@ -226,12 +281,14 @@ int main(int argc, char **argv)
 	Uint32 src_tex = 0, dst_tex = 1;
 
 	int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0;
+	int lastframe_key = 0;
 
 	while(SDL_PollEvent(&event) >= 0) {
 		if(event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) break;
-		if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F1)) debug_maxsrc = !debug_maxsrc;
-		if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F2)) debug_pal = !debug_pal;
-		if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F3)) show_mandel = !show_mandel;
+		if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F1)) { if(!lastframe_key) { debug_maxsrc = !debug_maxsrc; } lastframe_key = 1; }
+		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F2)) { if(!lastframe_key) { debug_pal = !debug_pal; } lastframe_key = 1; }
+		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F3)) { if(!lastframe_key) { show_mandel = !show_mandel; } lastframe_key = 1; }
+		else lastframe_key = 0;
 
 		gl_maxsrc_update(now);
 		do_frame(src_tex, dst_tex, im_w, im_h, pd);
@@ -283,6 +340,12 @@ int main(int argc, char **argv)
 			glUseProgramObjectARB(0);
 			glPopAttrib();
 		}
+
+		char buf[32];
+		sprintf(buf,"%6.1f FPS", 1000.0f / frametime);
+		glRasterPos2f(-1,1 - 20.0f/(screen->h*0.5f));
+		draw_string(buf);
+
 		SDL_GL_SwapBuffers();
 		Uint32 tex_tmp = src_tex; src_tex = dst_tex; dst_tex = tex_tmp;
 
@@ -302,12 +365,16 @@ int main(int argc, char **argv)
 		} else update_points(pd, (now - tick0), 0);
 		beats = newbeat;
 
+
 		now = SDL_GetTicks();
-		if(now - fps_oldtime < 8) SDL_Delay(9 - (now-fps_oldtime)); // stay below ~125 FPS
+		if(now - fps_oldtime < 10) SDL_Delay(10 - (now-fps_oldtime)); // stay below ~125 FPS
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		fps_oldtime = now;
 		cnt++;
 	}
+
+
+	SDL_Quit();
 	return 0;
 }
 

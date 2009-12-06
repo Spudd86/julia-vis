@@ -11,7 +11,7 @@ struct pallet_colour {
 	unsigned char pos;
 };
 
-#define NUM_PALLETS 4
+#define NUM_PALLETS 5
 static const int num_pallets = NUM_PALLETS;
 static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 
@@ -47,16 +47,16 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 		{   0,   0,   0,  29},
 		{ 115, 230,   0, 240},
 		{  45, 255, 255, 255}
-	}
+	},
 
-//	,{	//  r    g    b  pos
-//		{   0,   0,   0,   0}, // TODO tweak this
-//		{ 196,  23,   0,  10},
-//		{ 255, 255, 255,  40},
-//		{  32,  96,   0,  70},
-//		{ 115, 230,   0, 240},
-//		{  45, 255, 255, 255}
-//	}
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0}, // TODO tweak this
+		{ 196,  23,   0,  60},
+		{ 255, 255, 255, 150},
+		{  32,  96,   0, 200},
+//		{ 115, 230,   0, 255},
+		{  45, 255, 255, 255}
+	}
 
 	// END
 	//{   0,   0,   0,   0},
@@ -106,6 +106,7 @@ void pallet_start_switch(int next) {
 	if(pallet_changing) return; // haven't finished the last one
 	if(next == curpal) next = (next+1) % num_pallets;
 
+//	nextpal = 4;
 	nextpal = next;
 	pallet_changing = 1;
 }

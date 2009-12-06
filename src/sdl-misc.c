@@ -11,10 +11,16 @@ static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl);
 
 SDL_Surface *sdl_setup(opt_data *opts, int im_size) {
 	return real_sdl_setup(opts, im_size, 0);
+
+	if(TTF_Init()==-1) {
+		printf("TTF_Init: %s\n", TTF_GetError());
+		exit(2);
+	}
+	font = TTF_OpenFont("font.ttf", 16);
 }
 
 SDL_Surface *sdl_setup_gl(opt_data *opts, int im_size) {
-	return real_sdl_setup(opts, im_size, 1);
+	return real_sdl_setup(opts, im_size, 1); //TODO: make gl stuff not need SDL_ttf
 }
 
 // TODO: improve automatic mode selection
@@ -46,12 +52,6 @@ static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl)
 	SDL_EventState(SDL_USEREVENT, SDL_IGNORE);
 	SDL_EventState(SDL_SYSWMEVENT, SDL_IGNORE);
 	SDL_EventState(SDL_ACTIVEEVENT, SDL_IGNORE);
-
-	if(TTF_Init()==-1) {
-		printf("TTF_Init: %s\n", TTF_GetError());
-		exit(2);
-	}
-	font = TTF_OpenFont("font.ttf", 16);
 
     printf("SDL initialized.\n");
 
@@ -119,5 +119,26 @@ void DrawText(SDL_Surface* screen, const char* text)
 	SDL_BlitSurface(text_surface, NULL, screen, NULL);
 	SDL_FreeSurface(text_surface);
 }
+
+/*
+#include "terminusIBM.h"
+//TODO: write this
+static void draw_string(SDL_Surface *surf, int x, int y, const char *str)
+{
+	const char *c = str;
+	while(*c) {
+		const uint8_t * restrict src = terminusIBM + 16 * *c;;
+		for(int i=0; i < 16; i++) {
+			uint8_t line = *src++;
+			while(line) {
+				int o = __builtin_ctz(line);
+
+			}
+		}
+		c++;
+	}
+}
+
+*/
 
 

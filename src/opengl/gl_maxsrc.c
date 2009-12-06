@@ -54,7 +54,8 @@ static void setup_max_fbo(int width, int height) {
 		else if(GLEW_ARB_color_buffer_float && GLEW_ARB_texture_float)
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F_ARB,  width, height, 0, GL_RGB, GL_FLOAT, NULL);
 		else
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB10,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		//TODO: check for errors to be sure we can actually use GL_RGB10 here (possibly also testing that we can render to it)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -95,12 +96,18 @@ static const char *frag_src =
 	"	vec3 p = vec3(0.5f);"
 	"	{"
 	"		vec2 uv = gl_TexCoord[0].st;"
-	"		float d = 0.97f*0.5f + (0.03f*0.5f)*length(uv);"
+	"		float d = 0.96f*0.5f + (0.04f*0.5f)*log2(length(uv)*0.707106781186547 + 1);"
 	"		p.yz = vec2(d); p = (uv.x*R[0] + uv.y*R[1])*p;" //NOTE: on mesa 7.6's compiler p*= generates more code for some reason
 	"	}"
+//	"	vec2 tmp = texture2D(prev, gl_TexCoord[0].st*0.5+0.5).rb;"
+//	"	float c = dot(tmp, vec2(256,1-1.0/256)/256) - 0.25/256;"
+//	"	vec2 c = texture2D(prev, p*R + 0.5f).xy*(98.0/100);"
+//	"	c.y += fract(c.x*255);"
+//	"	gl_FragData[0].xy = c;"
+//	"	gl_FragData[0].r = c; gl_FragData[0].b = fract(c*256);"
 	"	vec4 c = texture2D(prev, p*R + 0.5f);"
-	"	gl_FragData[0].x = (c.x - max(3/256.0f, c.x*(6.0f/256)));" //TODO: only do this if tex format not precise enough
-//	"	gl_FragData[0].x = (c.x - c.x*(2/128.0f));
+	"	gl_FragData[0].x = (c.x - max(2/256.0f, c.x*(1.0f/100)));" //TODO: only do this if tex format not precise enough
+//	"	gl_FragData[0].x = (c.x - c.x*(2/128.0f));"
 //	"	gl_FragData[0] = texture2D(prev, vec2(p*R)*0.5f + 0.5f)*(63/64.0f);"
 //	"	gl_FragData[0] = (texture2D(prev, vec2(p*R)*0.5f + 0.5f) - (2/256.0f));"
 	"}";
@@ -188,7 +195,7 @@ void gl_maxsrc_update(Uint32 now) {
 		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
-		float xt = (i - samp/2)*1.0f/samp, yt = 0.15f*s, zt = 0.0f;
+		float xt = (i - samp/2)*1.0f/samp, yt = 0.1f*s, zt = 0.0f;
 		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
 		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
 		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
@@ -199,6 +206,8 @@ void gl_maxsrc_update(Uint32 now) {
 	} glEnd();
 
 	audio_finish_samples();
+//	glFlush();
+	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, 0, 0);
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glPopClientAttrib();
 	glPopAttrib();
@@ -208,5 +217,5 @@ void gl_maxsrc_update(Uint32 now) {
 }
 
 GLuint gl_maxsrc_get() {
-	return max_fbo_tex[cur_tex];
+	return max_fbo_tex[cur_tex]; //TODO: why does using cur_tex here break?
 }

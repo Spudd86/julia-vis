@@ -21,7 +21,7 @@ static inline __attribute__((always_inline)) double sqrd(double x) {return x*x;}
 void init_mandel()
 {
 	mandel_surf = malloc(sizeof(Pixbuf));
-	mandel_surf->w = mandel_surf->h = 512;
+	mandel_surf->w = mandel_surf->h = 1024;
 	mandel_surf->pitch = mandel_surf->w*sizeof(uint8_t);
 	mandel_surf->bpp  = 8; uint8_t *data = mandel_surf->data = malloc(mandel_surf->w * mandel_surf->h * sizeof(*data));
 
@@ -30,11 +30,16 @@ void init_mandel()
 			double complex z0 = x*2.0f/mandel_surf->w - 1.5 + (y*2.0f/mandel_surf->h - 1)*I;
 			double complex z = z0;
 //			int i=0; while(cabs(z) < 2 && i < 1024) {
-			int i=0; while(sqrd(cimag(z))+sqrd(creal(z)) < 4 && i < 1024) {
+			int i=0; while(sqrd(cimag(z))+sqrd(creal(z)) < 4 && i < 128) {
 				i++;
 				z = z*z + z0;
 			}
-			data[y*mandel_surf->w + x] = (256*log2f(i*32.0f/1024+1)/5);
+
+			//n + log2ln(R) – log2ln|z|
+			float mu = (i + 1 - log2f(logf(cabs(z))));
+			data[y*mandel_surf->w + x] = 128*log2f(mu*(4.0f/128)+1);
+
+			//data[y*mandel_surf->w + x] = (256*log2(i*32.0f/1024+1)/5);
 		}
 	}
 	glPushAttrib(GL_TEXTURE_BIT);

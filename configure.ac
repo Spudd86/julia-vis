@@ -26,12 +26,6 @@ if test "x$enable_3dnow" = xyes; then
 	CFLAGS="$CFLAGS -mmmx -m3dnow"
 fi
 
-AC_ARG_ENABLE([opengl], AS_HELP_STRING([--disable-opengl], [enable opengl based versions (default: enabled)]))
-if test "x$enable_opengl" != xno; then
-	enable_opengl=yes
-fi
-AC_SUBST(enable_opengl)
-
 # Checks for programs.
 AC_PROG_CC
 AC_PROG_CC_C99
@@ -92,6 +86,22 @@ fi
 AC_SUBST(PULSE_CFLAGS)
 AC_SUBST(PULSE_LIBS)
 AC_SUBST(enable_pulseaudio)
+
+AC_ARG_ENABLE([opengl], AS_HELP_STRING([--disable-opengl], [enable opengl based versions (default: enabled)]))
+if test "x$enable_opengl" != xno; then
+	enable_opengl=yes
+fi
+AC_SUBST(enable_opengl)
+
+#TODO: make work on windows
+if test "x$enable_opengl" = xyes; then
+	PKG_CHECK_MODULES([GL], [glu],
+        [AC_DEFINE([HAVE_GL], [1], [Define if we have gl])],
+        [AC_MSG_FAILURE([--enable-gl was given, but test for gl failed (old gl?)])])
+fi
+AC_SUBST(GL_CFLAGS)
+AC_SUBST(GL_LIBS)
+
 
 AC_ARG_ENABLE([orc], AS_HELP_STRING([--enable-orc], [enable using orc (default: disabled)]))
 if test "x$enable_orc" = xyes; then
