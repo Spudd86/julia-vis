@@ -73,10 +73,12 @@ DFB_FLAGS = @DIRECTFB_CFLAGS@ @DIRECTFB_LIBS@
 
 ALL_BINS := bin/sdl-test$(EXEEXT) bin/sdlthread-test$(EXEEXT) bin/audio-test$(EXEEXT)
 ifeq (@enable_opengl@,yes) 
-	ALL_BINS += bin/glsl-test$(EXEEXT) bin/gl-test$(EXEEXT)
+	ALL_BINS += bin/glsl-test$(EXEEXT)
 endif
 
 AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/portaudio.c 
+
+COMMON_SRCS = src/terminusIBM.c src/sdl-misc.c src/mtwist/mtwist.c src/pallet.c src/optproc.c src/points.c
 
 ifeq ($(ENABLE_JACK),yes)
 AUDIO_SRCS += src/audio/jack.c
@@ -117,24 +119,24 @@ distclean: clean
 config.mk:
 	touch config.mk
 
-bin/sdl-test$(EXEEXT): src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c src/points.h src/common.h Makefile config.mk
+bin/sdl-test$(EXEEXT): src/sdl.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pixmisc.c src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
-	src/sdl.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c \
+	src/sdl.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pixmisc.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
 
 bin/gl-test$(EXEEXT): src/opengl/opengl_fix.c src/opengl/drawscope.c src/opengl/fixed_map.c src/opengl/glmisc.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
-	src/opengl/opengl_fix.c src/opengl/drawscope.c src/opengl/fixed_map.c src/opengl/glmisc.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c \
+	src/opengl/opengl_fix.c src/opengl/drawscope.c src/opengl/fixed_map.c src/opengl/glmisc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -L/usr/X11R6/lib -lGL -lGLU -lGLEW -o $@
 
 bin/glsl-test$(EXEEXT): src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/mandelbrot.c src/pallet.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
-	src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/mandelbrot.c src/pallet.c src/sdl-misc.c src/mtwist/mtwist.c src/opengl/terminusIBM.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/optproc.c src/points.c \
+	src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/mandelbrot.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -L/usr/X11R6/lib -lGL -lGLU -lGLEW -o $@
 
-bin/sdlthread-test$(EXEEXT): src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c src/points.h src/common.h Makefile config.mk
+bin/sdlthread-test$(EXEEXT): src/sdl-thread.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pixmisc.c src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL -DTRIBUF_LOCKING \
-	src/sdl-thread.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c \
+	src/sdl-thread.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pixmisc.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
 
 bin/dfb-test$(EXEEXT): src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c $(TRIBUF_SRCS) src/common.h Makefile config.mk
@@ -143,8 +145,8 @@ bin/dfb-test$(EXEEXT): src/directfb.c src/map.c src/pallet.c src/pixmisc.c src/o
 	$(DFB_FLAGS) $(AUDIO_FLAGS) -o $@
 
 bin/audio-test$(EXEEXT): $(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c $(TRIBUF_SRCS) src/line.c
-	$(CC) -DFFT_TRIBUF -DUSE_SDL $(CFLAGS) \
-	$(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/optproc.c $(TRIBUF_SRCS) src/line.c \
+	$(CC) $(CFLAGS) -DFFT_TRIBUF -DUSE_SDL \
+	$(AUDIO_SRCS) src/audio/sdl-test.c src/sdl-misc.c src/terminusIBM.c src/optproc.c $(TRIBUF_SRCS) src/line.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
 
 
