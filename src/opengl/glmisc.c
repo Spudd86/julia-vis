@@ -27,6 +27,7 @@ static GLboolean do_shader_compile(GLhandleARB shader, const char *source) {
 	return GL_TRUE;
 }
 
+//TODO: add stuff to allow a second set of code for functions
 GLhandleARB compile_program(const char *vert_shader, const char *frag_shader) {
 	GLhandleARB vert=0, frag=0;
 

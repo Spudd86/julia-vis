@@ -169,7 +169,7 @@ void gl_maxsrc_update(Uint32 now) {
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, max_fbo_tex[cur_tex]);
 	glUseProgramObjectARB(shader_prog);
-	glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0);
+	glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0); //TODO: only need to call glGetUniformLocationARB once
 	glUniformMatrix2x3fv(glGetUniformLocationARB(shader_prog, "R"), 1, 0, (float *)Rt);
 	glBegin(GL_QUADS);
 		glTexCoord2d(-1,-1); glVertex2d(-1, -1);

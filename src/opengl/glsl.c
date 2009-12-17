@@ -39,8 +39,8 @@ static void draw_string(const char *str)
 	while(*c) {
 			//TODO: fix the font
 
-			char tmp[16]; const char *src = terminusIBM + 16 * *c;
-			for(int i = 0; i<16; i++) {
+			uint8_t tmp[16]; const uint8_t *src = terminusIBM + 16 * *c;
+			for(int i = 0; i<16; i++) { //FIXME draws upsidedown on ATI's gl on windows
 				tmp[i] = src[15-i];
 			}
 
@@ -156,8 +156,6 @@ static void set_viewport(int w, int h) {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 }
-
-static float mix = 0;
 
 static void do_frame(int src_tex, int draw_tex, int im_w, int im_h, struct point_data *pd) {
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
