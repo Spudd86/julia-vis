@@ -76,9 +76,12 @@ static void update_pal_tex(void) {
 }
 
 //TODO: ARB_fragment_program version
+//TODO: write code to mix'n'match the map() functions with different mains (ie different # of samples per pixel)
 static GLhandleARB pal_prog;
 static GLhandleARB map_prog;
-static const char *map_frag_shader =
+static GLint map_c_loc=0, map_prev_loc=0, map_maxsrc_loc=0;
+static GLhandleARB rat_map_prog;
+static const char *map_frag_shader = 
 	"#version 120\n"
 	"uniform sampler2D prev;"
 	"uniform sampler2D maxsrc;"
@@ -93,6 +96,38 @@ static const char *map_frag_shader =
 	"			texture2D(prev, vec2(t.x - t.y, 2*gl_TexCoord[1].x*gl_TexCoord[1].y) + c)*(253/256.0f),"
 	"			texture2D(maxsrc, gl_TexCoord[0].st));"
 	"}";
+	
+
+	
+static const char *rat_map_frag_shader = 
+	"#version 120\n"
+	"uniform sampler2D prev;\n"
+	"uniform sampler2D maxsrc;\n"
+	"invariant uniform vec4 c;\n"
+	
+	"vec4 smap(vec2 s) {\n"
+	"	s = s*2.5;\n"
+	"	vec2 t = s*s;\n"
+	"	float ab = s.x*s.y;\n"
+	"	s = vec2(4*ab*(t.x - t.y), t.x*t.x - 6*t.x*t.y + t.y*t.y) + c.xy;\n"
+	"	t = vec2(t.x - t.y, 2*ab)+c.zw;\n"
+	"	return texture2D(prev,(0.5f/2.5)*vec2(dot(s,t), dot(s,t.yx))/dot(t,t)+0.5f);\n"
+	"}\n"
+
+	"void main() {\n"
+	"	vec2 dx = dFdx(gl_TexCoord[1].st); vec2 dy = dFdy(gl_TexCoord[1].st);\n"
+/*	"	vec4 r = (254/(8*256.0f))*(smap(gl_TexCoord[1].st)*4 + \n"
+	"			smap(gl_TexCoord[1].st+dy) + smap(gl_TexCoord[1].st+dx) +\n"
+	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx) );\n"
+/**/"	vec4 r = (253.0f/4096)*(smap(gl_TexCoord[1].st)*4 + \n"
+	"			(smap(gl_TexCoord[1].st+dy) + smap(gl_TexCoord[1].st+dx) +\n"
+	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx))*2 +\n"
+	"			(smap(gl_TexCoord[1].st+dy+dx) + smap(gl_TexCoord[1].st+dy-dx) +\n"
+	"			smap(gl_TexCoord[1].st-dx-dy) + smap(gl_TexCoord[1].st-dy+dx)) );\n"
+/**/"	gl_FragData[0] = max(r, texture2D(maxsrc, gl_TexCoord[0].st));\n"
+//	"	gl_FragData[0] = max(\n"
+//	"		texture2D(prev, map(gl_TexCoord[1].xy))*(253/256.0f), texture2D(maxsrc, gl_TexCoord[0].st));\n"
+	"}\n";
 
 static const char *pal_frag_shader =
 	"#version 120\n"
@@ -128,7 +163,7 @@ static void setup_map_fbo(int width, int height) {
 		} else if(GLEW_ARB_color_buffer_float && GLEW_ARB_texture_float) { printf("float pixels in map fbo\n");
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F_ARB,  width, height, 0, GL_RGB, GL_FLOAT, NULL);
 		} else {
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB10,  width, height, 0, GL_RGB, GL_UNSIGNED_SHORT, NULL);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB10_A2,  width, height, 0, GL_RGBA, GL_UNSIGNED_SHORT, NULL);
 			//TODO: make sure that this works
 		}
 
@@ -168,10 +203,18 @@ static void do_frame(int src_tex, int draw_tex, int im_w, int im_h, struct point
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
 
-		glUseProgramObjectARB(map_prog);
-		glUniform2fARB(glGetUniformLocationARB(map_prog, "c"), (pd->p[0]-0.5f)*0.25f + 0.5f, pd->p[1]*0.25f + 0.5f);
-		glUniform1iARB(glGetUniformLocationARB(map_prog, "maxsrc"), 0);
-		glUniform1iARB(glGetUniformLocationARB(map_prog, "prev"), 1);
+		if(pd->dim == 2) {
+			glUseProgramObjectARB(map_prog);
+			//glUniform2fARB(map_c_loc, pd->p[0]*0.5f, pd->p[1]*0.5f);
+			glUniform2fARB(map_c_loc, (pd->p[0]-0.5f)*0.25f + 0.5f, pd->p[1]*0.25f + 0.5f);
+			glUniform1iARB(map_maxsrc_loc, 0);
+			glUniform1iARB(map_prev_loc, 1);
+		} else if(pd->dim == 4) {
+			glUseProgramObjectARB(rat_map_prog);
+			glUniform4fARB(glGetUniformLocationARB(rat_map_prog, "c"), pd->p[0], pd->p[1], pd->p[2], pd->p[3]);
+			glUniform1iARB(glGetUniformLocationARB(rat_map_prog, "maxsrc"), 0);
+			glUniform1iARB(glGetUniformLocationARB(rat_map_prog, "prev"), 1);
+		}
 		glBegin(GL_QUADS);
 			glMultiTexCoord2f(GL_TEXTURE0, 0.0, 1.0);
 			glMultiTexCoord2f(GL_TEXTURE1,-1.0, 1.0);
@@ -259,11 +302,17 @@ int main(int argc, char **argv)
 	audio_init(&opts);
 	setup_opengl(screen->w, screen->h);
 	gl_maxsrc_init(IMAX(im_w/2, 128), IMAX(im_h/2, 128));
-	setup_map_fbo(im_w, im_h);
+	setup_map_fbo(im_w, im_h); 
 	map_prog = compile_program(NULL, map_frag_shader);
+	map_c_loc = glGetUniformLocationARB(map_prog, "c");
+	map_prev_loc = glGetUniformLocationARB(map_prog, "prev");
+	map_maxsrc_loc = glGetUniformLocationARB(map_prog, "maxsrc");
+	
 	pal_prog = compile_program(NULL, pal_frag_shader);
+	
+	rat_map_prog = compile_program(NULL, rat_map_frag_shader);
 
-	struct point_data *pd = new_point_data(2);
+	struct point_data *pd = new_point_data(opts.rational_julia?4:2);
 
 	glPixelZoom(1.0, -1.0);
 	glRasterPos2f(-1.0, 1.0);

@@ -54,7 +54,7 @@ static void setup_max_fbo(int width, int height) {
 		else if(GLEW_ARB_color_buffer_float && GLEW_ARB_texture_float)
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F_ARB,  width, height, 0, GL_RGB, GL_FLOAT, NULL);
 		else
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB10,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB10_A2,  width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 		//TODO: check for errors to be sure we can actually use GL_RGB10 here (possibly also testing that we can render to it)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
