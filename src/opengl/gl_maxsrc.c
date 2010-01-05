@@ -114,6 +114,9 @@ static const char *frag_src =
 
 //TODO: fallback to glCopyTexImage2D/glCopyTexSubImage2D if no FBO's
 
+static int samp = 0;
+static float *verts = NULL;
+
 void gl_maxsrc_init(int width, int height) {
 	iw=width, ih=height;
 	setup_max_fbo(width, height);
@@ -129,6 +132,9 @@ void gl_maxsrc_init(int width, int height) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glPopAttrib();
+
+	samp = IMAX(iw,ih);
+	verts = malloc(sizeof(float)*samp*5*4);
 }
 
 void gl_maxsrc_update(Uint32 now) {
@@ -179,19 +185,11 @@ void gl_maxsrc_update(Uint32 now) {
 	glEnd();
 	glUseProgramObjectARB(0);
 
-	audio_data ad;
-	audio_get_samples(&ad);
-	int samp = IMAX(iw,ih);
 
-	glEnable(GL_BLEND);
-	glBlendEquationEXT(GL_MAX_EXT);
-
-	//TODO: use vertex array or VBO
+	// ******************* normal
 	float pw = 0.5f*fmaxf(1.0f/38, 10.0f/iw), ph = 0.5f*fmaxf(1.0f/38, 10.0f/ih);
-	glBindTexture(GL_TEXTURE_2D, pnt_tex);
-	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-	glBegin(GL_QUADS); for(int i=0; i<samp; i++) {
+	audio_data ad; audio_get_samples(&ad);
+	for(int i=0; i<samp; i++) {
 		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
@@ -199,15 +197,61 @@ void gl_maxsrc_update(Uint32 now) {
 		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
 		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
 		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
-		glTexCoord2d(0.0,1.0); glVertex3f(x-pw, y-ph, z);
-		glTexCoord2d(1.0,1.0); glVertex3f(x+pw, y-ph, z);
-		glTexCoord2d(1.0,0.0); glVertex3f(x+pw, y+ph, z);
-		glTexCoord2d(0.0,0.0); glVertex3f(x-pw, y+ph, z);
-	} glEnd();
 
+		verts[(i*4+0)*5+0] = 0; verts[(i*4+0)*5+1] = 1; verts[(i*4+0)*5+2] = x-pw; verts[(i*4+0)*5+3] = y-ph; verts[(i*4+0)*5+4] = z;
+		verts[(i*4+1)*5+0] = 1; verts[(i*4+1)*5+1] = 1; verts[(i*4+1)*5+2] = x+pw; verts[(i*4+1)*5+3] = y-ph; verts[(i*4+1)*5+4] = z;
+		verts[(i*4+2)*5+0] = 1; verts[(i*4+2)*5+1] = 0; verts[(i*4+2)*5+2] = x+pw; verts[(i*4+2)*5+3] = y+ph; verts[(i*4+2)*5+4] = z;
+		verts[(i*4+3)*5+0] = 0; verts[(i*4+3)*5+1] = 0; verts[(i*4+3)*5+2] = x-pw; verts[(i*4+3)*5+3] = y+ph; verts[(i*4+3)*5+4] = z;
+	}
 	audio_finish_samples();
-//	glFlush();
-	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, 0, 0);
+
+	glEnable(GL_BLEND);
+	glBlendEquationEXT(GL_MAX_EXT);
+	glBindTexture(GL_TEXTURE_2D, pnt_tex);
+	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+	glEnableClientState(GL_VERTEX_ARRAY); //FIXME
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	glInterleavedArrays(GL_T2F_V3F, 0, verts);
+	glDrawArrays(GL_QUADS, 0, samp*4);
+
+// ********************** Point spirte -- broken in mesa? (tex co-ords are wrong, don't seem to maxblend)
+//	glEnable(GL_BLEND);
+//	glBlendEquationEXT(GL_MAX_EXT);
+//	audio_data ad; audio_get_samples(&ad);
+//	float pnt_size = fmaxf(iw/38.0, 10);
+//	float quadratic[] =  { 1.0f, 0.0f, 0.01f };
+//	float maxSize = 0.0f;
+//	glEnable(GL_POINT_SPRITE_ARB);
+////	glGetFloatv(GL_POINT_SIZE_MAX_ARB, &maxSize );
+////	glPointParameterfvARB(GL_POINT_DISTANCE_ATTENUATION_ARB, quadratic);
+////	glPointParameterf(GL_POINT_SIZE_MIN, 1.0f);
+////	glPointParameterf(GL_POINT_SIZE_MAX, maxSize);
+//	glPointSize(pnt_size);
+//	glBindTexture(GL_TEXTURE_2D, pnt_tex);
+//	glTexEnvf(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE);
+//
+//	float verts[samp][6]; // need to include colour or the points don't show (BLEH!)
+//	for(int i=0; i<samp; i++) {
+//		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
+//		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
+//
+//		float xt = (i - samp/2)*1.0f/samp, yt = 0.1f*s, zt = 0.0f;
+//		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
+//		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
+//		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
+//		verts[i][0] = 1; verts[i][1] = 1; verts[i][2] = 1;
+//		verts[i][3] = x; verts[i][4] = y; verts[i][5] = z;
+//	}
+//	glEnableClientState(GL_VERTEX_ARRAY);
+//	glEnableClientState(GL_COLOR_ARRAY);
+////	glVertexPointer(3, GL_FLOAT, 0, verts);
+//	glInterleavedArrays(GL_C3F_V3F, 0, verts);
+//	glDrawArrays(GL_POINTS, 0, samp);
+//	glDisableClientState(GL_COLOR_ARRAY);
+//	glDisableClientState(GL_VERTEX_ARRAY);
+//	glDisable( GL_POINT_SPRITE_ARB );
+//	audio_finish_samples();
+
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glPopClientAttrib();
 	glPopAttrib();
