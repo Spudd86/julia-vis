@@ -116,11 +116,20 @@ static const char *frag_src =
 
 static int samp = 0;
 static float *verts = NULL;
+static GLboolean have_glsl = GL_FALSE;
 
+static void fixed_init(void);
+//TODO: clean up, only generate VBO's if we're going to use them
+//TODO: add command line flag to use fixed function pipeline as much as possible
 void gl_maxsrc_init(int width, int height) {
-	iw=width, ih=height;
-	setup_max_fbo(width, height);
-	shader_prog = compile_program(NULL, frag_src);
+	iw=width, ih=height; samp = IMAX(iw,ih);
+
+	if(GLEW_ARB_fragment_shader) {
+		setup_max_fbo(width, height);
+		shader_prog = compile_program(NULL, frag_src);
+		verts = malloc(sizeof(float)*samp*5*4);
+		have_glsl = GL_TRUE;
+	}
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glGenTextures(1, &pnt_tex);
 	glBindTexture(GL_TEXTURE_2D, pnt_tex);
@@ -131,10 +140,139 @@ void gl_maxsrc_init(int width, int height) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glPopAttrib();
 
-	samp = IMAX(iw,ih);
-	verts = malloc(sizeof(float)*samp*5*4);
+	fixed_init();
+
+	glPopAttrib();
+}
+
+// render the old frame and distort it with GL shading language
+static void render_bg_glsl(float R[3][3])
+{
+	float Rt[][3] = {
+		{R[0][0], R[1][0], R[2][0]},
+		{R[0][1], R[1][1], R[2][1]},
+		{R[0][2], R[1][2], R[2][2]}
+	};
+
+	glUseProgramObjectARB(shader_prog);
+	glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0); //TODO: only need to call glGetUniformLocationARB once
+	glUniformMatrix2x3fv(glGetUniformLocationARB(shader_prog, "R"), 1, 0, (float *)Rt);
+	glBegin(GL_QUADS);
+		glTexCoord2d(-1,-1); glVertex2d(-1, -1);
+		glTexCoord2d( 1,-1); glVertex2d( 1, -1);
+		glTexCoord2d( 1, 1); glVertex2d( 1,  1);
+		glTexCoord2d(-1, 1); glVertex2d(-1,  1);
+	glEnd();
+	glUseProgramObjectARB(0);
+}
+
+#define GRID_SIZE 32
+static GLint fixedind[GRID_SIZE][GRID_SIZE][4];
+static float fixedvtx[GRID_SIZE+1][GRID_SIZE+1][2]; // TODO: this could be a const array filled in...
+
+static union {
+	struct { GLhandleARB ind, vtx, txco; };
+	GLhandleARB handles[3];
+}fixedH;
+
+static GLboolean have_vbo = GL_FALSE;
+
+static void fixed_init(void)
+{
+	for(int x=0; x<GRID_SIZE; x++) {
+		for(int y=0; y<GRID_SIZE; y++) {
+			fixedind[x][y][0] = x*(GRID_SIZE+1) + y;
+			fixedind[x][y][1] = x*(GRID_SIZE+1) + y+1;
+			fixedind[x][y][2] = (x+1)*(GRID_SIZE+1) + y+1;
+			fixedind[x][y][3] = (x+1)*(GRID_SIZE+1) + y;
+		}
+	}
+	const float step = 2.0f/GRID_SIZE;
+	for(int xd=0; xd<=GRID_SIZE; xd++) {
+		float u = xd*step - 1.0f;
+		for(int yd=0; yd<=GRID_SIZE; yd++) {
+			float v = yd*step - 1.0f;
+			fixedvtx[xd][yd][0] = u; fixedvtx[xd][yd][1] = v;
+		}
+	}
+
+	//TODO: command line option to disable this
+	if(GLEW_ARB_vertex_buffer_object) {
+		have_vbo = GL_TRUE;
+		glGenBuffersARB(3, fixedH.handles);
+		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, fixedH.ind);
+		glBufferDataARB(GL_ELEMENT_ARRAY_BUFFER_ARB, sizeof(fixedind), fixedind, GL_STATIC_DRAW_ARB);
+
+		glBindBufferARB(GL_ARRAY_BUFFER_ARB, fixedH.vtx);
+		glBufferDataARB(GL_ARRAY_BUFFER_ARB, sizeof(fixedvtx), fixedvtx, GL_STATIC_DRAW_ARB);
+		glBindBufferARB(GL_ARRAY_BUFFER_ARB, fixedH.txco);
+		glBufferDataARB(GL_ARRAY_BUFFER_ARB, sizeof(fixedvtx), NULL, GL_STREAM_DRAW_ARB);
+		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);
+		glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+	}
+}
+
+typedef float fixed_txco_buf[GRID_SIZE+1][GRID_SIZE+1][2];
+
+static void render_bg_fixed(float R[3][3])
+{
+	fixed_txco_buf texco_buf;
+	fixed_txco_buf *texco = &texco_buf;
+
+//	glBindBufferARB(GL_ARRAY_BUFFER_ARB, fixedH.txco);
+//	float *ptr = glMapBufferARB(GL_ARRAY_BUFFER_ARB, GL_WRITE_ONLY_ARB);
+//	texco = &ptr;
+
+	const float step = 2.0f/GRID_SIZE;
+	for(int xd=0; xd<=GRID_SIZE; xd++) {
+		float u = xd*step - 1.0f;
+		for(int yd=0; yd<=GRID_SIZE; yd++) {
+			float v = yd*step - 1.0f;
+
+			float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
+			float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
+				(u*R[0][0] + v*R[0][1]),
+				(u*R[1][0] + v*R[1][1])*d,
+				(u*R[2][0] + v*R[2][1])*d
+			};
+
+			// rotate back and shift/scale to [0, GRID_SIZE]
+			float x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
+			float y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
+
+			(*texco)[xd][yd][0] = x; (*texco)[xd][yd][1] = y;
+		}
+	}
+//	glUnmapBufferARB(GL_ARRAY_BUFFER_ARB);
+
+	//TODO: try to come up with something that will run faster
+	glClearColor(1.0f/256, 1.0f/256,1.0f/256, 1);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glClearColor(0,0,0,1);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_CONSTANT_ALPHA, GL_ONE);
+	glBlendEquationEXT(GL_FUNC_SUBTRACT_EXT);
+	glBlendColor(0, 0, 0, 63.0f/64);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	glTexCoordPointer(2, GL_FLOAT, 0, *texco);
+	if(have_vbo) {
+		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, fixedH.ind);
+		glBindBufferARB(GL_ARRAY_BUFFER_ARB, fixedH.vtx);
+		glVertexPointer(2, GL_FLOAT, 0, 0);
+		glDrawElements(GL_QUADS, GRID_SIZE*GRID_SIZE*4, GL_UNSIGNED_INT, 0);
+//		glBindBufferARB(GL_ARRAY_BUFFER_ARB, fixedH.txco);
+//		glTexCoordPointer(2, GL_FLOAT, 0, 0);
+		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);
+		glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+	} else {
+		glVertexPointer(2, GL_FLOAT, 0, fixedvtx);
+		glDrawElements(GL_QUADS, GRID_SIZE*GRID_SIZE*4, GL_UNSIGNED_INT, fixedind);
+	}
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+	glDisableClientState(GL_VERTEX_ARRAY);
 }
 
 void gl_maxsrc_update(Uint32 now) {
@@ -155,14 +293,9 @@ void gl_maxsrc_update(Uint32 now) {
 		{cx*sy         ,    -sx,  cy*cx}
 	};
 
-	float Rt[][3] = {
-		{R[0][0], R[1][0], R[2][0]},
-		{R[0][1], R[1][1], R[2][1]},
-		{R[0][2], R[1][2], R[2][2]}
-	};
-
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, max_fbo);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, max_fbo_tex[next_tex], 0);
 	glViewport(0,0, iw, ih);
@@ -171,20 +304,11 @@ void gl_maxsrc_update(Uint32 now) {
 	glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, max_fbo_tex[cur_tex]);
-	glUseProgramObjectARB(shader_prog);
-	glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0); //TODO: only need to call glGetUniformLocationARB once
-	glUniformMatrix2x3fv(glGetUniformLocationARB(shader_prog, "R"), 1, 0, (float *)Rt);
-	glBegin(GL_QUADS);
-		glTexCoord2d(-1,-1); glVertex2d(-1, -1);
-		glTexCoord2d( 1,-1); glVertex2d( 1, -1);
-		glTexCoord2d( 1, 1); glVertex2d( 1,  1);
-		glTexCoord2d(-1, 1); glVertex2d(-1,  1);
-	glEnd();
-	glUseProgramObjectARB(0);
 
+	if(have_glsl) render_bg_glsl(R);
+	else render_bg_fixed(R);
 
 	// ******************* normal
 	float pw = 0.5f*fmaxf(1.0f/38, 10.0f/iw), ph = 0.5f*fmaxf(1.0f/38, 10.0f/ih);
