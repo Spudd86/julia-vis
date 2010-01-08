@@ -341,7 +341,6 @@ void gl_maxsrc_update(Uint32 now) {
 // ********************** Point spirte -- broken in mesa? (tex co-ords are wrong, don't seem to maxblend)
 //	glEnable(GL_BLEND);
 //	glBlendEquationEXT(GL_MAX_EXT);
-//	audio_data ad; audio_get_samples(&ad);
 //	float pnt_size = fmaxf(iw/38.0, 10);
 //	float quadratic[] =  { 1.0f, 0.0f, 0.01f };
 //	float maxSize = 0.0f;
@@ -353,9 +352,10 @@ void gl_maxsrc_update(Uint32 now) {
 //	glPointSize(pnt_size);
 //	glBindTexture(GL_TEXTURE_2D, pnt_tex);
 //	glTexEnvf(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE);
+////	glPointParameteri(GL_POINT_SPRITE_COORD_ORIGIN, GL_UPPER_LEFT);
 //
 //	float verts[samp][6]; // need to include colour or the points don't show (BLEH!)
-//	for(int i=0; i<samp; i++) {
+//	audio_data ad; audio_get_samples(&ad); for(int i=0; i<samp; i++) {
 //		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
 //		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 //
@@ -365,7 +365,7 @@ void gl_maxsrc_update(Uint32 now) {
 //		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
 //		verts[i][0] = 1; verts[i][1] = 1; verts[i][2] = 1;
 //		verts[i][3] = x; verts[i][4] = y; verts[i][5] = z;
-//	}
+//	} audio_finish_samples();
 //	glEnableClientState(GL_VERTEX_ARRAY);
 //	glEnableClientState(GL_COLOR_ARRAY);
 ////	glVertexPointer(3, GL_FLOAT, 0, verts);
@@ -374,7 +374,6 @@ void gl_maxsrc_update(Uint32 now) {
 //	glDisableClientState(GL_COLOR_ARRAY);
 //	glDisableClientState(GL_VERTEX_ARRAY);
 //	glDisable( GL_POINT_SPRITE_ARB );
-//	audio_finish_samples();
 
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glPopClientAttrib();
