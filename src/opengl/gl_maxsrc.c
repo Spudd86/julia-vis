@@ -170,6 +170,7 @@ static void render_bg_glsl(float R[3][3])
 }
 
 #define GRID_SIZE 32
+#define FXD_IND_LEN (GRID_SIZE*GRID_SIZE*4)
 static GLint fixedind[GRID_SIZE][GRID_SIZE][4];
 static float fixedvtx[GRID_SIZE+1][GRID_SIZE+1][2]; // TODO: this could be a const array filled in...
 
@@ -264,7 +265,7 @@ static void render_bg_fixed(float R[3][3])
 		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, fixedH.ind);
 		glBindBufferARB(GL_ARRAY_BUFFER_ARB, fixedH.vtx);
 		glVertexPointer(2, GL_FLOAT, 0, 0);
-		glDrawElements(GL_QUADS, GRID_SIZE*GRID_SIZE*4, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_QUADS, FXD_IND_LEN, GL_UNSIGNED_INT, 0);
 //		glBindBufferARB(GL_ARRAY_BUFFER_ARB, fixedH.txco);
 //		glTexCoordPointer(2, GL_FLOAT, 0, 0);
 		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);

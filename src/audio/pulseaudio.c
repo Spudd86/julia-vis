@@ -57,7 +57,7 @@ static void stream_state_callback(pa_stream *s, void *userdata)
 static const pa_sample_spec sample_spec = { .format = PA_SAMPLE_FLOAT32NE, .rate = 44100, .channels = 1 };
 static const pa_buffer_attr buf_attr = { -1, -1, -1, -1, 1024*4 };
 
-static void connect_sink_info_callback(pa_context  *c, const pa_sink_info  *i, int eol, void *userdata) {(void)userdata;
+static void connect_sink_info_callback(pa_context  *c, const pa_sink_info  *i, int eol, void *userdata) {(void)userdata;(void)eol;
 	stream = pa_stream_new(c, "foo", &sample_spec, NULL);
     pa_stream_set_state_callback(stream, stream_state_callback, NULL);
 //    pa_stream_set_read_callback(stream, stream_read_callback, NULL);
