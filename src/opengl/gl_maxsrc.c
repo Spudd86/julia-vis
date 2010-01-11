@@ -115,7 +115,8 @@ static const char *frag_src =
 //TODO: fallback to glCopyTexImage2D/glCopyTexSubImage2D if no FBO's
 
 static int samp = 0;
-static float *verts = NULL;
+static float *sco_verts = NULL;
+static float *sco_texco = NULL;
 static GLboolean have_glsl = GL_FALSE;
 
 static void fixed_init(void);
@@ -127,7 +128,7 @@ void gl_maxsrc_init(int width, int height) {
 	if(GLEW_ARB_fragment_shader) {
 		setup_max_fbo(width, height);
 		shader_prog = compile_program(NULL, frag_src);
-		verts = malloc(sizeof(float)*samp*5*4);
+		sco_verts = malloc(sizeof(float)*samp*5*4);
 		have_glsl = GL_TRUE;
 	}
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
@@ -322,10 +323,10 @@ void gl_maxsrc_update(Uint32 now) {
 		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
 		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
 
-		verts[(i*4+0)*5+0] = 0; verts[(i*4+0)*5+1] = 1; verts[(i*4+0)*5+2] = x-pw; verts[(i*4+0)*5+3] = y-ph; verts[(i*4+0)*5+4] = z;
-		verts[(i*4+1)*5+0] = 1; verts[(i*4+1)*5+1] = 1; verts[(i*4+1)*5+2] = x+pw; verts[(i*4+1)*5+3] = y-ph; verts[(i*4+1)*5+4] = z;
-		verts[(i*4+2)*5+0] = 1; verts[(i*4+2)*5+1] = 0; verts[(i*4+2)*5+2] = x+pw; verts[(i*4+2)*5+3] = y+ph; verts[(i*4+2)*5+4] = z;
-		verts[(i*4+3)*5+0] = 0; verts[(i*4+3)*5+1] = 0; verts[(i*4+3)*5+2] = x-pw; verts[(i*4+3)*5+3] = y+ph; verts[(i*4+3)*5+4] = z;
+		sco_verts[(i*4+0)*5+0] = 0; sco_verts[(i*4+0)*5+1] = 1; sco_verts[(i*4+0)*5+2] = x-pw; sco_verts[(i*4+0)*5+3] = y-ph; sco_verts[(i*4+0)*5+4] = z;
+		sco_verts[(i*4+1)*5+0] = 1; sco_verts[(i*4+1)*5+1] = 1; sco_verts[(i*4+1)*5+2] = x+pw; sco_verts[(i*4+1)*5+3] = y-ph; sco_verts[(i*4+1)*5+4] = z;
+		sco_verts[(i*4+2)*5+0] = 1; sco_verts[(i*4+2)*5+1] = 0; sco_verts[(i*4+2)*5+2] = x+pw; sco_verts[(i*4+2)*5+3] = y+ph; sco_verts[(i*4+2)*5+4] = z;
+		sco_verts[(i*4+3)*5+0] = 0; sco_verts[(i*4+3)*5+1] = 0; sco_verts[(i*4+3)*5+2] = x-pw; sco_verts[(i*4+3)*5+3] = y+ph; sco_verts[(i*4+3)*5+4] = z;
 	}
 	audio_finish_samples();
 
@@ -335,7 +336,7 @@ void gl_maxsrc_update(Uint32 now) {
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 	glEnableClientState(GL_VERTEX_ARRAY); //FIXME
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-	glInterleavedArrays(GL_T2F_V3F, 0, verts); //TODO: replace with seperate calls to glVertexPointer/glTexCoordPointer also maybe use VBOs and have a fixed VBO for tex-coords
+	glInterleavedArrays(GL_T2F_V3F, 0, sco_verts); //TODO: replace with seperate calls to glVertexPointer/glTexCoordPointer also maybe use VBOs and have a fixed VBO for tex-coords
 	glDrawArrays(GL_QUADS, 0, samp*4);
 
 // ********************** Point spirte -- broken in mesa? (tex co-ords are wrong, don't seem to maxblend)
