@@ -171,6 +171,7 @@ int main(int argc, char **argv)
 				glBindTexture(GL_TEXTURE_2D, disp_texture);
 				glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbos[maxfrms%2]);
 				// copy pixels from PBO to texture object
+				// TODO: make this a PBO so we can blit right to it
 				glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, disp_surf->w, disp_surf->h, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, 0);
 				glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbos[(maxfrms+1)%2]);
 				glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, disp_surf->w * disp_surf->h * sizeof(uint32_t), 0, GL_STREAM_DRAW_ARB);

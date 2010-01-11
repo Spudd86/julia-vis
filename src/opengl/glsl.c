@@ -67,7 +67,7 @@ static void init_pal_tex(void) {
 	glPopAttrib();
 }
 
-static void update_pal_tex(void) {
+static void update_pal_tex(void) { //TODO: PBO?
 	glPushAttrib(GL_TEXTURE_BIT);
 	glBindTexture(GL_TEXTURE_1D, pal_tex);
 //	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, NULL);
@@ -129,6 +129,10 @@ static const char *rat_map_frag_shader =
 //	"		texture2D(prev, map(gl_TexCoord[1].xy))*(253/256.0f), texture2D(maxsrc, gl_TexCoord[0].st));\n"
 	"}\n";
 
+
+//TODO: write code to do this using these extensions:
+//		ATI_fragment_shader (http://www.opengl.org/registry/specs/ATI/fragment_shader.txt)
+//		NV_texture_shader (http://www.opengl.org/registry/specs/NV/texture_shader.txt)
 static const char *pal_frag_shader =
 	"#version 120\n"
 	"uniform sampler2D src;"

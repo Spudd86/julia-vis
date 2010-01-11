@@ -335,7 +335,7 @@ void gl_maxsrc_update(Uint32 now) {
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 	glEnableClientState(GL_VERTEX_ARRAY); //FIXME
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-	glInterleavedArrays(GL_T2F_V3F, 0, verts);
+	glInterleavedArrays(GL_T2F_V3F, 0, verts); //TODO: replace with seperate calls to glVertexPointer/glTexCoordPointer also maybe use VBOs and have a fixed VBO for tex-coords
 	glDrawArrays(GL_QUADS, 0, samp*4);
 
 // ********************** Point spirte -- broken in mesa? (tex co-ords are wrong, don't seem to maxblend)
