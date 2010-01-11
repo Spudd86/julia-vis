@@ -125,10 +125,11 @@ static void fixed_init(void);
 void gl_maxsrc_init(int width, int height) {
 	iw=width, ih=height; samp = IMAX(iw,ih);
 
+	sco_verts = malloc(sizeof(float)*samp*5*4);
+
 	if(GLEW_ARB_fragment_shader) {
 		setup_max_fbo(width, height);
 		shader_prog = compile_program(NULL, frag_src);
-		sco_verts = malloc(sizeof(float)*samp*5*4);
 		have_glsl = GL_TRUE;
 	}
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
