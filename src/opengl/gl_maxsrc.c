@@ -127,8 +127,9 @@ void gl_maxsrc_init(int width, int height) {
 
 	sco_verts = malloc(sizeof(float)*samp*5*4);
 
-	if(GLEW_ARB_fragment_shader) {
-		setup_max_fbo(width, height);
+	setup_max_fbo(width, height);
+
+	if(glewGetExtension("GL_ARB_shading_language_120")) {
 		shader_prog = compile_program(NULL, frag_src);
 		have_glsl = GL_TRUE;
 	}
@@ -299,6 +300,7 @@ void gl_maxsrc_update(Uint32 now) {
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 
+	glActiveTexture(GL_TEXTURE0);
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, max_fbo);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, max_fbo_tex[next_tex], 0);
 	glViewport(0,0, iw, ih);
@@ -307,7 +309,6 @@ void gl_maxsrc_update(Uint32 now) {
 	glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, max_fbo_tex[cur_tex]);
 
 	if(have_glsl) render_bg_glsl(R);
@@ -340,43 +341,6 @@ void gl_maxsrc_update(Uint32 now) {
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	glInterleavedArrays(GL_T2F_V3F, 0, sco_verts); //TODO: replace with seperate calls to glVertexPointer/glTexCoordPointer also maybe use VBOs and have a fixed VBO for tex-coords
 	glDrawArrays(GL_QUADS, 0, samp*4);
-
-// ********************** Point spirte -- broken in mesa? (tex co-ords are wrong, don't seem to maxblend)
-//	glEnable(GL_BLEND);
-//	glBlendEquationEXT(GL_MAX_EXT);
-//	float pnt_size = fmaxf(iw/38.0, 10);
-//	float quadratic[] =  { 1.0f, 0.0f, 0.01f };
-//	float maxSize = 0.0f;
-//	glEnable(GL_POINT_SPRITE_ARB);
-////	glGetFloatv(GL_POINT_SIZE_MAX_ARB, &maxSize );
-////	glPointParameterfvARB(GL_POINT_DISTANCE_ATTENUATION_ARB, quadratic);
-////	glPointParameterf(GL_POINT_SIZE_MIN, 1.0f);
-////	glPointParameterf(GL_POINT_SIZE_MAX, maxSize);
-//	glPointSize(pnt_size);
-//	glBindTexture(GL_TEXTURE_2D, pnt_tex);
-//	glTexEnvf(GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE);
-////	glPointParameteri(GL_POINT_SPRITE_COORD_ORIGIN, GL_UPPER_LEFT);
-//
-//	float verts[samp][6]; // need to include colour or the points don't show (BLEH!)
-//	audio_data ad; audio_get_samples(&ad); for(int i=0; i<samp; i++) {
-//		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
-//		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
-//
-//		float xt = (i - samp/2)*1.0f/samp, yt = 0.1f*s, zt = 0.0f;
-//		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
-//		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
-//		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
-//		verts[i][0] = 1; verts[i][1] = 1; verts[i][2] = 1;
-//		verts[i][3] = x; verts[i][4] = y; verts[i][5] = z;
-//	} audio_finish_samples();
-//	glEnableClientState(GL_VERTEX_ARRAY);
-//	glEnableClientState(GL_COLOR_ARRAY);
-////	glVertexPointer(3, GL_FLOAT, 0, verts);
-//	glInterleavedArrays(GL_C3F_V3F, 0, verts);
-//	glDrawArrays(GL_POINTS, 0, samp);
-//	glDisableClientState(GL_COLOR_ARRAY);
-//	glDisableClientState(GL_VERTEX_ARRAY);
-//	glDisable( GL_POINT_SPRITE_ARB );
 
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glPopClientAttrib();
