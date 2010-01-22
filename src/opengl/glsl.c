@@ -3,8 +3,6 @@
  *
  */
 
-//TODO: depth textures? (more bits!) GL_ARB_depth_texture (also use the depth texture as a shadow texture)
-
 #define GL_GLEXT_PROTOTYPES
 
 #include "common.h"
@@ -21,16 +19,7 @@
 #include "audio/audio.h"
 #include "glpallet.h"
 
-
-#define IM_SIZE (512)
-
-//TODO: ARB_fragment_program version
-//TODO: write code to mix'n'match the map() functions with different mains (ie different # of samples per pixel)
-static GLhandleARB map_prog;
-static GLint map_c_loc=0, map_prev_loc=0, map_maxsrc_loc=0;
-static GLhandleARB rat_map_prog;
 static const char *map_frag_shader =
-
 	"#ifdef FLOAT_PACK_PIX\n"
 	FLOAT_PACK_FUNCS
 	"#else\n"
@@ -106,12 +95,12 @@ static const char *rat_map_frag_shader =
 	"#else\n"
 	"	gl_FragData[0] = encode(max((253.0f/256.0f)*decode(smap(gl_TexCoord[1].st)), decode(texture2D(maxsrc, gl_TexCoord[0].st))));\n"
 	"#endif\n"
-	"}\n"
-//	"#endif\n\n"
-	;
+	"}\n";
 
 
-GLuint disp_texture;
+static GLhandleARB map_prog;
+static GLint map_c_loc=0, map_prev_loc=0, map_maxsrc_loc=0;
+static GLhandleARB rat_map_prog;
 
 static void setup_opengl(int width, int height);
 static opt_data opts;
@@ -144,54 +133,79 @@ static void setup_map_fbo(int width, int height) {
 	glPopAttrib();
 }
 
-static void set_viewport(int w, int h) {
-	glViewport(0, 0, w, h);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
+static void render_fract_map_glsl(GLint srctex, struct point_data *pd) {
+	glActiveTextureARB(GL_TEXTURE1_ARB);
+	glBindTexture(GL_TEXTURE_2D, srctex);
+	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
+
+	if(pd->dim == 2) {
+		glUseProgramObjectARB(map_prog);
+		glUniform2fARB(map_c_loc, (pd->p[0]-0.5f)*0.25f + 0.5f, pd->p[1]*0.25f + 0.5f);
+		glUniform1iARB(map_maxsrc_loc, 0);
+		glUniform1iARB(map_prev_loc, 1);
+	} else if(pd->dim == 4) {
+		glUseProgramObjectARB(rat_map_prog);
+		glUniform4fARB(glGetUniformLocationARB(rat_map_prog, "c"), pd->p[0], pd->p[1], pd->p[2], pd->p[3]);
+		glUniform1iARB(glGetUniformLocationARB(rat_map_prog, "maxsrc"), 0);
+		glUniform1iARB(glGetUniformLocationARB(rat_map_prog, "prev"), 1);
+	}
+	glBegin(GL_QUADS);
+		glMultiTexCoord2f(GL_TEXTURE0, 0.0, 1.0);
+		glMultiTexCoord2f(GL_TEXTURE1,-1.0, 1.0);
+		glVertex2d(-1,  1);
+		glMultiTexCoord2f(GL_TEXTURE0, 1.0, 1.0);
+		glMultiTexCoord2f(GL_TEXTURE1, 1.0, 1.0);
+		glVertex2d( 1,  1);
+		glMultiTexCoord2f(GL_TEXTURE0, 1.0, 0.0);
+		glMultiTexCoord2f(GL_TEXTURE1, 1.0,-1.0);
+		glVertex2d( 1,-1);
+		glMultiTexCoord2f(GL_TEXTURE0, 0.0, 0.0);
+		glMultiTexCoord2f(GL_TEXTURE1,-1.0,-1.0);
+		glVertex2d(-1,-1);
+	glEnd();
+	glUseProgramObjectARB(0);
 }
 
+static Map *fixed_map = NULL;
+static GLboolean use_glsl = GL_TRUE;
+
 static void do_frame(int src_tex, int draw_tex, int im_w, int im_h, struct point_data *pd) {
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glPushAttrib(GL_TEXTURE_BIT | GL_VIEWPORT_BIT | GL_ENABLE_BIT);
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, map_fbo);
 		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, map_fbo_tex[draw_tex], 0);
-		set_viewport(im_w, im_h);
+		glViewport(0, 0, im_w, im_h);
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
 
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, map_fbo_tex[src_tex]);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
+		if(use_glsl) {
+			render_fract_map_glsl(map_fbo_tex[src_tex], pd);
+		} else {
+			glClearColor(1.0f/256, 1.0f/256,1.0f/256, 1);
+			glClear(GL_COLOR_BUFFER_BIT);
+			glClearColor(0,0,0,1);
 
-		if(pd->dim == 2) {
-			glUseProgramObjectARB(map_prog);
-			//glUniform2fARB(map_c_loc, pd->p[0]*0.5f, pd->p[1]*0.5f);
-			glUniform2fARB(map_c_loc, (pd->p[0]-0.5f)*0.25f + 0.5f, pd->p[1]*0.25f + 0.5f);
-			glUniform1iARB(map_maxsrc_loc, 0);
-			glUniform1iARB(map_prev_loc, 1);
-		} else if(pd->dim == 4) {
-			glUseProgramObjectARB(rat_map_prog);
-			glUniform4fARB(glGetUniformLocationARB(rat_map_prog, "c"), pd->p[0], pd->p[1], pd->p[2], pd->p[3]);
-			glUniform1iARB(glGetUniformLocationARB(rat_map_prog, "maxsrc"), 0);
-			glUniform1iARB(glGetUniformLocationARB(rat_map_prog, "prev"), 1);
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_CONSTANT_ALPHA, GL_ONE);
+			glBlendEquationEXT(GL_FUNC_SUBTRACT_EXT);
+			glBlendColor(0, 0, 0, 63.0f/64);
+			glBindTexture(GL_TEXTURE_2D, map_fbo_tex[src_tex]);
+			map_render(fixed_map, pd);
+
+			glBlendEquationEXT(GL_MAX_EXT);
+			glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
+			glBegin(GL_QUADS);
+				glTexCoord2d( 0, 0); glVertex2d(-1, -1);
+				glTexCoord2d( 1, 0); glVertex2d( 1, -1);
+				glTexCoord2d( 1, 1); glVertex2d( 1,  1);
+				glTexCoord2d( 0, 1); glVertex2d(-1,  1);
+			glEnd();
 		}
-		glBegin(GL_QUADS);
-			glMultiTexCoord2f(GL_TEXTURE0, 0.0, 1.0);
-			glMultiTexCoord2f(GL_TEXTURE1,-1.0, 1.0);
-			glVertex2d(-1,  1);
-			glMultiTexCoord2f(GL_TEXTURE0, 1.0, 1.0);
-			glMultiTexCoord2f(GL_TEXTURE1, 1.0, 1.0);
-			glVertex2d( 1,  1);
-			glMultiTexCoord2f(GL_TEXTURE0, 1.0, 0.0);
-			glMultiTexCoord2f(GL_TEXTURE1, 1.0,-1.0);
-			glVertex2d( 1,-1);
-			glMultiTexCoord2f(GL_TEXTURE0, 0.0, 0.0);
-			glMultiTexCoord2f(GL_TEXTURE1,-1.0,-1.0);
-			glVertex2d(-1,-1);
-		glEnd();
+
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-		glUseProgramObjectARB(0);
 	glPopAttrib();
 
 	pal_render(src_tex);
@@ -199,6 +213,13 @@ static void do_frame(int src_tex, int draw_tex, int im_w, int im_h, struct point
 
 void init_mandel();
 void render_mandel(struct point_data *pd);
+
+static void map_vtx(float u, float v, vec2f *txco, void *cb_data) {
+	struct point_data *pd = cb_data;
+	float c1 = (pd->p[0]-0.5f)*0.25f + 0.5f, c2 = pd->p[1]*0.25f + 0.5f;
+	txco->x = (u*u - v*v + c1); txco->y = (2*u*v + c2 );
+}
+GEN_MAP_CB(map_cb, map_vtx);
 
 static int make_pow2(int x) {
 	int t = x, n = 0;
@@ -210,7 +231,7 @@ static int make_pow2(int x) {
 int main(int argc, char **argv)
 {
 	optproc(argc, argv, &opts);
-	SDL_Surface *screen = sdl_setup_gl(&opts, IM_SIZE);
+	SDL_Surface *screen = sdl_setup_gl(&opts, 512);
 	int im_w = IMAX(make_pow2(IMAX(screen->w, screen->h)), 128), im_h = im_w; //TODO: nearest power of two
 	glewInit();
 
@@ -238,22 +259,26 @@ int main(int argc, char **argv)
 	gl_maxsrc_init(IMAX(im_w/2, 128), IMAX(im_h/2, 128), opts.quality == 3);
 	setup_map_fbo(im_w, im_h); 
 
-	printf("Compiling map shader:\n");
-	const char *map_defs = "#version 120\n";
-	if(opts.quality == 1) map_defs = "#version 120\n#define MAP_SAMP 5\n\n";
-	else if(opts.quality == 2) map_defs = "#version 120\n#define MAP_SAMP 7\n";
-	else if(opts.quality == 3) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n";
-	else if(opts.quality == 4) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 5\n";
-	else if(opts.quality == 5) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 7\n";
-	if(opts.rational_julia) {
-		rat_map_prog = compile_program_defs(map_defs, NULL, rat_map_frag_shader);
+	if(use_glsl) {
+		printf("Compiling map shader:\n");
+		const char *map_defs = "#version 120\n";
+		if(opts.quality == 1) map_defs = "#version 120\n#define MAP_SAMP 5\n\n";
+		else if(opts.quality == 2) map_defs = "#version 120\n#define MAP_SAMP 7\n";
+		else if(opts.quality == 3) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n";
+		else if(opts.quality == 4) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 5\n";
+		else if(opts.quality == 5) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 7\n";
+		if(opts.rational_julia) {
+			rat_map_prog = compile_program_defs(map_defs, NULL, rat_map_frag_shader);
+		} else {
+			map_prog = compile_program_defs(map_defs, NULL, map_frag_shader);
+			map_c_loc = glGetUniformLocationARB(map_prog, "c");
+			map_prev_loc = glGetUniformLocationARB(map_prog, "prev");
+			map_maxsrc_loc = glGetUniformLocationARB(map_prog, "maxsrc");
+		}
+		printf("Map shader compiled\n");
 	} else {
-		map_prog = compile_program_defs(map_defs, NULL, map_frag_shader);
-		map_c_loc = glGetUniformLocationARB(map_prog, "c");
-		map_prev_loc = glGetUniformLocationARB(map_prog, "prev");
-		map_maxsrc_loc = glGetUniformLocationARB(map_prog, "maxsrc");
+		fixed_map = map_new(97, map_cb);
 	}
-	printf("Map shader compiled\n");
 
 	struct point_data *pd = new_point_data(opts.rational_julia?4:2);
 
@@ -268,7 +293,7 @@ int main(int argc, char **argv)
 	int cnt = 0;
 	int beats = beat_get_count();
 	Uint32 last_beat_time = tick0, lastpalstep = tick0;
-//	Uint32  maxfrms = 0;
+	Uint32  maxfrms = 0;
 
 	Uint32 src_tex = 0, dst_tex = 1;
 
@@ -281,8 +306,14 @@ int main(int argc, char **argv)
 		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F2)) { if(!lastframe_key) { debug_pal = !debug_pal; } lastframe_key = 1; }
 		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F3)) { if(!lastframe_key) { show_mandel = !show_mandel; } lastframe_key = 1; }
 		else lastframe_key = 0;
+		
+		// rate limit our maxsrc updates, but run at full frame rate if we're close the opts.maxsrc_rate to avoid choppyness
+		if(tick0-now + (maxfrms*1000)/opts.maxsrc_rate > + 1000/opts.maxsrc_rate ) {
+//				|| (unsigned int)(1000/frametime) < opts.maxsrc_rate + 8) {
+			gl_maxsrc_update(now);
+			maxfrms++;
+		}
 
-		gl_maxsrc_update(now);
 		do_frame(src_tex, dst_tex, im_w, im_h, pd);
 		if(show_mandel) render_mandel(pd); //TODO: enable click to change target
 

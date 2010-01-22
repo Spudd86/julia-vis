@@ -27,7 +27,7 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 
 	{	//  r    g    b  pos
 		{   0,   0,   0,   0},
-		{   0,   0, 128,  60},
+		{   0,   0,  64,  60},
 		{ 255, 128,  64, 137},
 		{ 255, 255, 255, 240},
 		{   0,   0, 255, 255}
@@ -112,8 +112,9 @@ void pallet_start_switch(int next) {
 }
 
 #ifdef HAVE_ORC
+//#if 0
 #include <orc/orc.h>
-static void do_pallet_step(void) {
+static void do_pallet_step(uint32_t * restrict active_pal) { //TODO: make this take the dest buffer as a param
 	static OrcProgram *p = NULL;
 	OrcExecutor _ex;
 	OrcExecutor *ex = &_ex;
@@ -157,139 +158,12 @@ static void do_pallet_step(void) {
 
 	orc_executor_run (ex);
 }
-#elif  defined(__SSE2__)
-#warning Doing sse2 Compiled program will NOT work on system without it!
-#include <emmintrin.h>
-//TODO: decide if it's worth maintainig this... MMX version is probably plenty fast... and
-//      it's not like 1k of uint8's is all that much work or data... so is sse really helping
-//      (or for that matter is mmx?)
-static void do_pallet_step(void) {
-	__m128i zero = _mm_setzero_si128();
-	__m128i mask = _mm_set1_epi16(0x00ff);
-	__m128i vt = _mm_set1_epi16(palpos); // same for all i
-
-	const __m128i * restrict const next = (__m128i *)pallets32[nextpal];
-	const __m128i * restrict const old  = (__m128i *)pallets32[curpal];
-	__m128i * restrict const dest = (__m128i *)active_pal;
-
-	for(unsigned int i = 0; i < (256*4)/sizeof(__m128i); i+=2) {
-		__m128i s1 = *(next+i);
-		__m128i s2 = s1;
-		s1 = _mm_unpacklo_epi8(s1, zero);
-		s2 = _mm_unpackhi_epi8(s2, zero);
-
-		__m128i d1 = *(old+i);
-		__m128i d2 = d1;
-		d1 = _mm_unpacklo_epi8(d1, zero);
-		d2 = _mm_unpackhi_epi8(d2, zero);
-
-		s1 = _mm_mullo_epi16(s1, vt);
-		vt = _mm_andnot_si128(vt, mask); // vt = 255 - vt
-		d1 = _mm_mullo_epi16(d1, vt);
-		s1 = _mm_add_epi16(s1, d1);
-		s1 = _mm_srli_epi16(s1, 8);
-
-		d2 = _mm_mullo_epi16(d2, vt);
-		vt = _mm_andnot_si128(vt, mask); // vt = 255 - vt
-		s2 = _mm_mullo_epi16(s2, vt);
-		s2 = _mm_add_epi16(s2, d2);
-		s2 = _mm_srli_epi16(s2, 8);
-
-		s1 = _mm_packs_epi16(s1, s2);
-		*(dest + i) = s1;
-
-		s1 = *(next+i+1);
-		s2 = s1;
-		s1 = _mm_unpacklo_epi8(s1, zero);
-		s2 = _mm_unpackhi_epi8(s2, zero);
-
-		d1 = *(old+i+1);
-		d2 = d1;
-		d1 = _mm_unpacklo_epi8(d1, zero);
-		d2 = _mm_unpackhi_epi8(d2, zero);
-
-		s1 = _mm_mullo_epi16(s1, vt);
-		vt = _mm_andnot_si128(vt, mask); // vt = 255 - vt
-		d1 = _mm_mullo_epi16(d1, vt);
-		s1 = _mm_add_epi16(s1, d1);
-		s1 = _mm_srli_epi16(s1, 8);
-
-		d2 = _mm_mullo_epi16(d2, vt);
-		vt = _mm_andnot_si128(vt, mask); // vt = 255 - vt
-		s2 = _mm_mullo_epi16(s2, vt);
-		s2 = _mm_add_epi16(s2, d2);
-		s2 = _mm_srli_epi16(s2, 8);
-
-		s1 = _mm_packs_epi16(s1, s2);
-		*(dest + i + 1) = s1;
-	}
-}
-#elif defined(__MMX__)
-#warning Doing mmx Compiled program will NOT work on system without it!
-static void do_pallet_step(void) {
-	__m64 zero = _mm_cvtsi32_si64(0ll);
-	__m64 mask = (__m64)(0x00ff00ff00ff);
-	__m64 vt = _mm_set1_pi16(palpos); // same for all i
-
-	for(int i = 0; i < 256; i+=4) {
-		__m64 s1 = *(__m64 *)(pallets32[nextpal]+i);
-		__m64 s2 = s1;
-		s1 = _mm_unpacklo_pi8(s1, zero);
-		s2 = _mm_unpackhi_pi8(s2, zero);
-
-		__m64 d1 = *(__m64 *)(pallets32[curpal]+i);
-		__m64 d2 = d1;
-		d1 = _mm_unpacklo_pi8(d1, zero);
-		d2 = _mm_unpackhi_pi8(d2, zero);
-
-		s1 = _mm_mullo_pi16(s1, vt);
-		vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
-		d1 = _mm_mullo_pi16(d1, vt);
-		s1 = _mm_add_pi16(s1, d1);
-		s1 = _mm_srli_pi16(s1, 8);
-
-		d2 = _mm_mullo_pi16(d2, vt);
-		vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
-		s2 = _mm_mullo_pi16(s2, vt);
-		s2 = _mm_add_pi16(s2, d2);
-		s2 = _mm_srli_pi16(s2, 8);
-
-		s1 = _mm_packs_pu16(s1, s2);
-		*(__m64 *)(active_pal+i) = s1;
-
-		s1 = *(__m64 *)(pallets32[nextpal]+i+2);
-		s2 = s1;
-		s1 = _mm_unpacklo_pi8(s1, zero);
-		s2 = _mm_unpackhi_pi8(s2, zero);
-
-		d1 = *(__m64 *)(pallets32[curpal]+i+2);
-		d2 = d1;
-		d1 = _mm_unpacklo_pi8(d1, zero);
-		d2 = _mm_unpackhi_pi8(d2, zero);
-
-		s1 = _mm_mullo_pi16(s1, vt);
-		vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
-		d1 = _mm_mullo_pi16(d1, vt);
-		s1 = _mm_add_pi16(s1, d1);
-		s1 = _mm_srli_pi16(s1, 8);
-
-		d2 = _mm_mullo_pi16(d2, vt);
-		vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
-		s2 = _mm_mullo_pi16(s2, vt);
-		s2 = _mm_add_pi16(s2, d2);
-		s2 = _mm_srli_pi16(s2, 8);
-
-		s1 = _mm_packs_pu16(s1, s2);
-		*(__m64 *)(active_pal+i+2) = s1;
-	}
-	_mm_empty();
-}
 #else
-static void do_pallet_step(void) {
+static void do_pallet_step(uint32_t * restrict active_pal) {
 	const uint8_t *restrict next = (uint8_t *restrict)pallets32[nextpal], *restrict prev = (uint8_t *restrict)pallets32[curpal];
 	uint8_t *restrict d = (uint8_t *restrict)active_pal;
 	for(int i=0; i<256*4; i++)
-		d[i] = (uint8_t)(next[i]*palpos + prev[i]*(255-palpos));
+		d[i] = (uint8_t)((next[i]*palpos + prev[i]*(255-palpos))>>8);
 }
 #endif
 
@@ -302,7 +176,7 @@ int pallet_step(int step) {
 		curpal = nextpal;
 		memcpy(active_pal, pallets32[nextpal], 256);
 	} else
-		do_pallet_step();
+		do_pallet_step(active_pal);
 
 	active_pal[256] = active_pal[255];
 	return 1;
