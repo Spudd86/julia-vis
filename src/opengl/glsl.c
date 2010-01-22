@@ -126,25 +126,12 @@ static void setup_map_fbo(int width, int height) {
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 	for(int i=0; i<2; i++) {
 		glBindTexture(GL_TEXTURE_2D, map_fbo_tex[i]);
-//		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F_ARB,  width, height, 0, GL_RGB, GL_HALF_FLOAT_ARB, NULL);
-//		if(glGetError() != GL_NONE) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F_ARB,  width, height, 0, GL_RGB, GL_FLOAT, NULL);
-//		if(glGetError() != GL_NONE) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-//		if(GLEW_ARB_half_float_pixel && GLEW_ARB_texture_float) { printf("using half float pixels in map fbo\n");
-//			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F_ARB,  width, height, 0, GL_RGB, GL_HALF_FLOAT_ARB, NULL);
-//		} else if(GLEW_ARB_color_buffer_float && GLEW_ARB_texture_float) { printf("float pixels in map fbo\n");
-//			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F_ARB,  width, height, 0, GL_RGB, GL_FLOAT, NULL);
-//		} else {
-			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-//			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB10_A2,  width, height, 0, GL_RGBA, GL_UNSIGNED_INT_10_10_10_2, NULL);
-			GLint redsize; glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_RED_SIZE, &redsize);
-			GLint greensize; glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_GREEN_SIZE, &greensize);
-			GLint bluesize; glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_GREEN_SIZE, &bluesize);
-			GLint alphasize; glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_ALPHA_SIZE, &alphasize);
-			printf("Got format with RGBA bits %i,%i,%i %i\n", redsize, greensize, bluesize, alphasize);
-			//TODO: make sure that this works
-			// perhaps use depth textures?
-//		}
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		GLint redsize; glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_RED_SIZE, &redsize);
+		GLint greensize; glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_GREEN_SIZE, &greensize);
+		GLint bluesize; glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_GREEN_SIZE, &bluesize);
+		GLint alphasize; glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_ALPHA_SIZE, &alphasize);
+		printf("Got format with RGBA bits %i,%i,%i %i\n", redsize, greensize, bluesize, alphasize);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
@@ -228,23 +215,13 @@ int main(int argc, char **argv)
 	glewInit();
 
 	printf("GL_VENDOR: %s\n", glGetString(GL_VENDOR));
-	printf("GL_VERSION: %s\n", glGetString(GL_VERSION));
-	printf("GL_SL_VERSION: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 	printf("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
-//	printf("GL_EXTENSIONS: %s\n", glGetString(GL_EXTENSIONS));
+	printf("GL_VERSION: %s\n", glGetString(GL_VERSION));
+	if(GLEW_ARB_shading_language_100) printf("GL_SL_VERSION: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 	printf("\n\n");
 
-
-	//	if (glewIsSupported("GL_VERSION_2_0"))
-	//			printf("Ready for OpenGL 2.0\n");
-	//	else
-	if(GLEW_ARB_half_float_pixel) {
-		printf("Have half float pixels!\n");
-	}
-	if(GLEW_ARB_vertex_shader && GLEW_ARB_fragment_shader) {
-		printf("Ready for GLSL\n");
-	} else {
-		printf("No GLSL support\n");
+	if(!glewGetExtension("GL_ARB_shading_language_120")) {
+		printf("GLSL support not good enough, or missing\n");
 		exit(1);
 	}
 	
