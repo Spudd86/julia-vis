@@ -8,11 +8,33 @@
 
 typedef struct {
 	float x, y;
-}vec2f;
+} __attribute__((__packed__)) vec2f;
 
 typedef struct {
 	float x, y, z;
 }vec3f;
+
+typedef struct {
+	float x, y, z, w;
+}vec4f;
+
+typedef struct Map_s Map;
+typedef void (*map_texco_cb)(int grid_size, vec2f *restrict txco_buf, void *cb_data);
+typedef void (*map_texco_vxt_func)(float u, float v, vec2f *txco, void *cb_data);
+
+Map *map_new(int grid_size, map_texco_cb callback);
+void map_destroy(Map *self);
+void map_render(Map *self, void *cb_data);
+
+#define GEN_MAP_CB(map_cb, vtx_func) \
+		static void map_cb(int grid_size, vec2f *txco_buf, void *cb_data) {\
+			const float step = 2.0f/(grid_size);\
+			for(int yd=0; yd<=grid_size; yd++) {\
+				vec2f *row = txco_buf + yd*(grid_size+1);\
+				for(int xd=0; xd<=grid_size; xd++)\
+					vtx_func(xd*step - 1.0f, yd*step - 1.0f, row + xd, cb_data);\
+			}\
+		}
 
 GLhandleARB compile_program(const char *vert_shader, const char *frag_shader);
 GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, const char *frag_shader);
