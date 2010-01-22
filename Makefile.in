@@ -124,11 +124,6 @@ bin/sdl-test$(EXEEXT): src/sdl.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src
 	src/sdl.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pixmisc.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
 
-bin/gl-test$(EXEEXT): src/opengl/opengl_fix.c src/opengl/drawscope.c src/opengl/fixed_map.c src/opengl/glmisc.c src/sdl-misc.c src/mtwist/mtwist.c $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pallet.c src/pixmisc.c src/optproc.c src/points.c src/points.h src/common.h Makefile config.mk
-	$(CC) $(CFLAGS) -DUSE_SDL \
-	src/opengl/opengl_fix.c src/opengl/drawscope.c src/opengl/fixed_map.c src/opengl/glmisc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) \
-	$(SDL_FLAGS) $(AUDIO_FLAGS) -L/usr/X11R6/lib -lGL -lGLU -lGLEW -o $@
-
 bin/glsl-test$(EXEEXT): src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
 	src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c \
