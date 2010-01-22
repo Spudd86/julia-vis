@@ -37,6 +37,7 @@ typedef struct {
 	int doublebuf;
 	int hw_pallet;
 	int rational_julia;
+	int quality;
 
 	opt_audio_drv audio_driver;
 	const char *audio_opts;

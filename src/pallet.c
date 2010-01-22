@@ -294,18 +294,18 @@ static void do_pallet_step(void) {
 #endif
 
 int get_pallet_changing(void) { return pallet_changing; }
-void pallet_step(int step) {
-	if(!pallet_changing) return;
+int pallet_step(int step) {
+	if(!pallet_changing) return 0;
 	palpos += step;
 	if(palpos >=256) {
 		pallet_changing = palpos = 0;
 		curpal = nextpal;
 		memcpy(active_pal, pallets32[nextpal], 256);
-		return;
 	} else
 		do_pallet_step();
 
 	active_pal[256] = active_pal[255];
+	return 1;
 }
 
 // pallet must have 257 entries (for easier interpolation on 16 bit indicies)

@@ -33,8 +33,27 @@ static Pixbuf *setup_point_16(int w, int h)
 
 	for(int y=0; y < h; y++)  {
 		for(int x=0; x < w; x++) {
-			float u = (2.0f*x)/w - 1, v = (2.0f*y)/h - 1;
+//			float u = (2.0f*x)/w - 1, v = (2.0f*y)/h - 1;
+			float u = 1-((float)x)/w, v = 1-((float)y)/h;
 			buf[y*w + x] = (uint16_t)(expf(-4.5f*(u*u+v*v))*(UINT16_MAX));
+		}
+	}
+	return surf;
+}
+
+static Pixbuf *setup_point_32(int w, int h)
+{
+	Pixbuf *surf = malloc(sizeof(Pixbuf));
+	uint32_t *buf = surf->data = malloc(w * h * sizeof(*buf)); surf->bpp  = 32;
+	surf->w = w; surf->h = h;
+	surf->pitch = surf->w*sizeof(*buf);
+	memset(buf, 0, w*h*sizeof(*buf));
+
+	for(int y=0; y < h; y++)  {
+		for(int x=0; x < w; x++) {
+//			float u = (2.0f*x)/w - 1, v = (2.0f*y)/h - 1;
+			float u = 1-((float)x)/w, v = 1-((float)y)/h;
+			buf[y*w + x] = (uint32_t)(expf(-4.5f*(u*u+v*v))*(UINT32_MAX));
 		}
 	}
 	return surf;
@@ -47,15 +66,7 @@ static void setup_max_fbo(int width, int height) {
 
 	for(int i=0; i<2; i++) {
 		glBindTexture(GL_TEXTURE_2D, max_fbo_tex[i]);
-//		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE,  width, height, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, NULL);
-//		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,  width, height, 0, GL_RGBA, GL_UNSIGNED_INT_10_10_10_2, NULL);
-		if(GLEW_ARB_half_float_pixel && GLEW_ARB_texture_float)
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F_ARB,  width, height, 0, GL_RGB, GL_HALF_FLOAT_ARB, NULL);
-		else if(GLEW_ARB_color_buffer_float && GLEW_ARB_texture_float)
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F_ARB,  width, height, 0, GL_RGB, GL_FLOAT, NULL);
-		else
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB10_A2,  width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-		//TODO: check for errors to be sure we can actually use GL_RGB10 here (possibly also testing that we can render to it)
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -90,57 +101,81 @@ static GLhandleARB shader_prog;
 
 static const char *frag_src =
 	"#version 120\n"
-	"uniform sampler2D prev;"
-	"invariant uniform mat2x3 R;"
-	"void main() {"
-	"	vec3 p = vec3(0.5f);"
-	"	{"
-	"		vec2 uv = gl_TexCoord[0].st;"
-	"		float d = 0.96f*0.5f + (0.04f*0.5f)*log2(length(uv)*0.707106781186547 + 1);"
-	"		p.yz = vec2(d); p = (uv.x*R[0] + uv.y*R[1])*p;" //NOTE: on mesa 7.6's compiler p*= generates more code for some reason
-	"	}"
-//	"	vec2 tmp = texture2D(prev, gl_TexCoord[0].st*0.5+0.5).rb;"
-//	"	float c = dot(tmp, vec2(256,1-1.0/256)/256) - 0.25/256;"
-//	"	vec2 c = texture2D(prev, p*R + 0.5f).xy*(98.0/100);"
-//	"	c.y += fract(c.x*255);"
-//	"	gl_FragData[0].xy = c;"
-//	"	gl_FragData[0].r = c; gl_FragData[0].b = fract(c*256);"
-	"	vec4 c = texture2D(prev, p*R + 0.5f);"
-	"	gl_FragData[0].x = (c.x - max(2/256.0f, c.x*(1.0f/100)));" //TODO: only do this if tex format not precise enough
-//	"	gl_FragData[0].x = (c.x - c.x*(2/128.0f));"
-//	"	gl_FragData[0] = texture2D(prev, vec2(p*R)*0.5f + 0.5f)*(63/64.0f);"
-//	"	gl_FragData[0] = (texture2D(prev, vec2(p*R)*0.5f + 0.5f) - (2/256.0f));"
-	"}";
+	"uniform sampler2D prev;\n"
+	"invariant uniform mat2x3 R;\n"
+	"void main() {\n"
+	"	vec3 p = vec3(0.5f);\n"
+	"	{\n"
+	"		vec2 uv = gl_TexCoord[0].st;\n"
+	"		float d = 0.96f*0.5f + (0.04f*0.5f)*log2(length(uv)*0.707106781186547f + 1);\n"
+	"		p.yz = vec2(d); p = (uv.x*R[0] + uv.y*R[1])*p;\n" //NOTE: on mesa 7.6's compiler p*= generates more code for some reason
+	"	}\n"
+	"	vec4 c = texture2D(prev, p*R + 0.5f);\n"
+	"	gl_FragData[0].x = (c.x - max(2/256.0f, c.x*(1.0f/100)));\n" //TODO: only do this if tex format not precise enough
+	"}\n";
 
-//TODO: fallback to glCopyTexImage2D/glCopyTexSubImage2D if no FBO's
+static const char *frag_src_mix =
+	"#version 120\n"
+	FLOAT_PACK_FUNCS
+	"uniform sampler2D prev;\n"
+	"invariant uniform mat2x3 R;\n"
+	"void main() {\n"
+	"	vec3 p = vec3(0.5f);\n"
+	"	{\n"
+	"		vec2 uv = gl_TexCoord[0].st;\n"
+//	"		float d = 0.96f*0.5f + (0.04f*0.5f)*log2(length(uv) + 1);\n"
+	"		float d = 0.95f*0.5f + (0.05f*0.5f)*length(uv);"
+	"		p.yz = vec2(d); p = (uv.x*R[0] + uv.y*R[1])*p;\n" //NOTE: on mesa 7.6's compiler p*= generates more code for some reason
+	"	}\n"
+//	"	float c = decode(texture2D(prev, p*R + 0.5f));\n"
+//	"	gl_FragData[0] = encode(pow(pow(c,2.2f)*(97.0f/100), 1/2.2f));\n"
+//	"	gl_FragData[0] = encode(pow(decode(texture2D(prev, p*R + 0.5f)), 1.03));\n"
+//	"	gl_FragData[0] = encode(decode(texture2D(prev, p*R + 0.5f)) - 1.0f/100);\n"
+	"	gl_FragData[0] = encode(decode(texture2D(prev, p*R + 0.5f))*(98.0f/100));\n"
+	"}\n";
+
 
 static int samp = 0;
 static float *sco_verts = NULL;
-static float *sco_texco = NULL;
 static GLboolean have_glsl = GL_FALSE;
 
 static void fixed_init(void);
 //TODO: clean up, only generate VBO's if we're going to use them
 //TODO: add command line flag to use fixed function pipeline as much as possible
-void gl_maxsrc_init(int width, int height) {
+void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels) {
 	iw=width, ih=height; samp = IMAX(iw,ih);
+//	samp = 4;
 
 	sco_verts = malloc(sizeof(float)*samp*5*4);
 
 	setup_max_fbo(width, height);
 
 	if(glewGetExtension("GL_ARB_shading_language_120")) {
-		shader_prog = compile_program(NULL, frag_src);
+		printf("Compiling maxsrc shader:\n");
+		if(packed_intesity_pixels)
+			shader_prog = compile_program(NULL, frag_src_mix);
+		else
+			shader_prog = compile_program(NULL, frag_src);
 		have_glsl = GL_TRUE;
+		printf("maxsrc shader compiled\n");
 	}
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glGenTextures(1, &pnt_tex);
 	glBindTexture(GL_TEXTURE_2D, pnt_tex);
 
-	Pixbuf *src = pnt = setup_point_16(64, 64);
-	gluBuild2DMipmaps(GL_TEXTURE_2D, GL_LUMINANCE, src->w, src->h, GL_LUMINANCE, GL_UNSIGNED_SHORT, src->data);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_CLAMP_TO_EDGE);
+	Pixbuf *src = NULL;
+	if(have_glsl && packed_intesity_pixels) {
+		src = pnt = setup_point_32(32, 32);
+		gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, src->w, src->h, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, src->data);
+	} else {
+		src = pnt = setup_point_16(32, 32);
+		gluBuild2DMipmaps(GL_TEXTURE_2D, GL_LUMINANCE, src->w, src->h, GL_LUMINANCE, GL_UNSIGNED_SHORT, src->data);
+	}
+
+//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_CLAMP_TO_EDGE);
+//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT_ARB);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT_ARB);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -326,9 +361,13 @@ void gl_maxsrc_update(Uint32 now) {
 		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
 		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
 
-		sco_verts[(i*4+0)*5+0] = 0; sco_verts[(i*4+0)*5+1] = 1; sco_verts[(i*4+0)*5+2] = x-pw; sco_verts[(i*4+0)*5+3] = y-ph; sco_verts[(i*4+0)*5+4] = z;
-		sco_verts[(i*4+1)*5+0] = 1; sco_verts[(i*4+1)*5+1] = 1; sco_verts[(i*4+1)*5+2] = x+pw; sco_verts[(i*4+1)*5+3] = y-ph; sco_verts[(i*4+1)*5+4] = z;
-		sco_verts[(i*4+2)*5+0] = 1; sco_verts[(i*4+2)*5+1] = 0; sco_verts[(i*4+2)*5+2] = x+pw; sco_verts[(i*4+2)*5+3] = y+ph; sco_verts[(i*4+2)*5+4] = z;
+//		sco_verts[(i*4+0)*5+0] = 0; sco_verts[(i*4+0)*5+1] = 1; sco_verts[(i*4+0)*5+2] = x-pw; sco_verts[(i*4+0)*5+3] = y-ph; sco_verts[(i*4+0)*5+4] = z;
+//		sco_verts[(i*4+1)*5+0] = 1; sco_verts[(i*4+1)*5+1] = 1; sco_verts[(i*4+1)*5+2] = x+pw; sco_verts[(i*4+1)*5+3] = y-ph; sco_verts[(i*4+1)*5+4] = z;
+//		sco_verts[(i*4+2)*5+0] = 1; sco_verts[(i*4+2)*5+1] = 0; sco_verts[(i*4+2)*5+2] = x+pw; sco_verts[(i*4+2)*5+3] = y+ph; sco_verts[(i*4+2)*5+4] = z;
+//		sco_verts[(i*4+3)*5+0] = 0; sco_verts[(i*4+3)*5+1] = 0; sco_verts[(i*4+3)*5+2] = x-pw; sco_verts[(i*4+3)*5+3] = y+ph; sco_verts[(i*4+3)*5+4] = z;
+		sco_verts[(i*4+0)*5+0] = 0; sco_verts[(i*4+0)*5+1] = 2; sco_verts[(i*4+0)*5+2] = x-pw; sco_verts[(i*4+0)*5+3] = y-ph; sco_verts[(i*4+0)*5+4] = z;
+		sco_verts[(i*4+1)*5+0] = 2; sco_verts[(i*4+1)*5+1] = 2; sco_verts[(i*4+1)*5+2] = x+pw; sco_verts[(i*4+1)*5+3] = y-ph; sco_verts[(i*4+1)*5+4] = z;
+		sco_verts[(i*4+2)*5+0] = 2; sco_verts[(i*4+2)*5+1] = 0; sco_verts[(i*4+2)*5+2] = x+pw; sco_verts[(i*4+2)*5+3] = y+ph; sco_verts[(i*4+2)*5+4] = z;
 		sco_verts[(i*4+3)*5+0] = 0; sco_verts[(i*4+3)*5+1] = 0; sco_verts[(i*4+3)*5+2] = x-pw; sco_verts[(i*4+3)*5+3] = y+ph; sco_verts[(i*4+3)*5+4] = z;
 	}
 	audio_finish_samples();

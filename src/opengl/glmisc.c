@@ -14,9 +14,9 @@
 
 static void check_gl_obj_msg(GLhandleARB obj);
 
-static GLboolean do_shader_compile(GLhandleARB shader, const char *source) {
+static GLboolean do_shader_compile(GLhandleARB shader, int count, const char **source) {
 	GLint compiled = GL_FALSE;
-	glShaderSourceARB(shader, 1, &source, NULL);
+	glShaderSourceARB(shader, count, source, NULL);
 	glCompileShaderARB(shader);
 	glGetObjectParameterivARB(shader, GL_OBJECT_COMPILE_STATUS_ARB, &compiled);
 	check_gl_obj_msg(shader);
@@ -27,17 +27,25 @@ static GLboolean do_shader_compile(GLhandleARB shader, const char *source) {
 	return GL_TRUE;
 }
 
+static GLboolean do_shader_compile_defs(GLhandleARB shader, const char *defs, const char *source) {
+	if(defs) {
+		const char *sources[] = { defs, source };
+		return do_shader_compile(shader, 2, sources);
+	} else
+		return do_shader_compile(shader, 1, &source);
+}
+
 //TODO: add stuff to allow a second set of code for functions
-GLhandleARB compile_program(const char *vert_shader, const char *frag_shader) {
+GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, const char *frag_shader) {
 	GLhandleARB vert=0, frag=0;
 
 	if(vert_shader != NULL) {
 		vert = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
-		do_shader_compile(vert, vert_shader);
+		do_shader_compile_defs(vert, defs, vert_shader);
 	}
 	if(frag_shader != NULL) {
 		frag = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
-		do_shader_compile(frag, frag_shader);
+		do_shader_compile_defs(frag, defs, frag_shader);
 	}
 
 	// delete so that the shaders go away as soon as they are detached from the program
@@ -54,6 +62,10 @@ GLhandleARB compile_program(const char *vert_shader, const char *frag_shader) {
 		exit(1);
 	}
 	return prog;
+}
+
+GLhandleARB compile_program(const char *vert_shader, const char *frag_shader) {
+	return compile_program_defs(NULL, vert_shader, frag_shader);
 }
 
 static void check_gl_obj_msg(GLhandleARB obj) {
@@ -81,6 +93,33 @@ void pixbuf_to_texture(Pixbuf *src, GLuint *tex, GLint clamp_mode, int rgb) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glPopAttrib();
+}
+
+#include "terminusIBM.h"
+
+void draw_string(const char *str)
+{
+	glPushClientAttrib( GL_CLIENT_PIXEL_STORE_BIT );
+	glPixelStorei( GL_UNPACK_SWAP_BYTES,  GL_FALSE );
+	glPixelStorei( GL_UNPACK_LSB_FIRST,   GL_FALSE );
+	glPixelStorei( GL_UNPACK_ROW_LENGTH,  0        );
+	glPixelStorei( GL_UNPACK_SKIP_ROWS,   0        );
+	glPixelStorei( GL_UNPACK_SKIP_PIXELS, 0        );
+	glPixelStorei( GL_UNPACK_ALIGNMENT,   1        );
+
+	const char *c = str;
+	while(*c) {
+			//TODO: fix the font
+
+			uint8_t tmp[16]; const uint8_t *src = terminusIBM + 16 * *c;
+			for(int i = 0; i<16; i++) { //FIXME draws upsidedown on ATI's gl on windows
+				tmp[i] = src[15-i];
+			}
+
+			glBitmap(8, 16, 0,0, 8, 0, tmp);
+			c++;
+		}
+	glPopClientAttrib();
 }
 
 //void drawString3D(const char *str, float pos[3], float color[4], void *font)
