@@ -400,7 +400,7 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 	}
 }
 #else
-void pallet_blit32(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
+static void pallet_blit32(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++)
 		for(unsigned int x = 0; x < w; x++)
@@ -534,7 +534,7 @@ static void pallet_blit555(uint8_t *restrict dest, unsigned int dst_stride, cons
 #ifdef __MMX__
 #warning no mmx for 16-bit modes (needs extras added in 3dnow or SSE)!
 #endif
-void pallet_blit565(uint8_t * restrict dest, unsigned int dst_stride,
+static void pallet_blit565(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h,
 					const uint32_t *restrict pal)
@@ -549,7 +549,7 @@ void pallet_blit565(uint8_t * restrict dest, unsigned int dst_stride,
 		}
 	}
 }
-void pallet_blit555(uint8_t * restrict dest, unsigned int dst_stride,
+static void pallet_blit555(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h,
 					const uint32_t *restrict pal)
@@ -596,7 +596,7 @@ static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride,
 	}
 }
 #else
-void pallet_blit8(uint8_t * restrict dest, unsigned int dst_stride,
+static void pallet_blit8(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h)
 {
