@@ -96,7 +96,7 @@ int main(int argc, char **argv)
 	int lastdrawn=0;
 	int maxfrms = 0;
 	Uint32 tick0 = SDL_GetTicks();
-	Uint32 lastpalstep, lastupdate, lasttime; lastpalstep = lastupdate = lasttime = tick0;
+	Uint32 lastpalstep, lastupdate; lastpalstep = lastupdate = tick0;
 	Uint32 fpstimes[opts.draw_rate]; for(int i=0; i<opts.draw_rate; i++) fpstimes[i] = tick0;
 	float scr_fps = 0;
 
@@ -134,7 +134,6 @@ int main(int argc, char **argv)
 				maxsrc_update();
 				maxfrms++;
 				prevfrm = tribuf_get_frmnum(map_tb);
-				lasttime = now;
 			}
 
 			now = SDL_GetTicks();
