@@ -95,6 +95,15 @@ void pixbuf_to_texture(Pixbuf *src, GLuint *tex, GLint clamp_mode, int rgb) {
 	glPopAttrib();
 }
 
+void setup_viewport(int width, int height) {
+	glViewport(0, 0, width, height);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+}
+
 #include "terminusIBM.h"
 
 void draw_string(const char *str)
@@ -109,34 +118,20 @@ void draw_string(const char *str)
 
 	const char *c = str;
 	while(*c) {
-			//TODO: fix the font
-
-			uint8_t tmp[16]; const uint8_t *src = terminusIBM + 16 * *c;
-			for(int i = 0; i<16; i++) { //FIXME draws upsidedown on ATI's gl on windows
-				tmp[i] = src[15-i];
-			}
-
-			glBitmap(8, 16, 0,0, 8, 0, tmp);
-			c++;
+		//TODO: fix the font
+		if(*c == '\n') {
+//			glRasterPos2iv();
+			//TODO: move down
+			c++; continue;
 		}
+
+		uint8_t tmp[16]; const uint8_t *src = terminusIBM + 16 * *c;
+		for(int i = 0; i<16; i++) { //FIXME draws upsidedown on ATI's gl on windows
+			tmp[i] = src[15-i];
+		}
+
+		glBitmap(8, 16, 0,0, 8, 0, tmp);
+		c++;
+	}
 	glPopClientAttrib();
 }
-
-//void drawString3D(const char *str, float pos[3], float color[4], void *font)
-//{
-//    glPushAttrib(GL_LIGHTING_BIT | GL_CURRENT_BIT); // lighting and color mask
-//    glDisable(GL_LIGHTING);     // need to disable lighting for proper text color
-//
-//    glColor4fv(color);          // set text color
-//    glRasterPos3fv(pos);        // place text position
-//
-//    // loop all characters in the string
-//    while(*str)
-//    {
-//        glutBitmapCharacter(font, *str);
-//        ++str;
-//    }
-//
-//    glEnable(GL_LIGHTING);
-//    glPopAttrib();
-//}

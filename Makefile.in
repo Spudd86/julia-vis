@@ -73,7 +73,7 @@ DFB_FLAGS = @DIRECTFB_CFLAGS@ @DIRECTFB_LIBS@
 
 ALL_BINS := bin/sdl-test$(EXEEXT) bin/sdlthread-test$(EXEEXT) bin/audio-test$(EXEEXT)
 ifeq (@enable_opengl@,yes) 
-	ALL_BINS += bin/glsl-test$(EXEEXT)
+	ALL_BINS += bin/gl-test$(EXEEXT)
 endif
 
 AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/portaudio.c 
@@ -109,7 +109,7 @@ run: bin/sdlthread-test
 
 clean:
 	rm -f src/*.o
-	rm -f bin/dfb-test bin/audio-test bin/sdl-test bin/sdlthread-test
+	rm -f bin/dfb-test bin/audio-test bin/sdl-test bin/sdlthread-test bin/gl-test
 
 distclean: clean
 	rm -f Makefile config.h config.status config.cache config.log configure stamp-h
@@ -124,9 +124,9 @@ bin/sdl-test$(EXEEXT): src/sdl.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src
 	src/sdl.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/maxsrc.c src/map.c src/pixmisc.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
 
-bin/glsl-test$(EXEEXT): src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+bin/gl-test$(EXEEXT): src/opengl/glmain.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
-	src/opengl/glsl.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c \
+	src/opengl/glmain.c src/opengl/glmisc.c src/opengl/gl_maxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c \
 	$(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -L/usr/X11R6/lib -lGL -lGLU -lGLEW -o $@
 

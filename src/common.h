@@ -41,6 +41,8 @@ typedef struct {
 
 	opt_audio_drv audio_driver;
 	const char *audio_opts;
+
+	const char *gl_opts;
 }opt_data;
 
 void optproc(int argc, char **argv, opt_data *res);

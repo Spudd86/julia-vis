@@ -74,7 +74,7 @@ static const char *frag_src =
 	"		p.yz = vec2(d); p = (uv.x*R[0] + uv.y*R[1])*p;\n" //NOTE: on mesa 7.6's compiler p*= generates more code for some reason
 	"	}\n"
 	"	vec4 c = texture2D(prev, p*R + 0.5f);\n"
-	"	gl_FragData[0].x = (c.x - max(2/256.0f, c.x*(1.0f/100)));\n" //TODO: only do this if tex format not precise enough
+	"	gl_FragData[0] = (c - max(vec4(2/256.0f), c*(1.0f/100)));\n" //TODO: only do this if tex format not precise enough
 	"}\n";
 
 static const char *frag_src_mix =
@@ -98,49 +98,58 @@ static const char *frag_src_mix =
 	"}\n";
 
 static void bg_vtx(float u, float v, vec2f *txco, void *cb_data) {
-	struct {
-		float R[3][3];
-	} *Rp = cb_data;
+//	float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
+//	float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
+//		(u*(*R)[0][0] + v*(*R)[0][1]),
+//		(u*(*R)[1][0] + v*(*R)[1][1])*d,
+//		(u*(*R)[2][0] + v*(*R)[2][1])*d
+//	};
+//	txco->x = (p[0]*(*R)[0][0] + p[1]*(*R)[1][0] + p[2]*(*R)[2][0]+1.0f)*0.5f;
+//	txco->y = (p[0]*(*R)[0][1] + p[1]*(*R)[1][1] + p[2]*(*R)[2][1]+1.0f)*0.5f;
 
+	float *R = cb_data;
 	float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
 	float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
-		(u*Rp->R[0][0] + v*Rp->R[0][1]),
-		(u*Rp->R[1][0] + v*Rp->R[1][1])*d,
-		(u*Rp->R[2][0] + v*Rp->R[2][1])*d
+		(u*R[0*3+0] + v*R[0*3+1]),
+		(u*R[1*3+0] + v*R[1*3+1])*d,
+		(u*R[2*3+0] + v*R[2*3+1])*d
 	};
-
-	// rotate back and shift/scale to [0, GRID_SIZE]
-	txco->x = (p[0]*Rp->R[0][0] + p[1]*Rp->R[1][0] + p[2]*Rp->R[2][0]+1.0f)*0.5f;
-	txco->y = (p[0]*Rp->R[0][1] + p[1]*Rp->R[1][1] + p[2]*Rp->R[2][1]+1.0f)*0.5f;
+	txco->x = (p[0]*R[0*3+0] + p[1]*R[1*3+0] + p[2]*R[2*3+0]+1.0f)*0.5f;
+	txco->y = (p[0]*R[0*3+1] + p[1]*R[1*3+1] + p[2]*R[2*3+1]+1.0f)*0.5f;
+//	txco->x = (u+1)/2; txco->y = (v+1)/2;
 }
 
-static GLuint pnt_tex;
-static GLhandleARB shader_prog;
-static GLuint max_fbo, max_fbo_tex[2];
+static GLuint pnt_tex = 0;
+static GLhandleARB shader_prog = 0;
+static GLuint max_fbo = 0, max_fbo_tex[2] = { 0, 0 };
 static int cur_tex = 0;
 static int iw, ih;
 static int samp = 0;
+static float pw = 0, ph = 0;
 static float *sco_verts = NULL;
-static GLboolean have_glsl = GL_FALSE;
+static GLboolean use_glsl = GL_FALSE;
 static Map *fixed_map = NULL;
 GEN_MAP_CB(fixed_map_cb, bg_vtx);
 
-void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels) {
-	iw=width, ih=height; samp = IMAX(iw,ih);
+void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLboolean force_fixed) {
+	iw=width, ih=height;
+	pw = 0.5f*fmaxf(1.0f/38, 10.0f/iw), ph = 0.5f*fmaxf(1.0f/38, 10.0f/ih);
+	samp = (int)(10*fmaxf(1/pw,1/ph));
+	printf("maxsrc using %n points\n", samp);
 	sco_verts = malloc(sizeof(float)*samp*5*4);
 
-	if(glewGetExtension("GL_ARB_shading_language_120")) {
+	if(glewGetExtension("GL_ARB_shading_language_120") && !force_fixed) {
+		use_glsl = GL_TRUE;
 		printf("Compiling maxsrc shader:\n");
 		if(packed_intesity_pixels)
 			shader_prog = compile_program(NULL, frag_src_mix);
 		else
 			shader_prog = compile_program(NULL, frag_src);
-		have_glsl = GL_TRUE;
 		printf("maxsrc shader compiled\n");
 	} else {
+		use_glsl = GL_FALSE;
 		fixed_map = map_new(32, fixed_map_cb);
 	}
-
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
@@ -158,7 +167,7 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels) {
 	Pixbuf *src = NULL;
 	glGenTextures(1, &pnt_tex);
 	glBindTexture(GL_TEXTURE_2D, pnt_tex);
-	if(have_glsl && packed_intesity_pixels) {
+	if(use_glsl && packed_intesity_pixels) {
 		src = setup_point_32(32, 32);
 		gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, src->w, src->h, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, src->data);
 	} else {
@@ -188,6 +197,7 @@ static void render_bg_glsl(float R[3][3])
 	glUseProgramObjectARB(shader_prog);
 	glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0); //TODO: only need to call glGetUniformLocationARB once
 	glUniformMatrix2x3fv(glGetUniformLocationARB(shader_prog, "R"), 1, 0, (float *)Rt);
+	glBindTexture(GL_TEXTURE_2D, max_fbo_tex[cur_tex]);
 	glBegin(GL_QUADS);
 		glTexCoord2d(-1,-1); glVertex2d(-1, -1);
 		glTexCoord2d( 1,-1); glVertex2d( 1, -1);
@@ -209,10 +219,12 @@ static void render_bg_fixed(float R[3][3])
 	glBlendEquationEXT(GL_FUNC_SUBTRACT_EXT);
 	glBlendColor(0, 0, 0, 63.0f/64);
 
-	map_render(fixed_map, &R);
+	glBindTexture(GL_TEXTURE_2D, max_fbo_tex[cur_tex]);
+	map_render(fixed_map, R);
 }
 
-void gl_maxsrc_update(Uint32 now) {(void)now;
+void gl_maxsrc_update(void)
+{
 	int next_tex = (cur_tex+1)%2;
 	float dt = 1;
 //	static static Uint32 lastupdate = -1;
@@ -225,31 +237,25 @@ void gl_maxsrc_update(Uint32 now) {(void)now;
 	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz);
 	float sx=sinf(tx), sy=sinf(ty), sz=sinf(tz);
 
-	float R[][3] = {
+	float R[3][3] = {
 		{cz*cy-sz*sx*sy, -sz*cx, -sy*cz-cy*sz*sx},
 		{sz*cy+cz*sx*sy,  cz*cx, -sy*sz+cy*cz*sx},
 		{cx*sy         ,    -sx,  cy*cx}
 	};
 
-	glPushAttrib(GL_TEXTURE_BIT | GL_VIEWPORT_BIT | GL_ENABLE_BIT);
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0);
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, max_fbo);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, max_fbo_tex[next_tex], 0);
-	glViewport(0,0, iw, ih);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
+	setup_viewport(iw, ih);
 
-	glBindTexture(GL_TEXTURE_2D, max_fbo_tex[cur_tex]);
-	if(have_glsl) render_bg_glsl(R);
+	if(use_glsl) render_bg_glsl(R);
 	else render_bg_fixed(R);
+	CHECK_GL_ERR;
 
 	// ******************* normal
-	float pw = 0.5f*fmaxf(1.0f/38, 10.0f/iw), ph = 0.5f*fmaxf(1.0f/38, 10.0f/ih);
 	audio_data ad; audio_get_samples(&ad);
 	for(int i=0; i<samp; i++) {
 		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
@@ -282,9 +288,11 @@ void gl_maxsrc_update(Uint32 now) {(void)now;
 
 	tx+=0.02*dt; ty+=0.01*dt; tz-=0.003*dt;
 	cur_tex = next_tex;
+
+	CHECK_GL_ERR;
 }
 
-GLuint gl_maxsrc_get() {
+GLuint gl_maxsrc_get(void) {
 	return max_fbo_tex[(cur_tex+1)%2];
 //	return max_fbo_tex[(cur_tex)];
 }

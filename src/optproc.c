@@ -21,7 +21,15 @@ static const char *helpstr =
 "\t\t\t 0 take 1 sample (default)\n"
 "\t\t\t 1 take 5 samples\n"
 "\t\t\t 2 take 7 samples\n"
+"\t\t\t 3 take 1 sample (packed intensity)\n"
+"\t\t\t 4 take 5 samples (packed intensity)\n"
+"\t\t\t 5 take 7 samples (packed intensity)\n"
+"\t\tfixed function gl: currently no effect\n"
 "\t\tsoftware: currently no effect\n"
+
+"\t-g opt1:opt2:...\n"
+"\t\tgeneric opengl options\n"
+"\t\t\tfixed\tforce use fixed function GL\n"
 
 "\t-i <driver>[:opts] select audio input driver\n"
 "\t\tdrivers:\n"
@@ -57,8 +65,9 @@ void optproc(int argc, char **argv, opt_data *res)
 
 	res->audio_driver = AUDIO_PORTAUDIO;
 	res->audio_opts = NULL;
+	res->gl_opts = NULL;
 
-	while((opt = getopt(argc, argv, "w:h:s:a:i:q:rftpd")) != -1) {
+	while((opt = getopt(argc, argv, "w:h:s:a:i:q:g:rftpd")) != -1) {
 		switch(opt) {
 			case 'w':
 				res->w = atoi(optarg);
@@ -80,6 +89,9 @@ void optproc(int argc, char **argv, opt_data *res)
 				break;
 			case 'p':
 				res->hw_pallet = 1;
+				break;
+			case 'g':
+				res->gl_opts = strdup(optarg);
 				break;
 			case 'i': {
 				char *drvstr = strdup(optarg);

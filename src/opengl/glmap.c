@@ -27,17 +27,17 @@ struct Map_s {
 	map_texco_cb callback;
 };
 
-//static void vtx_func(float u, float v, vec2f *txco, void *cb_data) {(void)cb_data;
-//	txco->x = (u+1)/2; txco->y = (v+1)/2;
-//}
-//static void map_cb(int grid_size, vec2f *txco_buf, void *cb_data) {
-//	const float step = 2.0f/(grid_size);
-//	for(int yd=0; yd<=grid_size; yd++) {
-//		vec2f *row = txco_buf + yd*(grid_size+1);
-//		for(int xd=0; xd<=grid_size; xd++)
-//			vtx_func(xd*step - 1.0f, yd*step - 1.0f, row + xd, cb_data);
-//	}
-//}
+static void vtx_func(float u, float v, vec2f *txco, void *cb_data) {(void)cb_data;
+	txco->x = (u+1)/2; txco->y = (v+1)/2;
+}
+static void map_cb(int grid_size, vec2f *txco_buf, void *cb_data) {
+	const float step = 2.0f/(grid_size);
+	for(int yd=0; yd<=grid_size; yd++) {
+		vec2f *row = txco_buf + yd*(grid_size+1);
+		for(int xd=0; xd<=grid_size; xd++)
+			vtx_func(xd*step - 1.0f, yd*step - 1.0f, row + xd, cb_data);
+	}
+}
 
 Map *map_new(int grid_size, map_texco_cb callback)
 {
@@ -67,6 +67,7 @@ Map *map_new(int grid_size, map_texco_cb callback)
 	}
 
 	if(GLEW_ARB_vertex_buffer_object) {
+//	if(0) {
 		self->use_vbo = GL_TRUE;
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
@@ -92,6 +93,8 @@ Map *map_new(int grid_size, map_texco_cb callback)
 		memcpy(self->txco_buf, self->vtx_buf, sizeof(vec2f)*(self->grid_size+1)*(self->grid_size+1));
 	}
 
+	CHECK_GL_ERR;
+
 	return self;
 }
 
@@ -108,17 +111,22 @@ void map_destroy(Map *self)
 
 void map_render(Map *self, void *cb_data)
 {
-//	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
+	CHECK_GL_ERR;
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 
 	if(self->use_vbo) {
 		glBindBufferARB(GL_ARRAY_BUFFER_ARB, self->txco);
 		vec2f *ptr = glMapBufferARB(GL_ARRAY_BUFFER_ARB, GL_WRITE_ONLY_ARB);
-		if(!ptr) return;
+		if(!ptr) {
+			printf("Map buffer failed!\n");
+			return;
+		}
 		self->callback(self->grid_size, ptr, cb_data);
 		glUnmapBufferARB(GL_ARRAY_BUFFER_ARB);
 	} else
 		self->callback(self->grid_size, self->txco_buf, cb_data);
+	CHECK_GL_ERR;
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -137,5 +145,6 @@ void map_render(Map *self, void *cb_data)
 		glDrawElements(GL_QUADS, self->grid_size*self->grid_size*4, GL_UNSIGNED_INT, self->ind_buf);
 	}
 	glPopClientAttrib();
-//	glPopAttrib();
+	glPopAttrib();
+	CHECK_GL_ERR;
 }

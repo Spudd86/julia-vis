@@ -101,10 +101,6 @@ static const char *rat_map_frag_shader =
 static GLhandleARB map_prog;
 static GLint map_c_loc=0, map_prev_loc=0, map_maxsrc_loc=0;
 static GLhandleARB rat_map_prog;
-
-static void setup_opengl(int width, int height);
-static opt_data opts;
-
 GLuint map_fbo, map_fbo_tex[2];
 
 static void setup_map_fbo(int width, int height) {
@@ -165,21 +161,19 @@ static void render_fract_map_glsl(GLint srctex, struct point_data *pd) {
 		glVertex2d(-1,-1);
 	glEnd();
 	glUseProgramObjectARB(0);
+	glActiveTextureARB(GL_TEXTURE1_ARB);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTextureARB(GL_TEXTURE0_ARB);
 }
 
 static Map *fixed_map = NULL;
-static GLboolean use_glsl = GL_TRUE;
+static GLboolean use_glsl = GL_FALSE;
 
-static void do_frame(int src_tex, int draw_tex, int im_w, int im_h, struct point_data *pd) {
-	glPushAttrib(GL_TEXTURE_BIT | GL_VIEWPORT_BIT | GL_ENABLE_BIT);
+static void render_fractal(int src_tex, int draw_tex, int im_w, int im_h, struct point_data *pd) {
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, map_fbo);
 		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, map_fbo_tex[draw_tex], 0);
-		glViewport(0, 0, im_w, im_h);
-		glMatrixMode(GL_PROJECTION);
-		glLoadIdentity();
-		glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
-		glMatrixMode(GL_MODELVIEW);
-		glLoadIdentity();
+		setup_viewport(im_w, im_h);
 
 		if(use_glsl) {
 			render_fract_map_glsl(map_fbo_tex[src_tex], pd);
@@ -195,6 +189,7 @@ static void do_frame(int src_tex, int draw_tex, int im_w, int im_h, struct point
 			glBindTexture(GL_TEXTURE_2D, map_fbo_tex[src_tex]);
 			map_render(fixed_map, pd);
 
+			glActiveTextureARB(GL_TEXTURE0_ARB);
 			glBlendEquationEXT(GL_MAX_EXT);
 			glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
 			glBegin(GL_QUADS);
@@ -207,8 +202,6 @@ static void do_frame(int src_tex, int draw_tex, int im_w, int im_h, struct point
 
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glPopAttrib();
-
-	pal_render(src_tex);
 }
 
 void init_mandel();
@@ -230,36 +223,55 @@ static int make_pow2(int x) {
 
 int main(int argc, char **argv)
 {
+	opt_data opts;
 	optproc(argc, argv, &opts);
+	GLboolean force_fixed = opts.gl_opts != NULL && strstr(opts.gl_opts, "fixed") != NULL;
 	SDL_Surface *screen = sdl_setup_gl(&opts, 512);
 	int im_w = IMAX(make_pow2(IMAX(screen->w, screen->h)), 128), im_h = im_w; //TODO: nearest power of two
 	glewInit();
+	setup_viewport(screen->w, screen->h);
+	glHint(GL_CLIP_VOLUME_CLIPPING_HINT_EXT, GL_FASTEST);
+	glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST);
+
+//	glEnable(GL_MULTISAMPLE);
+
+	glClear(GL_COLOR_BUFFER_BIT);
+	glRasterPos2f(-1,1 - 20.0f/(screen->h*0.5f));
+	draw_string("Loading...\n"); SDL_GL_SwapBuffers();
 
 	printf("GL_VENDOR: %s\n", glGetString(GL_VENDOR));
 	printf("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
 	printf("GL_VERSION: %s\n", glGetString(GL_VERSION));
 	if(GLEW_ARB_shading_language_100) printf("GL_SL_VERSION: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 	printf("\n\n");
-
-	if(!glewGetExtension("GL_ARB_shading_language_120")) {
-		printf("GLSL support not good enough, or missing\n");
-		exit(1);
-	}
 	
-	if(GLEW_EXT_blend_minmax) {
-		printf("Have blend_minmax!\n");
-	} else {
-		printf("missing GL_EXE_blend_minmax!\n");
+	if(!GLEW_EXT_blend_minmax) {
+		printf("missing GL_EXT_blend_minmax!\n");
 		exit(1);
 	}
+
+	if(!GLEW_ARB_shading_language_100)
+		printf("No GLSL using all fixed function! (might be slow)\n");
+	else if(!glewGetExtension("GL_ARB_shading_language_120"))
+		printf("GLSL support not good enough. Using (mostly) fixed function\n");
+
+	if(!GLEW_ARB_shading_language_100 && !GLEW_ARB_pixel_buffer_object)
+		printf("Missing GLSL and pixel buffer objects, WILL be slow!\n");
+
+	if(force_fixed)
+		printf("Fixed function code forced\n");
+
+	glEnable(GL_TEXTURE_2D);
+
+	setup_map_fbo(im_w, im_h);
 
 	init_mandel();
 	audio_init(&opts);
-	setup_opengl(screen->w, screen->h);
-	gl_maxsrc_init(IMAX(im_w/2, 128), IMAX(im_h/2, 128), opts.quality == 3);
-	setup_map_fbo(im_w, im_h); 
 
-	if(use_glsl) {
+	if(glewGetExtension("GL_ARB_shading_language_120") && !force_fixed) {
+		use_glsl = GL_TRUE;
+		draw_string("Compiling Shaders...\n "); SDL_GL_SwapBuffers();
+
 		printf("Compiling map shader:\n");
 		const char *map_defs = "#version 120\n";
 		if(opts.quality == 1) map_defs = "#version 120\n#define MAP_SAMP 5\n\n";
@@ -279,13 +291,13 @@ int main(int argc, char **argv)
 	} else {
 		fixed_map = map_new(97, map_cb);
 	}
+	CHECK_GL_ERR;
 
 	struct point_data *pd = new_point_data(opts.rational_julia?4:2);
 
-	pal_init(im_w, im_h, map_fbo_tex, opts.quality == 3);
+	gl_maxsrc_init(IMAX(im_w/2, 128), IMAX(im_h/2, 128), opts.quality >= 3, force_fixed); CHECK_GL_ERR;
+	pal_init(im_w, im_h, opts.quality >= 3, force_fixed); CHECK_GL_ERR;
 
-	glPixelZoom(1.0, -1.0);
-	glRasterPos2f(-1.0, 1.0);
 	SDL_Event	event;
 	Uint32 tick0, fps_oldtime;
 	Uint32 now = fps_oldtime = tick0 = SDL_GetTicks();
@@ -310,31 +322,47 @@ int main(int argc, char **argv)
 		// rate limit our maxsrc updates, but run at full frame rate if we're close the opts.maxsrc_rate to avoid choppyness
 		if(tick0-now + (maxfrms*1000)/opts.maxsrc_rate > + 1000/opts.maxsrc_rate ) {
 //				|| (unsigned int)(1000/frametime) < opts.maxsrc_rate + 8) {
-			gl_maxsrc_update(now);
+			gl_maxsrc_update();
 			maxfrms++;
 		}
 
-		do_frame(src_tex, dst_tex, im_w, im_h, pd);
+		render_fractal(src_tex, dst_tex, im_w, im_h, pd);
+
+		if(!debug_pal || !debug_maxsrc || !show_mandel) {
+			pal_render(map_fbo_tex[src_tex]);
+		} else {
+			glPushAttrib(GL_VIEWPORT_BIT);
+			GLint vp[4]; glGetIntegerv(GL_VIEWPORT, vp);
+			glViewport(0, 0, vp[2]/2, vp[3]/2);
+			glMatrixMode(GL_PROJECTION);
+			glLoadIdentity();
+			glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+			glMatrixMode(GL_MODELVIEW);
+			glLoadIdentity();
+			pal_render(map_fbo_tex[src_tex]);
+			glPopAttrib();
+		}
+
 		if(show_mandel) render_mandel(pd); //TODO: enable click to change target
 
 		//TODO: figure out what attrib to push to save color
 		if(debug_pal || debug_maxsrc) { glPushAttrib(GL_TEXTURE_BIT); glColor3f(1.0f, 0.0f, 0.0f); }
 		if(debug_pal) {
-			glBindTexture(GL_TEXTURE_2D, map_fbo_tex[0]);
+			glBindTexture(GL_TEXTURE_2D, map_fbo_tex[src_tex]);
 			glBegin(GL_QUADS);
-				glTexCoord2d(0.0,1.0); glVertex2d( 1, -1);
-				glTexCoord2d(1.0,1.0); glVertex2d( 0, -1);
-				glTexCoord2d(1.0,0.0); glVertex2d( 0,  0);
-				glTexCoord2d(0.0,0.0); glVertex2d( 1,  0);
+				glTexCoord2d(0,0); glVertex2d( 1, -1);
+				glTexCoord2d(1,0); glVertex2d( 0, -1);
+				glTexCoord2d(1,1); glVertex2d( 0,  0);
+				glTexCoord2d(0,1); glVertex2d( 1,  0);
 			glEnd();
 		}
-		if(debug_maxsrc) { glColor3f(1.0f, 1.0f, 1.0f);
+		if(debug_maxsrc) {
 			glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
 			glBegin(GL_QUADS);
-				glTexCoord2d(0.0,1.0); glVertex2d( 0,  0);
-				glTexCoord2d(1.0,1.0); glVertex2d(-1,  0);
-				glTexCoord2d(1.0,0.0); glVertex2d(-1,  1);
-				glTexCoord2d(0.0,0.0); glVertex2d( 0,  1);
+				glTexCoord2d(0,0); glVertex2d(-1,  1);
+				glTexCoord2d(1,0); glVertex2d( 0,  1);
+				glTexCoord2d(1,1); glVertex2d( 0,  0);
+				glTexCoord2d(0,1); glVertex2d(-1,  0);
 			glEnd();
 		}
 		if(debug_pal || debug_maxsrc) { glPopAttrib(); glColor3f(1.0f, 1.0f, 1.0f); }
@@ -343,13 +371,8 @@ int main(int argc, char **argv)
 		sprintf(buf,"%6.1f FPS %6.1f UPS", 1000.0f / frametime, maxfrms*1000.0f/(now-tick0));
 		glRasterPos2f(-1,1 - 20.0f/(screen->h*0.5f));
 		draw_string(buf);
-
 		SDL_GL_SwapBuffers();
-		GLint gl_err = glGetError();
-		if(gl_err != GL_NO_ERROR) {
-			const GLubyte *errstr = gluErrorString(gl_err);
-			printf("GL ERROR: %s\n", errstr);
-		}
+		CHECK_GL_ERR;
 
 		Uint32 tex_tmp = src_tex; src_tex = dst_tex; dst_tex = tex_tmp;
 
@@ -379,22 +402,4 @@ int main(int argc, char **argv)
 
 	SDL_Quit();
 	return 0;
-}
-
-static void setup_opengl(int width, int height)
-{
-    glViewport(0, 0, width, height);
-
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
-    glClearColor(0, 0 ,0 , 0);
-
-    glEnable(GL_TEXTURE_2D);
-    glDisable(GL_LIGHTING);
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_ALPHA_TEST);
-	glDisable(GL_CULL_FACE);
-//	glEnable(GL_DITHER);
-	glHint(GL_CLIP_VOLUME_CLIPPING_HINT_EXT, GL_FASTEST);
 }

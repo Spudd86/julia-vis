@@ -148,6 +148,8 @@ void pulse_shutdown();
 
 int audio_init(opt_data *od)
 {
+	printf("\nAudio input starting...\n");
+
 	int rc;
 	switch(od->audio_driver) {
 	#ifdef HAVE_JACK
@@ -173,5 +175,7 @@ int audio_init(opt_data *od)
 	atexit(audio_shutdown);
 
 	usleep(10000); // wait a bit so we have some audio in the buffer (instead of garbage)
+
+	printf("Finished audio setup\n\n");
 	return rc;
 }
