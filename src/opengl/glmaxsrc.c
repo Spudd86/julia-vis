@@ -11,7 +11,7 @@
 
 #include "audio/audio.h"
 #include "glmisc.h"
-#include "gl_maxsrc.h"
+#include "glmaxsrc.h"
 
 #define USE_MIRRORED_REPEAT
 

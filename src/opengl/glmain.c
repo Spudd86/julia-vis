@@ -14,7 +14,7 @@
 #include "points.h"
 #include "sdl-misc.h"
 #include "glmisc.h"
-#include "gl_maxsrc.h"
+#include "glmaxsrc.h"
 #include "pixmisc.h"
 #include "audio/audio.h"
 #include "glpallet.h"

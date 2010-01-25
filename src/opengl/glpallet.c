@@ -9,10 +9,7 @@
 #include <GL/glew.h>
 #include <GL/glut.h>
 
-#include "points.h"
-#include "sdl-misc.h"
 #include "glmisc.h"
-#include "gl_maxsrc.h"
 #include "pixmisc.h"
 #include "mymm.h"
 
