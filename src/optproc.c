@@ -1,7 +1,5 @@
 #include "common.h"
-#include <stdio.h>
 #include <getopt.h>
-#include <string.h>
 
 #ifdef HAVE_ORC
 #include <orc/orc.h>

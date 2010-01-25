@@ -12,7 +12,7 @@ static uint16_t *setup_point(int w, int h)
 	int stride = w+1;
 	for(int y=0; y < h; y++)  {
 		for(int x=0; x < w; x++) {
-			float u = (2*x+1.0f)/w - 1, v = (2*y+1.0f)/h - 1;
+			float u = (2*x+1.0f)/(w-1) - 1, v = (2*y+1.0f)/(h-1) - 1;
 			buf[y*stride + x] = (uint16_t)(expf(-4.5f*(u*u+v*v))*(UINT16_MAX));
 		}
 	}

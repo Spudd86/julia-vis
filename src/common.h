@@ -11,9 +11,21 @@
 #ifdef HAVE_INTTYPES_H
 #include <inttypes.h>
 #endif
-#include <math.h>
+#ifdef HAVE_STRING_H
+#include <string.h>
+#endif
+#ifdef HAVE_STRINGS_H
+#include <strings.h>
+#endif
+#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
+#endif
+#ifdef HAVE_MEMORY_H
+#include <memory.h>
+#endif
+#include <stdio.h>
 #include <malloc.h>
+#include <math.h>
 
 //#define IMIN(x,y) ((x)+((((y)-(x)) >> 31)&((y)-(x))))
 //#define IMAX(x,y) ((x)-((((x)-(y)) >> 31)&((x)-(y))))

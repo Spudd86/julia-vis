@@ -57,7 +57,7 @@ void draw_string(const char *str);
 		"	return enc;\n"\
 		"}\n"\
 		"float decode(vec4 rgba ) {\n"\
-		"	return dot(rgba, vec4(1.0, 1/255.0, 1/65025.0, 1/16581375.0) );\n"\
+		"	return clamp(dot(rgba, vec4(1.0, 1/255.0, 1/65025.0, 1/16581375.0) ), 0, 1);\n"\
 		"}\n"
 
 #endif /* include guard */

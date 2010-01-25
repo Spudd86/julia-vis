@@ -30,7 +30,7 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 		{   0,   0,  64,  60},
 		{ 255, 128,  64, 137},
 		{ 255, 255, 255, 240},
-		{   0,   0, 255, 255}
+		{ 255, 255, 255, 255}
 	},
 
 	{	//  r    g    b  pos

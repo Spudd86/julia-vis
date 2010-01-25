@@ -119,34 +119,39 @@ static void pal_init_glsl(GLboolean float_packed_pixels)
 }
 
 // ********* FIXED FUNCTION STUFF
-#define PALLET_OFFSCREEN_TEMP
+//#define PALLET_OFFSCREEN_TEMP
 static void pallet_blit32(uint32_t *restrict dest, const uint32_t *restrict src, unsigned int w, unsigned int h, const uint32_t *restrict pal);
 
 static GLhandleARB pbos[2] = {0, 0}, srcpbos[2] = {0, 0};
-static GLuint disp_texture;
-static Pixbuf *disp_surf = NULL;
+static GLuint disp_texture = 0;
+static void *fxdsrcbuf = NULL, *fxddstbuf = NULL;
 static GLboolean have_pbo = GL_FALSE;
 #ifdef PALLET_OFFSCREEN_TEMP
-static GLint fbo = 0, rbos[2];
+static GLint fbo = 0;
+//static GLint rbos[2] = {0, 0};
+static GLint rbo = 0;
+static int rbow = 0, rboh = 0;
 #endif
 
 static void pal_init_fixed() //FIXME
 {
-	disp_surf = malloc(sizeof(Pixbuf));
-	disp_surf->bpp  = 32; disp_surf->w = im_w; disp_surf->h = im_h; // TODO: these should be the actual window size...
-	disp_surf->pitch = disp_surf->w*sizeof(uint32_t);
-
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 
 #ifdef PALLET_OFFSCREEN_TEMP
 	glGenFramebuffersEXT(1, &fbo);
-	glGenRenderbuffersEXT(2, rbos);
-	for(int i=0; i<2; i++) {
-		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbos[i]);
-		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, disp_surf->w, disp_surf->h);
-	}
+	glGenRenderbuffersEXT(1, &rbo);
+	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
+	glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, im_w, im_h);
+//	glGenRenderbuffersEXT(2, rbos);
+//	for(int i=0; i<2; i++) {
+//		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbos[i]);
+//		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, im_w, im_h);
+//	}
 	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo); CHECK_GL_ERR;
+	glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, rbo);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 #endif
 
 	glGenTextures(1, &disp_texture);
@@ -162,19 +167,19 @@ static void pal_init_fixed() //FIXME
 		glGenBuffersARB(2, pbos);
 		for(int i=0; i<2; i++) {
 			glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbos[i]);
-			glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, disp_surf->w * disp_surf->h * sizeof(uint32_t), 0, GL_STREAM_DRAW_ARB);
+			glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, im_w * im_h * sizeof(uint32_t), 0, GL_STREAM_DRAW_ARB);
 		}
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 
 		glGenBuffersARB(2, srcpbos);
 		for(int i=0; i<2; i++) {
 			glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, srcpbos[i]);
-			glBufferDataARB(GL_PIXEL_PACK_BUFFER_ARB, disp_surf->w * disp_surf->h * sizeof(uint32_t), 0, GL_STREAM_READ_ARB);
+			glBufferDataARB(GL_PIXEL_PACK_BUFFER_ARB, im_w * im_h * sizeof(uint32_t), 0, GL_STREAM_READ_ARB);
 		}
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, 0);
 	} else {
-		disp_surf->data = _mm_malloc(im_w * im_h * sizeof(uint32_t), 32);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,  im_w, im_h, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, disp_surf->data);
+		fxddstbuf = _mm_malloc(im_w * im_h * sizeof(uint32_t), 32);
+		fxdsrcbuf = _mm_malloc(im_w * im_h * sizeof(uint32_t), 32);
 	}
 
 	glPopClientAttrib();
@@ -194,12 +199,20 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 	const GLint vp_w = vp[2], vp_h = vp[3];
 
 #ifdef PALLET_OFFSCREEN_TEMP
-	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbos[frm%2]);
-	glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, vp_w, vp_h);
-	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+	glPushAttrib(GL_VIEWPORT_BIT);
+//	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbos[frm%2]);
+//	glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, vp_w, vp_h);
+//	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+//	if(rbow != vp_w || rboh != vp_h) {
+//		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
+//		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, vp_w, vp_h);
+//		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+//	}
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo); CHECK_GL_ERR;
-	glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, rbos[frm%2]);
+	glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, rbo);
+//	glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, rbos[frm%2]);
 	setup_viewport(vp_w, vp_h);
+//	glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
 #endif
 
 	glBindTexture(GL_TEXTURE_2D, srctex);
@@ -212,18 +225,21 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 	int read_buf; glGetIntegerv(GL_DRAW_BUFFER, &read_buf);
 	glReadBuffer(read_buf);
 
+	//TODO: figure out how to make sure this uses a fast format
 	if(have_pbo) {
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, srcpbos[(frm+1)%2]);
-		//TODO: figure out how to make sure this uses a fast format
-		glReadPixels(0, 0, vp[2], vp[3], GL_BGRA, GL_UNSIGNED_BYTE, 0);
+		glReadPixels(0, 0, vp_w, vp_h, GL_BGRA, GL_UNSIGNED_BYTE, 0);
+#ifdef PALLET_OFFSCREEN_TEMP
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+		glPopAttrib();
+#endif
+
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, srcpbos[(frm)%2]);
-
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbos[frm%2]);
-
 		void *dstdata = glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY_ARB);
 		const void *srcdata = glMapBufferARB(GL_PIXEL_PACK_BUFFER_ARB, GL_READ_ONLY_ARB);
-		if(dstdata && srcdata)
-			pallet_blit32(dstdata, srcdata, vp_w, vp_h, active_pal);
+		if(dstdata && srcdata) pallet_blit32(dstdata, srcdata, vp_w, vp_h, active_pal);
+		else printf("Failed to map a pbo\n");
 		if(srcdata) { glUnmapBufferARB(GL_PIXEL_PACK_BUFFER_ARB); }
 		if(dstdata) { glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB); }
 
@@ -233,24 +249,22 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, 0);
 	} else {
-		void *srcdata = malloc(vp_w * vp_h * sizeof(uint32_t));
-		glReadPixels(0, 0, vp[2], vp[3], GL_BGRA, GL_UNSIGNED_BYTE, srcdata);
-		pallet_blit32(disp_surf->data, srcdata, vp_w, vp_h, active_pal);
-		free(srcdata);
-		glBindTexture(GL_TEXTURE_2D, disp_texture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, vp_w, vp_h, 0, GL_BGRA, GL_UNSIGNED_BYTE, disp_surf->data);
-	}
-
+		glReadPixels(0, 0, vp[2], vp[3], GL_BGRA, GL_UNSIGNED_BYTE, fxdsrcbuf);
 #ifdef PALLET_OFFSCREEN_TEMP
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+		glPopAttrib();
 #endif
+		pallet_blit32(fxddstbuf, fxdsrcbuf, vp_w, vp_h, active_pal);
+		glBindTexture(GL_TEXTURE_2D, disp_texture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, vp_w, vp_h, 0, GL_BGRA, GL_UNSIGNED_BYTE, fxddstbuf);
+	}
 
 	glBindTexture(GL_TEXTURE_2D, disp_texture);
 	glBegin(GL_QUADS);
-		glTexCoord2f(0,0); glVertex2d(-1, -1);
-		glTexCoord2f(1,0); glVertex2d( 1, -1);
-		glTexCoord2f(1,1); glVertex2d( 1,  1);
-		glTexCoord2f(0,1); glVertex2d(-1,  1);
+		glTexCoord2d(0,0); glVertex2d( 1, -1);
+		glTexCoord2d(1,0); glVertex2d(-1, -1);
+		glTexCoord2d(1,1); glVertex2d(-1,  1);
+		glTexCoord2d(0,1); glVertex2d( 1,  1);
 	glEnd();
 
 	glPopClientAttrib();

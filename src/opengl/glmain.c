@@ -226,14 +226,16 @@ int main(int argc, char **argv)
 	opt_data opts;
 	optproc(argc, argv, &opts);
 	GLboolean force_fixed = opts.gl_opts != NULL && strstr(opts.gl_opts, "fixed") != NULL;
+	GLboolean res_boost = opts.gl_opts != NULL && strstr(opts.gl_opts, "rboost") != NULL;
+	GLboolean packed_intesity_pixels = GL_FALSE;
 	SDL_Surface *screen = sdl_setup_gl(&opts, 512);
-	int im_w = IMAX(make_pow2(IMAX(screen->w, screen->h)), 128), im_h = im_w; //TODO: nearest power of two
+	int im_w = IMAX(make_pow2(IMAX(screen->w, screen->h)), 128)<<res_boost, im_h = im_w; //TODO: nearest power of two
+	printf("Using internel resolution of %ix%i\n\n", im_h, im_w);
+
 	glewInit();
 	setup_viewport(screen->w, screen->h);
 	glHint(GL_CLIP_VOLUME_CLIPPING_HINT_EXT, GL_FASTEST);
 	glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST);
-
-//	glEnable(GL_MULTISAMPLE);
 
 	glClear(GL_COLOR_BUFFER_BIT);
 	glRasterPos2f(-1,1 - 20.0f/(screen->h*0.5f));
@@ -288,6 +290,7 @@ int main(int argc, char **argv)
 			map_maxsrc_loc = glGetUniformLocationARB(map_prog, "maxsrc");
 		}
 		printf("Map shader compiled\n");
+		if(opts.quality >=3) packed_intesity_pixels = GL_TRUE;
 	} else {
 		fixed_map = map_new(97, map_cb);
 	}
@@ -295,8 +298,8 @@ int main(int argc, char **argv)
 
 	struct point_data *pd = new_point_data(opts.rational_julia?4:2);
 
-	gl_maxsrc_init(IMAX(im_w/2, 128), IMAX(im_h/2, 128), opts.quality >= 3, force_fixed); CHECK_GL_ERR;
-	pal_init(im_w, im_h, opts.quality >= 3, force_fixed); CHECK_GL_ERR;
+	gl_maxsrc_init(IMAX(im_w/2, 128), IMAX(im_h/2, 128), packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
+	pal_init(im_w, im_h, packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
 
 	SDL_Event	event;
 	Uint32 tick0, fps_oldtime;
@@ -346,7 +349,7 @@ int main(int argc, char **argv)
 		if(show_mandel) render_mandel(pd); //TODO: enable click to change target
 
 		//TODO: figure out what attrib to push to save color
-		if(debug_pal || debug_maxsrc) { glPushAttrib(GL_TEXTURE_BIT); glColor3f(1.0f, 0.0f, 0.0f); }
+		if(debug_pal || debug_maxsrc) { glPushAttrib(GL_TEXTURE_BIT); if(packed_intesity_pixels) glColor3f(1.0f, 0.0f, 0.0f); }
 		if(debug_pal) {
 			glBindTexture(GL_TEXTURE_2D, map_fbo_tex[src_tex]);
 			glBegin(GL_QUADS);
@@ -365,7 +368,7 @@ int main(int argc, char **argv)
 				glTexCoord2d(0,1); glVertex2d(-1,  0);
 			glEnd();
 		}
-		if(debug_pal || debug_maxsrc) { glPopAttrib(); glColor3f(1.0f, 1.0f, 1.0f); }
+		if(debug_pal || debug_maxsrc) { glPopAttrib(); if(packed_intesity_pixels) glColor3f(1.0f, 1.0f, 1.0f); }
 
 		char buf[64];
 		sprintf(buf,"%6.1f FPS %6.1f UPS", 1000.0f / frametime, maxfrms*1000.0f/(now-tick0));
