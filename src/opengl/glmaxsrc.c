@@ -72,8 +72,8 @@ static const char *pnt_shader_src =
 //	"			4*uv2flt(uv)"
 //	"			+ uv2flt(uv+dx) + uv2flt(uv+dy)"
 //	"			+ uv2flt(uv-dx) + uv2flt(uv-dy)));"
-//	"	gl_FragData[0] = encode(v);\n"
-	"	gl_FragData[0] = encode(exp(-4.5f*uv2flt(uv)));\n"
+//	"	gl_FragColor = encode(v);\n"
+	"	gl_FragColor = encode(exp(-4.5f*uv2flt(uv)));\n"
 	"}\n";
 
 //TODO: use 2 basis vectors to find p instead of matrix op
@@ -124,7 +124,7 @@ static GLboolean use_glsl = GL_FALSE;
 static Map *fixed_map = NULL;
 GEN_MAP_CB(fixed_map_cb, bg_vtx);
 
-#define PNT_MIP_LEVELS 5
+#define PNT_MIP_LEVELS 4
 
 void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLboolean force_fixed) {
 	iw=width, ih=height;
@@ -158,7 +158,7 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	}
 
-	if(!use_glsl) {
+	if(!packed_intesity_pixels) {
 		glGenTextures(1, &pnt_tex);
 		glBindTexture(GL_TEXTURE_2D, pnt_tex);
 		const int pnt_tex_size = 1<<PNT_MIP_LEVELS;
@@ -295,7 +295,7 @@ void gl_maxsrc_update(void)
 
 	glEnable(GL_BLEND);
 	glBlendEquationEXT(GL_MAX_EXT);
-	if(use_glsl) glUseProgramObjectARB(pnt_shader);
+	if(!pnt_tex) glUseProgramObjectARB(pnt_shader);
 	else glBindTexture(GL_TEXTURE_2D, pnt_tex);
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 	glEnableClientState(GL_VERTEX_ARRAY); //FIXME
