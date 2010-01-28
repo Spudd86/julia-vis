@@ -126,7 +126,8 @@ int audio_setup(int sr)
 
 	#ifdef FFT_TRIBUF
 	for(int i=0;i<3;i++) {
-		fft_data[i] = xmalloc(sizeof(float) * (nr_samp/2+1));
+		fft_data[i] = fftwf_malloc(sizeof(float) * (nr_samp/2+1));
+		if(!fft_data[i]) abort();
 		memset(fft_data[i], 0, sizeof(float) * nr_samp/2+1);
 	}
 	fft_tb = tribuf_new(fft_data, 0);

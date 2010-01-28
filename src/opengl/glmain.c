@@ -15,7 +15,7 @@
 #include "sdl-misc.h"
 #include "glmisc.h"
 #include "glmaxsrc.h"
-#include "pixmisc.h"
+#include "pallet.h"
 #include "audio/audio.h"
 #include "glpallet.h"
 

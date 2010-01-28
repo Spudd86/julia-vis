@@ -7,6 +7,7 @@
 #include <mm_malloc.h>
 
 #include "tribuf.h"
+#include "pallet.h"
 #include "pixmisc.h"
 #include "sdl-misc.h"
 #include "map.h"

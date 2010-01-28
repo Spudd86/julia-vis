@@ -10,16 +10,13 @@
 #include <GL/glut.h>
 
 #include "glmisc.h"
-#include "pixmisc.h"
-#include "mymm.h"
+#include "pallet.h"
 
 #include "glpallet.h"
 
 static int im_w, im_h;
 
-uint32_t *get_active_pal(void);
-
-static uint32_t *active_pal;
+static const uint32_t *active_pal;
 static GLuint pal_tex;
 static GLhandleARB pal_prog = 0;
 static GLint pal_loc=0, src_loc=0;
@@ -175,8 +172,8 @@ static void pal_init_fixed() //FIXME
 		}
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, 0);
 	} else {
-		fxddstbuf = _mm_malloc(im_w * im_h * sizeof(uint32_t), 32);
-		fxdsrcbuf = _mm_malloc(im_w * im_h * sizeof(uint32_t), 32);
+		fxddstbuf = malloc(im_w * im_h * sizeof(uint32_t));
+		fxdsrcbuf = malloc(im_w * im_h * sizeof(uint32_t));
 	}
 
 	glPopClientAttrib();

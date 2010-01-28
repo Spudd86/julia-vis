@@ -1,11 +1,11 @@
 
 #include "common.h"
-#include <stdio.h>
 #include <SDL.h>
 #include <mm_malloc.h>
 
 #include "map.h"
 #include "sdl-misc.h"
+#include "pallet.h"
 #include "pixmisc.h"
 #include "audio/audio.h"
 
