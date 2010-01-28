@@ -214,6 +214,24 @@ static void map_vtx(float u, float v, vec2f *txco, void *cb_data) {
 }
 GEN_MAP_CB(map_cb, map_vtx);
 
+static void rat_map_vtx(float u, float v, vec2f *txco, void *cb_data)
+{
+	struct point_data *pd = cb_data;
+	static const float xoom = 3.0f, moox = 1.0f/xoom;
+	const float cx0 = pd->p[0], cy0 = pd->p[1], cx1 = pd->p[2]*2, cy1 = pd->p[3]*2;
+
+	float a,b,c,d,sa,sb, cdivt, x, y;
+	a=u*xoom; b=v*xoom; sa=a*a; sb=b*b;
+	c=sa-sb + cx1; d=2*a*b+cy1;
+	b=4*(sa*a*b - a*b*sb) + cy0;  a=sa*sa -6*sa*sb + sb*sb + cx0;
+	cdivt = moox/(c*c + d*d);
+	x = (a*c + b*d)*cdivt;  y = (a*d + c*b)*cdivt;
+
+	txco->x = (x+1.0f)*0.5f; txco->y = (y+1.0f)*0.5f;
+
+}
+GEN_MAP_CB(rat_map_cb, rat_map_vtx);
+
 static int make_pow2(int x) {
 	int t = x, n = 0;
 	while(t != 1) { t = t>>1; n++; }
@@ -292,7 +310,10 @@ int main(int argc, char **argv)
 		printf("Map shader compiled\n");
 		if(opts.quality >=3) packed_intesity_pixels = GL_TRUE;
 	} else {
-		fixed_map = map_new(97, map_cb);
+		if(!opts.rational_julia)
+			fixed_map = map_new(97, map_cb);
+		else
+			fixed_map = map_new(127, rat_map_cb);
 	}
 	CHECK_GL_ERR;
 
