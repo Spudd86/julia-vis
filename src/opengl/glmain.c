@@ -356,13 +356,7 @@ int main(int argc, char **argv)
 			pal_render(map_fbo_tex[src_tex]);
 		} else {
 			glPushAttrib(GL_VIEWPORT_BIT);
-			GLint vp[4]; glGetIntegerv(GL_VIEWPORT, vp);
-			glViewport(0, 0, vp[2]/2, vp[3]/2);
-			glMatrixMode(GL_PROJECTION);
-			glLoadIdentity();
-			glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
-			glMatrixMode(GL_MODELVIEW);
-			glLoadIdentity();
+			setup_viewport(screen->w/2, screen->h/2);
 			pal_render(map_fbo_tex[src_tex]);
 			glPopAttrib();
 		}
