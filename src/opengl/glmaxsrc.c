@@ -48,6 +48,13 @@ static inline float getsamp(audio_data *d, int i, int w) {
 	return res;
 }
 
+static const char *pnt_vtx_shader =
+		"varying vec4 gl_TexCoord[1];"
+		"void main() {\n"
+		"	gl_TexCoord[0] = gl_MultiTexCoord0;\n"
+		"	gl_Position = gl_Vertex;\n"
+		"}";
+
 static const char *pnt_shader_src =
 	"#ifdef FLOAT_PACK_PIX\n"
 	FLOAT_PACK_FUNCS
@@ -89,7 +96,8 @@ static const char *frag_src =
 	"	vec3 p = vec3(0.5f);\n"
 	"	{\n"
 	"		vec2 uv = gl_TexCoord[0].st;\n"
-	"		float d = 0.96f*0.5f + (0.04f*0.5f)*log2(length(uv)*0.707106781186547f + 1);\n"
+//	"		float d = 0.96f*0.5f + (0.04f*0.5f)*log2(length(uv)*0.707106781186547f + 1);\n"
+	"		float d = 0.96f*0.5f + (0.04f*0.5f)*length(uv);\n"
 	"		p.yz = vec2(d); p = (uv.x*R[0] + uv.y*R[1])*p;\n" //NOTE: on mesa 7.6's compiler p*= generates more code for some reason
 	"	}\n"
 	"	vec4 c = texture2D(prev, p*R + 0.5f);\n"
@@ -100,8 +108,8 @@ static const char *frag_src =
 	"#endif"
 	"}\n";
 
-static void bg_vtx(float u, float v, vec2f *txco, void *cb_data) {
-	float *R = cb_data;
+static void bg_vtx(float u, float v, vec2f *restrict txco, const void *cb_data) {
+	const float *R = cb_data;
 	float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
 	float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 		(u*R[0*3+0] + v*R[0*3+1]),
@@ -162,12 +170,6 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 		glGenTextures(1, &pnt_tex);
 		glBindTexture(GL_TEXTURE_2D, pnt_tex);
 		const int pnt_tex_size = 1<<PNT_MIP_LEVELS;
-
-//		Pixbuf *src = NULL;
-//		src = setup_point_16(pnt_tex_size, pnt_tex_size);
-//		gluBuild2DMipmaps(GL_TEXTURE_2D, GL_LUMINANCE, src->w, src->h, GL_LUMINANCE, GL_UNSIGNED_SHORT, src->data);
-//		free(src->data);
-//		free(src);
 
 		for(int lvl=0; lvl<PNT_MIP_LEVELS; lvl++) {
 			int size = pnt_tex_size>>lvl;
@@ -303,7 +305,7 @@ void gl_maxsrc_update(void)
 	glInterleavedArrays(GL_T2F_V3F, 0, sco_verts); //TODO: replace with seperate calls to glVertexPointer/glTexCoordPointer also maybe use VBOs and have a fixed VBO for tex-coords
 	glDrawArrays(GL_QUADS, 0, samp*4);
 
-	if(use_glsl) glUseProgramObjectARB(0);
+	if(!pnt_tex) glUseProgramObjectARB(0);
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glPopClientAttrib();
 	glPopAttrib();

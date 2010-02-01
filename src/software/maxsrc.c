@@ -117,8 +117,6 @@ void maxsrc_update(void)
 {
 	uint16_t *dst = next_src;
 
-	audio_data ad;
-	audio_get_samples(&ad);
 	int samp = IMAX(IMAX(iw,ih)/4, 1023);
 	//samp = 4;
 	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz);
@@ -133,6 +131,8 @@ void maxsrc_update(void)
 	zoom(dst, prev_src, iw, ih, R);
 	fade_pix(dst, iw, ih, 255*98/100);
 
+	audio_data ad;
+	audio_get_samples(&ad);
 	for(int i=0; i<samp; i++) {
 		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);

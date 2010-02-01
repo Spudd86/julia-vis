@@ -140,6 +140,7 @@ int main(int argc, char **argv)
 			now = SDL_GetTicks();
 			int delay =  (tick0 + frmcnt*1000/opts.draw_rate) - now;
 			if(delay > 0) SDL_Delay(delay);
+			now = SDL_GetTicks();
 			float fpsd = now - fpstimes[frmcnt%opts.draw_rate];
 			fpstimes[frmcnt%opts.draw_rate] = now;
 			scr_fps = opts.draw_rate * 1000.0f/ fpsd;

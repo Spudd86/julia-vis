@@ -5,19 +5,18 @@
 
 #include "common.h"
 
-#include <SDL.h>
 #include <GL/glew.h>
-#include <GL/glut.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
 
 #include "glmisc.h"
 #include "pallet.h"
-
 #include "glpallet.h"
 
-static int im_w, im_h;
+static int im_w = 0, im_h = 0;
 
-static const uint32_t *active_pal;
-static GLuint pal_tex;
+static const uint32_t *active_pal = NULL;
+static GLuint pal_tex = 0;
 static GLhandleARB pal_prog = 0;
 static GLint pal_loc=0, src_loc=0;
 
@@ -94,7 +93,7 @@ static void pal_init_glsl(GLboolean float_packed_pixels)
 	glPushAttrib(GL_TEXTURE_BIT);
 	glGenTextures(1, &pal_tex);
 	glBindTexture(GL_TEXTURE_1D, pal_tex);
-	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, active_pal);
+	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, active_pal);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -118,9 +117,11 @@ static GLhandleARB pbos[2] = {0, 0}, srcpbos[2] = {0, 0};
 static GLuint disp_texture = 0;
 static void *fxdsrcbuf = NULL, *fxddstbuf = NULL;
 static GLboolean have_pbo = GL_FALSE;
+static int buf_w = 0,  buf_h = 0;
 #ifdef PALLET_OFFSCREEN_TEMP
 static GLint fbo = 0;
 static GLint rbo = 0;
+static GLint tex = 0;
 static int rbow = 0, rboh = 0;
 #endif
 
@@ -132,9 +133,10 @@ static void pal_init_fixed() //FIXME
 #ifdef PALLET_OFFSCREEN_TEMP
 	glGenFramebuffersEXT(1, &fbo);
 	glGenRenderbuffersEXT(1, &rbo);
-	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
-	glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, im_w, im_h);
-	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+//	glGenTextures(1, &tex);
+//	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
+//	glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, im_w, im_h);
+//	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
 #endif
 
 	glGenTextures(1, &disp_texture);
@@ -145,6 +147,7 @@ static void pal_init_fixed() //FIXME
 
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
+	//TODO: remove requirment for NPOT textures... (easy but broken on my laptop's mesa)
 	if(GLEW_ARB_pixel_buffer_object) {
 //	if(0) {
 		have_pbo = GL_TRUE;
@@ -170,7 +173,7 @@ static void pal_init_fixed() //FIXME
 static GLuint frm = 0;
 
 static void draw_palleted_fixed(GLint srctex) //FIXME
-{CHECK_GL_ERR;
+{
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_ALL_ATTRIB_BITS);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -179,29 +182,33 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 	GLint vp[4]; glGetIntegerv(GL_VIEWPORT, vp);
 	const GLint vp_w = vp[2], vp_h = vp[3];
 
+
+	if(have_pbo && buf_w != vp_w && buf_h != vp_h) {
+		buf_w = vp_w; buf_h = vp_h;
+		for(int i=0; i<2; i++) {
+			glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbos[i]);
+			glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, vp_w * vp_h * sizeof(uint32_t), 0, GL_STREAM_DRAW_ARB);
+			glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, srcpbos[i]);
+			glBufferDataARB(GL_PIXEL_PACK_BUFFER_ARB, vp_w * vp_h * sizeof(uint32_t), 0, GL_STREAM_READ_ARB);
+		}
+		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, 0);
+		printf("Changed PBO size!\n");
+	}
+
 #ifdef PALLET_OFFSCREEN_TEMP
 	glPushAttrib(GL_VIEWPORT_BIT);
 	if(rbow != vp_w || rboh != vp_h) {
 		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
 		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, vp_w, vp_h);
 		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+//		glBindTexture(GL_TEXTURE_2D, tex);
+//		glTexImage2D(GL_TEXTURE_2D,0, GL_RGBA, vp_w, vp_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 		rbow = vp_w; rboh = vp_h;
 		printf("Changed RBO size!\n");
-
-		if(have_pbo) {
-			for(int i=0; i<2; i++) {
-				glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, srcpbos[i]);
-				glBufferDataARB(GL_PIXEL_PACK_BUFFER_ARB, im_w * im_h * sizeof(uint32_t), 0, GL_STREAM_READ_ARB);
-				glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbos[i]);
-				glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, vp_w * vp_h * sizeof(uint32_t), 0, GL_STREAM_DRAW_ARB);
-			}
-			glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
-			glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, 0);
-		}
 	}
-
-
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo); CHECK_GL_ERR;
+//	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, tex, 0);
 	glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, rbo);
 	setup_viewport(vp_w, vp_h);
 #endif
@@ -219,31 +226,28 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 	//TODO: figure out how to make sure this uses a fast format
 	if(have_pbo) {
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, srcpbos[(frm+1)%2]);
-#ifdef PALLET_OFFSCREEN_TEMP
 		glReadPixels(0, 0, vp_w, vp_h, GL_BGRA, GL_UNSIGNED_BYTE, 0);
+#ifdef PALLET_OFFSCREEN_TEMP
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 		glPopAttrib();
-#else
-		glReadPixels(0, 0, vp_w, vp_h, GL_BGRA, GL_UNSIGNED_BYTE, 0);
 #endif
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbos[(frm+1)%2]);
 
-		// currently this is broken... (probably a bug in the i965 mesa driver)
-		// also the texture is slightly faster for some reason...
-		// ~100FPS vs ~110-120FPS
-//		glRasterPos2f(-1, -1);
-//		glDrawPixels(vp_w, vp_h, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-//		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
-//		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, 0);
-
+#ifndef PAL_BROKEN_DRAW_PIXELS
+		glRasterPos2f(-1, -1); // currently this is broken in mesa 7.7 (fixed in master)
+		glDrawPixels(vp_w, vp_h, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, 0);
+#else
 		glBindTexture(GL_TEXTURE_2D, disp_texture);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, vp_w, vp_h, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL); //TODO: this could come out wrong some some hardware... (non pow2 tex)
 		glBegin(GL_QUADS);
-			glTexCoord2d(0,0); glVertex2d( 1, -1);
-			glTexCoord2d(1,0); glVertex2d(-1, -1);
-			glTexCoord2d(1,1); glVertex2d(-1,  1);
-			glTexCoord2d(0,1); glVertex2d( 1,  1);
+			glTexCoord2d( 0, 0); glVertex2d(-1, -1);
+			glTexCoord2d( 1, 0); glVertex2d( 1, -1);
+			glTexCoord2d( 1, 1); glVertex2d( 1,  1);
+			glTexCoord2d( 0, 1); glVertex2d(-1,  1);
 		glEnd();
+#endif
 
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, srcpbos[(frm)%2]);
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbos[frm%2]);
@@ -256,12 +260,10 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, 0);
 	} else {
+		glReadPixels(0, 0, vp[2], vp[3], GL_BGRA, GL_UNSIGNED_BYTE, fxdsrcbuf);
 #ifdef PALLET_OFFSCREEN_TEMP
-		glReadPixels(0, 0, vp[2], vp[3], GL_RGBA, GL_UNSIGNED_BYTE, fxdsrcbuf);
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 		glPopAttrib();
-#else
-		glReadPixels(0, 0, vp[2], vp[3], GL_BGRA, GL_UNSIGNED_BYTE, fxdsrcbuf);
 #endif
 		pallet_blit32(fxddstbuf, fxdsrcbuf, vp_w, vp_h, active_pal);
 		glRasterPos2f(-1, -1);
@@ -274,38 +276,27 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 }
 
 static GLboolean use_glsl = GL_FALSE;
-void pal_init(int width, int height, GLboolean packed_intesity_pixels, GLboolean force_fixed)
-{
+void pal_init(int width, int height, GLboolean packed_intesity_pixels, GLboolean force_fixed) {	
+	pallet_init(0);
+	active_pal = get_active_pal();
 	im_w = width, im_h = height;
-
-	if(GLEW_ARB_shading_language_100 && !force_fixed) {
-		pallet_init(1);
-		active_pal = get_active_pal();
-		pal_init_glsl(packed_intesity_pixels);
-		use_glsl = GL_TRUE;
-	} else {
-		pallet_init(0);
-		active_pal = get_active_pal();
-		pal_init_fixed();
-	}
+	use_glsl = GLEW_ARB_shading_language_100 && !force_fixed;
+	if(use_glsl) pal_init_glsl(packed_intesity_pixels);
+	else pal_init_fixed();
 	CHECK_GL_ERR;
 }
 
-void pal_render(GLuint srctex)
-{
-	if(use_glsl)
-		draw_palleted_glsl(srctex);
-	else
-		draw_palleted_fixed(srctex);
+void pal_render(GLuint srctex) { CHECK_GL_ERR;
+	if(use_glsl) draw_palleted_glsl(srctex);
+	else draw_palleted_fixed(srctex);
 	CHECK_GL_ERR;
 }
 
-void pal_pallet_changed(void)
-{
+void pal_pallet_changed(void) {
 	if(use_glsl) { // only GLSL version uses a texture for now
 		glPushAttrib(GL_TEXTURE_BIT);
 		glBindTexture(GL_TEXTURE_1D, pal_tex);
-		glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_RGBA, GL_UNSIGNED_BYTE, active_pal);
+		glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, active_pal);
 		glPopAttrib();
 		CHECK_GL_ERR;
 	}

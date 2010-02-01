@@ -6,6 +6,10 @@
 #ifndef GLMISC_H_
 #define GLMISC_H_
 
+void swap_buffers(void);
+uint32_t get_ticks(void);
+void dodelay(uint32_t ms);
+
 typedef struct {
 	float x, y;
 } __attribute__((__packed__)) vec2f;
@@ -19,15 +23,15 @@ typedef struct {
 }vec4f;
 
 typedef struct Map_s Map;
-typedef void (*map_texco_cb)(int grid_size, vec2f *restrict txco_buf, void *cb_data);
-typedef void (*map_texco_vxt_func)(float u, float v, vec2f *txco, void *cb_data);
+typedef void (*map_texco_cb)(int grid_size, vec2f *restrict txco_buf, const void *cb_data);
+typedef void (*map_texco_vxt_func)(float u, float v, vec2f *restrict txco, const void *cb_data);
 
 Map *map_new(int grid_size, map_texco_cb callback);
 void map_destroy(Map *self);
-void map_render(Map *self, void *cb_data);
+void map_render(Map *self, const void *cb_data);
 
 #define GEN_MAP_CB(map_cb, vtx_func) \
-		static void map_cb(int grid_size, vec2f *txco_buf, void *cb_data) {\
+		static void map_cb(int grid_size, vec2f *restrict txco_buf, const void *cb_data) {\
 			const float step = 2.0f/(grid_size);\
 			for(int yd=0; yd<=grid_size; yd++) {\
 				vec2f *row = txco_buf + yd*(grid_size+1);\

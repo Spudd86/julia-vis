@@ -120,8 +120,18 @@ void draw_string(const char *str)
 	while(*c) {
 		//TODO: fix the font
 		if(*c == '\n') {
-//			glRasterPos2iv();
-			//TODO: move down
+			float pos[4];
+			glGetFloatv(GL_CURRENT_RASTER_POSITION, pos);
+			pos[0] = 0;
+			pos[1] -= 16;
+			glWindowPos2fv(pos);
+			c++; continue;
+		}
+		if(*c == '\t') {
+			float pos[4];
+			glGetFloatv(GL_CURRENT_RASTER_POSITION, pos);
+			pos[0] += 8*4;
+			glWindowPos2fv(pos);
 			c++; continue;
 		}
 

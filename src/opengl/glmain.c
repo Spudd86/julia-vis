@@ -31,18 +31,18 @@ static const char *map_frag_shader =
 	"uniform sampler2D maxsrc;\n"
 	"invariant uniform vec2 c;\n"
 	"#ifdef MAP_SAMP\n"
-	"vec4 smap(vec2 s) {\n"
-	"	vec2 t = s*s;\n"
+	"vec4 smap(const vec2 s) {\n"
+	"	const vec2 t = s*s;\n"
 	"	return texture2D(prev, vec2(t.x - t.y, 2*s.x*s.y) + c);\n"
 	"}\n"
 	"void main() {\n"
-	"	vec2 dx = dFdx(gl_TexCoord[1].st)*0.5f; vec2 dy = dFdy(gl_TexCoord[1].st)*0.5f;\n"
+	"	const vec2 dx = dFdx(gl_TexCoord[1].st)*0.5f; const vec2 dy = dFdy(gl_TexCoord[1].st)*0.5f;\n"
 	"#if MAP_SAMP == 5\n"
-	"	vec4 r = (253/(8*256.0f))*(smap(gl_TexCoord[1].st)*4 + \n"
+	"	const vec4 r = (253/(8*256.0f))*(smap(gl_TexCoord[1].st)*4 + \n"
 	"			smap(gl_TexCoord[1].st+dy) + smap(gl_TexCoord[1].st+dx) +\n"
 	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx) );\n"
 	"#elif MAP_SAMP == 7\n"
-	"	vec4 r = (253.0f/4096)*(smap(gl_TexCoord[1].st)*4 + \n"
+	"	const vec4 r = (253.0f/4096)*(smap(gl_TexCoord[1].st)*4 + \n"
 	"			(smap(gl_TexCoord[1].st+dy) + smap(gl_TexCoord[1].st+dx) +\n"
 	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx))*2 +\n"
 	"			(smap(gl_TexCoord[1].st+dy+dx) + smap(gl_TexCoord[1].st+dy-dx) +\n"
@@ -52,7 +52,7 @@ static const char *map_frag_shader =
 	"}\n"
 	"#else\n"
 	"void main() {\n"
-	"	vec2 t = gl_TexCoord[1].st * gl_TexCoord[1].st;\n"
+	"	const vec2 t = gl_TexCoord[1].st * gl_TexCoord[1].st;\n"
 	"	gl_FragData[0] = encode(max("
 	"			decode( texture2D(prev, vec2(t.x - t.y, 2*gl_TexCoord[1].x*gl_TexCoord[1].y) + c)*(253/256.0f) ),"
 	"			decode( texture2D(maxsrc, gl_TexCoord[0].st) )"
@@ -69,23 +69,23 @@ static const char *rat_map_frag_shader =
 	"#else\n"
 	"#define encode(X) X\n#define decode(X) X\n"
 	"#endif\n"
-	"vec4 smap(vec2 s) {\n"
-	"	s = s*2.5;\n"
+	"vec4 smap(const vec2 tmp) {\n"
+	"	vec2 s = tmp*2.5;\n"
 	"	vec2 t = s*s;\n"
-	"	float ab = s.x*s.y;\n"
+	"	const float ab = s.x*s.y;\n"
 	"	s = vec2(4*ab*(t.x - t.y), t.x*t.x - 6*t.x*t.y + t.y*t.y) + c.xy;\n"
 	"	t = vec2(t.x - t.y, 2*ab)+c.zw;\n"
 	"	return texture2D(prev,(0.5f/2.5)*vec2(dot(s,t), dot(s,t.yx))/dot(t,t)+0.5f);\n"
 	"}\n"
 	"void main() {\n"
 	"#ifdef MAP_SAMP\n"
-	"	vec2 dx = dFdx(gl_TexCoord[1].st)*0.5f; vec2 dy = dFdy(gl_TexCoord[1].st)*0.5f;\n"
+	"	const vec2 dx = dFdx(gl_TexCoord[1].st)*0.5f; const vec2 dy = dFdy(gl_TexCoord[1].st)*0.5f;\n"
 	"#if MAP_SAMP == 5\n"
-	"	vec4 r = (254/(8*256.0f))*(smap(gl_TexCoord[1].st)*4 + \n"
+	"	const vec4 r = (254/(8*256.0f))*(smap(gl_TexCoord[1].st)*4 + \n"
 	"			smap(gl_TexCoord[1].st+dy) + smap(gl_TexCoord[1].st+dx) +\n"
 	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx) );\n"
 	"#elif MAP_SAMP == 7\n"
-	"	vec4 r = (253.0f/4096)*(smap(gl_TexCoord[1].st)*4 + \n"
+	"	const vec4 r = (253.0f/4096)*(smap(gl_TexCoord[1].st)*4 + \n"
 	"			(smap(gl_TexCoord[1].st+dy) + smap(gl_TexCoord[1].st+dx) +\n"
 	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx))*2 +\n"
 	"			(smap(gl_TexCoord[1].st+dy+dx) + smap(gl_TexCoord[1].st+dy-dx) +\n"
@@ -207,16 +207,16 @@ static void render_fractal(int src_tex, int draw_tex, int im_w, int im_h, struct
 void init_mandel();
 void render_mandel(struct point_data *pd);
 
-static void map_vtx(float u, float v, vec2f *txco, void *cb_data) {
-	struct point_data *pd = cb_data;
+static void map_vtx(float u, float v, vec2f *restrict txco, const void *cb_data) {
+	const struct point_data *pd = cb_data;
 	float c1 = (pd->p[0]-0.5f)*0.25f + 0.5f, c2 = pd->p[1]*0.25f + 0.5f;
 	txco->x = (u*u - v*v + c1); txco->y = (2*u*v + c2 );
 }
 GEN_MAP_CB(map_cb, map_vtx);
 
-static void rat_map_vtx(float u, float v, vec2f *txco, void *cb_data)
+static void rat_map_vtx(float u, float v, vec2f *restrict txco, const void *cb_data)
 {
-	struct point_data *pd = cb_data;
+	const struct point_data *pd = cb_data;
 	static const float xoom = 3.0f, moox = 1.0f/xoom;
 	const float cx0 = pd->p[0], cy0 = pd->p[1], cx1 = pd->p[2]*2, cy1 = pd->p[3]*2;
 
@@ -239,13 +239,15 @@ static int make_pow2(int x) {
 	else return 1<<(n+1);
 }
 
+#define FPS_HIST_LEN 32
+
 int main(int argc, char **argv)
 {
 	opt_data opts;
 	optproc(argc, argv, &opts);
 	GLboolean force_fixed = opts.gl_opts != NULL && strstr(opts.gl_opts, "fixed") != NULL;
 	GLboolean res_boost = opts.gl_opts != NULL && strstr(opts.gl_opts, "rboost") != NULL;
-	GLboolean packed_intesity_pixels = GL_FALSE;
+	GLboolean packed_intesity_pixels = opts.gl_opts != NULL && strstr(opts.gl_opts, "pintens") != NULL;
 	SDL_Surface *screen = sdl_setup_gl(&opts, 512);
 	int im_w = IMAX(make_pow2(IMAX(screen->w, screen->h)), 128)<<res_boost, im_h = im_w; //TODO: nearest power of two
 	printf("Using internel resolution of %ix%i\n\n", im_h, im_w);
@@ -257,7 +259,7 @@ int main(int argc, char **argv)
 
 	glClear(GL_COLOR_BUFFER_BIT);
 	glRasterPos2f(-1,1 - 20.0f/(screen->h*0.5f));
-	draw_string("Loading...\n"); SDL_GL_SwapBuffers();
+	draw_string("Loading... "); swap_buffers();
 
 	printf("GL_VENDOR: %s\n", glGetString(GL_VENDOR));
 	printf("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
@@ -266,7 +268,11 @@ int main(int argc, char **argv)
 	printf("\n\n");
 	
 	if(!GLEW_EXT_blend_minmax) {
-		printf("missing GL_EXT_blend_minmax!\n");
+		printf("missing required gl extension EXT_blend_minmax!\n");
+		exit(1);
+	}
+	if(!GLEW_EXT_framebuffer_object) {
+		printf("missing required gl extension ARB_framebuffer_object!\n");
 		exit(1);
 	}
 
@@ -288,17 +294,21 @@ int main(int argc, char **argv)
 	init_mandel();
 	audio_init(&opts);
 
+	draw_string("Done\n"); swap_buffers();
 	if(glewGetExtension("GL_ARB_shading_language_120") && !force_fixed) {
 		use_glsl = GL_TRUE;
-		draw_string("Compiling Shaders...\n "); SDL_GL_SwapBuffers();
+		draw_string("Compiling Shaders..."); swap_buffers();
 
 		printf("Compiling map shader:\n");
 		const char *map_defs = "#version 120\n";
-		if(opts.quality == 1) map_defs = "#version 120\n#define MAP_SAMP 5\n\n";
-		else if(opts.quality == 2) map_defs = "#version 120\n#define MAP_SAMP 7\n";
-		else if(opts.quality == 3) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n";
-		else if(opts.quality == 4) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 5\n";
-		else if(opts.quality == 5) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 7\n";
+		if(packed_intesity_pixels) {
+			if(opts.quality == 1) map_defs = "#version 120\n#define MAP_SAMP 5\n\n";
+			else if(opts.quality == 2) map_defs = "#version 120\n#define MAP_SAMP 7\n";
+		} else {
+			map_defs = "#version 120\n#define FLOAT_PACK_PIX\n";
+			if(opts.quality == 1) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 5\n";
+			else if(opts.quality == 2) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 7\n";
+		}
 		if(opts.rational_julia) {
 			rat_map_prog = compile_program_defs(map_defs, NULL, rat_map_frag_shader);
 		} else {
@@ -322,10 +332,11 @@ int main(int argc, char **argv)
 	gl_maxsrc_init(IMAX(im_w/2, 128), IMAX(im_h/2, 128), packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
 	pal_init(im_w, im_h, packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
 
-	SDL_Event	event;
+	SDL_Event event;
 	Uint32 tick0, fps_oldtime;
-	Uint32 now = fps_oldtime = tick0 = SDL_GetTicks();
-	float frametime = 100;
+	Uint32 now = fps_oldtime = tick0 = get_ticks();
+	Uint32 frametimes[FPS_HIST_LEN]; memset(frametimes, 0, sizeof(frametimes));
+	Uint32 totframetime = 0;
 	int cnt = 0;
 	int beats = beat_get_count();
 	Uint32 last_beat_time = tick0, lastpalstep = tick0;
@@ -333,7 +344,7 @@ int main(int argc, char **argv)
 
 	Uint32 src_tex = 0, dst_tex = 1;
 
-	int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0;
+	int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
 	int lastframe_key = 0;
 
 	while(SDL_PollEvent(&event) >= 0) {
@@ -341,11 +352,12 @@ int main(int argc, char **argv)
 		if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F1)) { if(!lastframe_key) { debug_maxsrc = !debug_maxsrc; } lastframe_key = 1; }
 		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F2)) { if(!lastframe_key) { debug_pal = !debug_pal; } lastframe_key = 1; }
 		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F3)) { if(!lastframe_key) { show_mandel = !show_mandel; } lastframe_key = 1; }
+		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F4)) { if(!lastframe_key) { show_fps_hist = !show_fps_hist; } lastframe_key = 1; }
 		else lastframe_key = 0;
 		
 		// rate limit our maxsrc updates, but run at full frame rate if we're close the opts.maxsrc_rate to avoid choppyness
-		if(tick0-now + (maxfrms*1000)/opts.maxsrc_rate > + 1000/opts.maxsrc_rate ) {
-//				|| (unsigned int)(1000/frametime) < opts.maxsrc_rate + 8) {
+		if(tick0-now + (maxfrms*1000)/opts.maxsrc_rate > + 1000/opts.maxsrc_rate //) {
+				|| (totframetime + 10*FPS_HIST_LEN > FPS_HIST_LEN*1000/opts.maxsrc_rate ) ) {
 			gl_maxsrc_update();
 			maxfrms++;
 		}
@@ -368,33 +380,55 @@ int main(int argc, char **argv)
 		if(debug_pal) {
 			glBindTexture(GL_TEXTURE_2D, map_fbo_tex[src_tex]);
 			glBegin(GL_QUADS);
-				glTexCoord2d(0,0); glVertex2d( 1, -1);
-				glTexCoord2d(1,0); glVertex2d( 0, -1);
-				glTexCoord2d(1,1); glVertex2d( 0,  0);
-				glTexCoord2d(0,1); glVertex2d( 1,  0);
+				glTexCoord2d(0,0); glVertex2d( 0, -1);
+				glTexCoord2d(1,0); glVertex2d( 1, -1);
+				glTexCoord2d(1,1); glVertex2d( 1,  0);
+				glTexCoord2d(0,1); glVertex2d( 0,  0);
 			glEnd();
 		}
 		if(debug_maxsrc) {
 			glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
 			glBegin(GL_QUADS);
-				glTexCoord2d(0,0); glVertex2d(-1,  1);
-				glTexCoord2d(1,0); glVertex2d( 0,  1);
-				glTexCoord2d(1,1); glVertex2d( 0,  0);
-				glTexCoord2d(0,1); glVertex2d(-1,  0);
+				glTexCoord2d(0,0); glVertex2d(-1,  0);
+				glTexCoord2d(1,0); glVertex2d( 0,  0);
+				glTexCoord2d(1,1); glVertex2d( 0,  1);
+				glTexCoord2d(0,1); glVertex2d(-1,  1);
 			glEnd();
 		}
 		if(debug_pal || debug_maxsrc) { glPopAttrib(); if(packed_intesity_pixels) glColor3f(1.0f, 1.0f, 1.0f); }
 
-		char buf[64];
-		sprintf(buf,"%6.1f FPS %6.1f UPS", 1000.0f / frametime, maxfrms*1000.0f/(now-tick0));
-		glRasterPos2f(-1,1 - 20.0f/(screen->h*0.5f));
-		draw_string(buf);
-		SDL_GL_SwapBuffers();
+
+		if(show_fps_hist) {
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+			glScalef(0.25, 0.25, 1);
+			glTranslatef(-3, 3, 0);
+			glBegin(GL_LINES);
+			glVertex2f(-1, 0); glVertex2f(0, 0);
+			glEnd();
+			glColor3f(0.0f, 1.0f, 0.0f);
+			glBegin(GL_LINES);
+			for(int i=0; i<FPS_HIST_LEN-1; ) {
+				int idx = (i + cnt)%FPS_HIST_LEN;
+				glVertex2f(-1 + ((float)i)/(FPS_HIST_LEN-1),  4*frametimes[idx]/(float)totframetime);
+				i++;idx = (i + cnt)%FPS_HIST_LEN;
+				glVertex2f(-1 + ((float)i)/(FPS_HIST_LEN-1),  4*frametimes[idx]/(float)totframetime);
+			}
+			glEnd();
+			glColor3f(1.0f, 1.0f, 1.0f);
+			glPopMatrix();
+			char buf[64];
+			sprintf(buf,"%6.1f FPS %6.1f", FPS_HIST_LEN*1000.0f/totframetime, maxfrms*1000.0f/(now-tick0));
+			glRasterPos2f(-1,1 - 20.0f/(screen->h*0.5f));
+			draw_string(buf);
+
+		}
+		swap_buffers();
 		CHECK_GL_ERR;
 
 		Uint32 tex_tmp = src_tex; src_tex = dst_tex; dst_tex = tex_tmp;
 
-		now = SDL_GetTicks();
+		now = get_ticks();
 		if(now - lastpalstep >= 2048/256 && get_pallet_changing()) { // want pallet switch to take ~2 seconds
 			if(pallet_step(IMIN((now - lastpalstep)*256/2048, 32)))
 				pal_pallet_changed();
@@ -410,10 +444,15 @@ int main(int argc, char **argv)
 		} else update_points(pd, (now - tick0), 0);
 		beats = newbeat;
 
-		now = SDL_GetTicks();
-		if(now - fps_oldtime < 10) SDL_Delay(10 - (now-fps_oldtime)); // stay below ~125 FPS
-		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
+		now = get_ticks();
+		int delay =  (tick0 + cnt*1000/opts.draw_rate) - now;
+//		if(now - fps_oldtime < 8) SDL_Delay(8 - (now-fps_oldtime)); // stay below ~125 FPS
+		if(delay > 0) dodelay(delay);
+		now = get_ticks();
+		totframetime -= frametimes[cnt%FPS_HIST_LEN];
+		totframetime += (frametimes[cnt%FPS_HIST_LEN] = now - fps_oldtime);
 		fps_oldtime = now;
+
 		cnt++;
 	}
 
@@ -421,3 +460,16 @@ int main(int argc, char **argv)
 	SDL_Quit();
 	return 0;
 }
+
+void swap_buffers(void) {
+	SDL_GL_SwapBuffers();
+}
+
+uint32_t get_ticks(void) {
+	return SDL_GetTicks();
+}
+
+void dodelay(uint32_t ms) {
+	SDL_Delay(ms);
+}
+

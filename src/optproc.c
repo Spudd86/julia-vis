@@ -19,15 +19,14 @@ static const char *helpstr =
 "\t\t\t 0 take 1 sample (default)\n"
 "\t\t\t 1 take 5 samples\n"
 "\t\t\t 2 take 7 samples\n"
-"\t\t\t 3 take 1 sample (packed intensity)\n"
-"\t\t\t 4 take 5 samples (packed intensity)\n"
-"\t\t\t 5 take 7 samples (packed intensity)\n"
 "\t\tfixed function gl: currently no effect\n"
 "\t\tsoftware: currently no effect\n"
 
 "\t-g opt1:opt2:...\n"
 "\t\tgeneric opengl options\n"
 "\t\t\tfixed\tforce use fixed function GL\n"
+"\t\t\tpintens\tuse packed intensity pixel values (precision boost)\n"
+"\t\t\trboos\tdouble internal resolution\n"
 
 "\t-i <driver>[:opts] select audio input driver\n"
 "\t\tdrivers:\n"
@@ -53,7 +52,7 @@ void optproc(int argc, char **argv, opt_data *res)
 
 	res->w = res->h = -1;
 	res->fullscreen = 0;
-	res->draw_rate = 30;
+	res->draw_rate = 60;
 	res->maxsrc_rate = 24;
 	res->doublebuf = 0;
 	res->hw_pallet = 0;

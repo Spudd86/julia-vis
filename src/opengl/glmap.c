@@ -27,17 +27,17 @@ struct Map_s {
 	map_texco_cb callback;
 };
 
-static void vtx_func(float u, float v, vec2f *txco, void *cb_data) {(void)cb_data;
-	txco->x = (u+1)/2; txco->y = (v+1)/2;
-}
-static void map_cb(int grid_size, vec2f *txco_buf, void *cb_data) {
-	const float step = 2.0f/(grid_size);
-	for(int yd=0; yd<=grid_size; yd++) {
-		vec2f *row = txco_buf + yd*(grid_size+1);
-		for(int xd=0; xd<=grid_size; xd++)
-			vtx_func(xd*step - 1.0f, yd*step - 1.0f, row + xd, cb_data);
-	}
-}
+//static void vtx_func(float u, float v, vec2f *txco, void *cb_data) {(void)cb_data;
+//	txco->x = (u+1)/2; txco->y = (v+1)/2;
+//}
+//static void map_cb(int grid_size, vec2f *txco_buf, void *cb_data) {
+//	const float step = 2.0f/(grid_size);
+//	for(int yd=0; yd<=grid_size; yd++) {
+//		vec2f *row = txco_buf + yd*(grid_size+1);
+//		for(int xd=0; xd<=grid_size; xd++)
+//			vtx_func(xd*step - 1.0f, yd*step - 1.0f, row + xd, cb_data);
+//	}
+//}
 
 Map *map_new(int grid_size, map_texco_cb callback)
 {
@@ -109,7 +109,7 @@ void map_destroy(Map *self)
 	free(self);
 }
 
-void map_render(Map *self, void *cb_data)
+void map_render(Map *self, const void *cb_data)
 {
 	CHECK_GL_ERR;
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
