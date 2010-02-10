@@ -39,7 +39,7 @@ static const opt_data *opts = NULL;
 static uint32_t frametimes[FPS_HIST_LEN];
 static uint32_t tick0 = 0;
 
-void fractal_init(opt_data *opts, int width, int height, GLboolean force_fixed, GLboolean packed_intesity_pixels);
+void fractal_init(const opt_data *opts, int width, int height, GLboolean force_fixed, GLboolean packed_intesity_pixels);
 void render_fractal(struct point_data *pd);
 GLint fract_get_tex(void);
 
@@ -79,27 +79,32 @@ void init_gl(const opt_data *opt_data, int width, int height)
 
 	if(!GLEW_ARB_shading_language_100)
 		printf("No GLSL using all fixed function! (might be slow)\n");
-	else if(!glewGetExtension("GL_ARB_shading_language_120"))
+	else if(!glewGetExtension("GL_ARB_shading_language_120")) {
 		printf("GLSL support not good enough. Using (mostly) fixed function\n");
+		packed_intesity_pixels = GL_FALSE;
+	}
 
 	if(!GLEW_ARB_shading_language_100 && !GLEW_ARB_pixel_buffer_object)
 		printf("Missing GLSL and pixel buffer objects, WILL be slow!\n");
 
-	if(force_fixed)
+	if(force_fixed) {
 		printf("Fixed function code forced\n");
+		packed_intesity_pixels = GL_FALSE;
+	}
+
+	if(packed_intesity_pixels) printf("Packed intensity enabled\n");
 
 	glEnable(GL_TEXTURE_2D);
 
 	init_mandel();
-	audio_init(opts);
 
 	draw_string("Done\n"); swap_buffers();
 	if(glewGetExtension("GL_ARB_shading_language_120") && !force_fixed) {
 		draw_string("Compiling Shaders..."); swap_buffers();
 	}
-
+	CHECK_GL_ERR;
 	fractal_init(opts, im_w, im_h, force_fixed, packed_intesity_pixels); CHECK_GL_ERR;
-	gl_maxsrc_init(IMAX(im_w/2, 128), IMAX(im_h/2, 128), packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
+	gl_maxsrc_init(IMAX(im_w>>res_boost, 128), IMAX(im_h>>res_boost, 128), packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
 	pal_init(im_w, im_h, packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
 	pd = new_point_data(opts->rational_julia?4:2);
 
@@ -114,12 +119,11 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	static uint32_t maxfrms = 0;
 	static uint32_t last_beat_time = 0, lastpalstep = 0, fps_oldtime = 0;
 	static int beats = 0;
-
-	uint32_t now = get_ticks();
+	static uint32_t now = 0;
 
 	// rate limit our maxsrc updates, but run at full frame rate if we're close the opts.maxsrc_rate to avoid choppyness
-	if(tick0-now + (maxfrms*1000)/opts->maxsrc_rate > + 1000/opts->maxsrc_rate //) {
-			|| (totframetime + 10*FPS_HIST_LEN > FPS_HIST_LEN*1000/opts->maxsrc_rate ) ) {
+	if((tick0-now)*opts->maxsrc_rate + (maxfrms*1000) > 1000 ) {
+//			|| (totframetime + 10*FPS_HIST_LEN > FPS_HIST_LEN*1000/opts->maxsrc_rate ) ) {
 		gl_maxsrc_update();
 		maxfrms++;
 	}
@@ -159,7 +163,6 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	}
 	if(debug_pal || debug_maxsrc) { glPopAttrib(); if(packed_intesity_pixels) glColor3f(1.0f, 1.0f, 1.0f); }
 
-
 	if(show_fps_hist) {
 		glMatrixMode(GL_MODELVIEW);
 		glPushMatrix();
@@ -180,10 +183,9 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 		glColor3f(1.0f, 1.0f, 1.0f);
 		glPopMatrix();
 		char buf[64];
-		sprintf(buf,"%6.1f FPS %6.1f", FPS_HIST_LEN*1000.0f/totframetime, maxfrms*1000.0f/(now-tick0));
+		sprintf(buf,"%6.1f FPS %6.1f\n", FPS_HIST_LEN*1000.0f/totframetime, maxfrms*1000.0f/(now-tick0));
 		glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));
 		draw_string(buf);
-
 	}
 	swap_buffers(); CHECK_GL_ERR;
 

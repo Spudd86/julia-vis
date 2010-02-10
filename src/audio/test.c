@@ -157,7 +157,7 @@ int main(int argc, char **argv)
 		ox = abs(ox)%im_w;
 		putpixel(screen, ox, (1.0f - 2*bd.stddev[0])*(im_h-2), 0xffffff00);
 		for(int i=1; i < bd.bands; i++) {
-			int x = 0.125f*im_w + (i+1)*0.75f*im_w/bd.bands;
+			int x = 0.125f*im_w + i*0.75f*im_w/bd.bands;
 			int y = (1.0f - 2*bd.means[i])*(im_h-2);
 
 			y = abs(y)%im_h;
@@ -168,6 +168,12 @@ int main(int argc, char **argv)
 			x = 0.125f*im_w + i*0.75f*im_w/bd.bands;
 			y = (1.0f - 2*bd.stddev[i])*(im_h-2);
 			putpixel(screen, x, y, 0xffff00);
+
+			x = 0.125f*im_w + i*0.75f*im_w/bd.bands; x = abs(x)%im_w;
+			y = (0.75f-0.25f*bd.df[i])*(im_h-2); y = abs(y)%im_h;
+			int xt = 0.125f*im_w + (i-1)*0.75f*im_w/bd.bands; xt = abs(xt)%im_w;
+			int yt = (0.75f-0.25f*bd.df[i-1])*(im_h-2); yt = abs(yt)%im_h;
+			draw_line(screen, xt, yt, x, y, 0xff0000);
 		}
 
 		for(int b=0; b < 16; b++) {

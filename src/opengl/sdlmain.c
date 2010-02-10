@@ -13,17 +13,17 @@
 
 #include "sdl-misc.h"
 #include "glmisc.h"
+#include "audio/audio.h"
 
 int main(int argc, char **argv)
 {
-	opt_data opts;
-	optproc(argc, argv, &opts);
+	opt_data opts; optproc(argc, argv, &opts);
+	if(audio_init(&opts) < 0) exit(1);
 	SDL_Surface *screen = sdl_setup_gl(&opts, 512);
 	init_gl(&opts, screen->w, screen->h);
 
 	int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
 	int lastframe_key = 0;
-
 	SDL_Event event;
 	while(SDL_PollEvent(&event) >= 0) {
 		if(event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) break;
@@ -34,7 +34,7 @@ int main(int argc, char **argv)
 		else lastframe_key = 0;
 		render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
 	}
-
+	audio_shutdown();
 	SDL_Quit();
 	return 0;
 }

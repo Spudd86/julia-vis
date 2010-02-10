@@ -21,7 +21,7 @@ static GLhandleARB pal_prog = 0;
 static GLint pal_loc=0, src_loc=0;
 
 static void draw_palleted_glsl(GLuint draw_tex)
-{
+{DEBUG_CHECK_GL_ERR;
 	glPushAttrib(GL_TEXTURE_BIT);
 		glUseProgramObjectARB(pal_prog);
 		glActiveTextureARB(GL_TEXTURE0_ARB);
@@ -39,6 +39,7 @@ static void draw_palleted_glsl(GLuint draw_tex)
 		glEnd();
 		glUseProgramObjectARB(0);
 	glPopAttrib();
+	DEBUG_CHECK_GL_ERR;
 }
 
 //TODO: test this
@@ -89,7 +90,7 @@ static const char *pal_frag_shader =
 	"}";
 
 static void pal_init_glsl(GLboolean float_packed_pixels)
-{
+{CHECK_GL_ERR;
 	glPushAttrib(GL_TEXTURE_BIT);
 	glGenTextures(1, &pal_tex);
 	glBindTexture(GL_TEXTURE_1D, pal_tex);
@@ -98,6 +99,7 @@ static void pal_init_glsl(GLboolean float_packed_pixels)
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glPopAttrib();
+	DEBUG_CHECK_GL_ERR;
 
 	printf("Compiling pallet shader:\n");
 	if(!float_packed_pixels)
@@ -107,36 +109,33 @@ static void pal_init_glsl(GLboolean float_packed_pixels)
 	pal_loc = glGetUniformLocationARB(pal_prog, "pal");
 	src_loc = glGetUniformLocationARB(pal_prog, "src");
 	printf("Pallet shader compiled\n");
+	CHECK_GL_ERR;
 }
 
 // ********* FIXED FUNCTION STUFF
 //#define PALLET_OFFSCREEN_TEMP
 static void pallet_blit32(uint32_t *restrict dest, const uint32_t *restrict src, unsigned int w, unsigned int h, const uint32_t *restrict pal);
 
-static GLhandleARB pbos[2] = {0, 0}, srcpbos[2] = {0, 0};
+static GLhandleARB pbos[2] = {-1, -1}, srcpbos[2] = {-1, -1};
 static GLuint disp_texture = 0;
 static void *fxdsrcbuf = NULL, *fxddstbuf = NULL;
 static GLboolean have_pbo = GL_FALSE;
 static int buf_w = 0,  buf_h = 0;
 #ifdef PALLET_OFFSCREEN_TEMP
-static GLint fbo = 0;
-static GLint rbo = 0;
-static GLint tex = 0;
+static GLint fbo = -1;
+static GLint rbo = -1, rbos[] = {-1,-1};
 static int rbow = 0, rboh = 0;
 #endif
 
 static void pal_init_fixed() //FIXME
-{
+{CHECK_GL_ERR;
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 
 #ifdef PALLET_OFFSCREEN_TEMP
 	glGenFramebuffersEXT(1, &fbo);
-	glGenRenderbuffersEXT(1, &rbo);
-//	glGenTextures(1, &tex);
-//	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
-//	glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, im_w, im_h);
-//	glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+//	glGenRenderbuffersEXT(1, &rbo);
+	glGenRenderbuffersEXT(2, rbos);
 #endif
 
 	glGenTextures(1, &disp_texture);
@@ -153,14 +152,6 @@ static void pal_init_fixed() //FIXME
 		have_pbo = GL_TRUE;
 		glGenBuffersARB(2, pbos);
 		glGenBuffersARB(2, srcpbos);
-		for(int i=0; i<2; i++) {
-			glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbos[i]);
-			glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, im_w * im_h * sizeof(uint32_t), 0, GL_STREAM_DRAW_ARB);
-			glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, srcpbos[i]);
-			glBufferDataARB(GL_PIXEL_PACK_BUFFER_ARB, im_w * im_h * sizeof(uint32_t), 0, GL_STREAM_READ_ARB);
-		}
-		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
-		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, 0);
 	} else {
 		fxddstbuf = malloc(im_w * im_h * sizeof(uint32_t));
 		fxdsrcbuf = malloc(im_w * im_h * sizeof(uint32_t));
@@ -173,7 +164,7 @@ static void pal_init_fixed() //FIXME
 static GLuint frm = 0;
 
 static void draw_palleted_fixed(GLint srctex) //FIXME
-{
+{DEBUG_CHECK_GL_ERR;
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_ALL_ATTRIB_BITS);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -182,7 +173,7 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 	GLint vp[4]; glGetIntegerv(GL_VIEWPORT, vp);
 	const GLint vp_w = vp[2], vp_h = vp[3];
 
-
+	DEBUG_CHECK_GL_ERR;
 	if(have_pbo && buf_w != vp_w && buf_h != vp_h) {
 		buf_w = vp_w; buf_h = vp_h;
 		for(int i=0; i<2; i++) {
@@ -194,22 +185,25 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, 0);
 		printf("Changed PBO size!\n");
+		DEBUG_CHECK_GL_ERR;
 	}
 
 #ifdef PALLET_OFFSCREEN_TEMP
-	glPushAttrib(GL_VIEWPORT_BIT);
+	glPushAttrib(GL_VIEWPORT_BIT); CHECK_GL_ERR;
 	if(rbow != vp_w || rboh != vp_h) {
-		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
+//		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
+//		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, vp_w, vp_h);
+		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbos[0]);
+		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, vp_w, vp_h);
+		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbos[1]);
 		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, vp_w, vp_h);
 		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
-//		glBindTexture(GL_TEXTURE_2D, tex);
-//		glTexImage2D(GL_TEXTURE_2D,0, GL_RGBA, vp_w, vp_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 		rbow = vp_w; rboh = vp_h;
 		printf("Changed RBO size!\n");
 	}
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo); CHECK_GL_ERR;
-//	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, tex, 0);
-	glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, rbo);
+//	glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, rbo);
+	glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, rbos[frm%2]);
 	setup_viewport(vp_w, vp_h);
 #endif
 
@@ -276,7 +270,7 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 }
 
 static GLboolean use_glsl = GL_FALSE;
-void pal_init(int width, int height, GLboolean packed_intesity_pixels, GLboolean force_fixed) {	
+void pal_init(int width, int height, GLboolean packed_intesity_pixels, GLboolean force_fixed) {	CHECK_GL_ERR;
 	pallet_init(0);
 	active_pal = get_active_pal();
 	im_w = width, im_h = height;
@@ -286,19 +280,20 @@ void pal_init(int width, int height, GLboolean packed_intesity_pixels, GLboolean
 	CHECK_GL_ERR;
 }
 
-void pal_render(GLuint srctex) { CHECK_GL_ERR;
+void pal_render(GLuint srctex) { DEBUG_CHECK_GL_ERR;
 	if(use_glsl) draw_palleted_glsl(srctex);
 	else draw_palleted_fixed(srctex);
-	CHECK_GL_ERR;
+	DEBUG_CHECK_GL_ERR;
 }
 
 void pal_pallet_changed(void) {
 	if(use_glsl) { // only GLSL version uses a texture for now
+		DEBUG_CHECK_GL_ERR;
 		glPushAttrib(GL_TEXTURE_BIT);
 		glBindTexture(GL_TEXTURE_1D, pal_tex);
 		glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, active_pal);
 		glPopAttrib();
-		CHECK_GL_ERR;
+		DEBUG_CHECK_GL_ERR;
 	}
 }
 

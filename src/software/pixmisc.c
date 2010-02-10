@@ -51,7 +51,7 @@ void maxblend(void *restrict dest, void *restrict src, int w, int h)
 // requires w%16 == 0
 void maxblend(void *restrict dest, void *restrict src, int w, int h)
 {
-	__m128i *mbdst = dest, *mbsrc = src;
+	__m128i * restrict mbdst = dest; const __m128i * restrict mbsrc = src;
 	const __m128i off = _mm_set1_epi16(0x8000);
 	for(unsigned int i=0; i < 2*w*h/sizeof(__m128); i+=2) { // TODO see if the prefeting is helping
 		__builtin_prefetch(&(mbsrc[i+2]), 0, 0); __builtin_prefetch(&(mbdst[i+2]), 1, 0);
@@ -74,12 +74,12 @@ void maxblend(void *restrict dest, void *restrict src, int w, int h)
 
 void fade_pix(void *restrict buf, int w, int h, uint8_t fade)
 {
-	__m128i *mbbuf = buf;
+	__m128i * const restrict mbbuf = buf;
 	const __m128i fd = _mm_set1_epi16(fade<<8);
-	const int n = 2*w*h/sizeof(__m128i);
-	unsigned int i=(n%4);
+	const unsigned int n = 2*w*h/sizeof(__m128i);
+	unsigned int i=0;
 
-	switch(i){
+	switch(n%4){
 		case 0: mbbuf[i] = _mm_mulhi_epu16(mbbuf[i], fd); i++;
 		case 3: mbbuf[i] = _mm_mulhi_epu16(mbbuf[i], fd); i++;
 		case 2: mbbuf[i] = _mm_mulhi_epu16(mbbuf[i], fd); i++;

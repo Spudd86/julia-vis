@@ -140,14 +140,14 @@ int audio_setup(int sr)
 }
 
 
-int audio_setup_pa(opt_data *od);
+int audio_setup_pa(const opt_data *od);
 void audio_stop_pa();
-int jack_setup(opt_data *);
+int jack_setup(const opt_data *);
 void jack_shutdown();
-int pulse_setup(opt_data *);
+int pulse_setup(const opt_data *);
 void pulse_shutdown();
 
-int audio_init(opt_data *od)
+int audio_init(const opt_data *od)
 {
 	printf("\nAudio input starting...\n");
 
@@ -173,10 +173,7 @@ int audio_init(opt_data *od)
 			rc = -1;
 	}
 
-	atexit(audio_shutdown);
-
-	usleep(10000); // wait a bit so we have some audio in the buffer (instead of garbage)
-
-	printf("Finished audio setup\n\n");
+	if(rc < 0) printf("Audio setup failed!\n");
+	else printf("Finished audio setup\n\n");
 	return rc;
 }

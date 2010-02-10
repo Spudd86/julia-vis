@@ -31,7 +31,7 @@ void jack_shutdown(void) {
 	jack_client_close (client);
 }
 
-int jack_setup(opt_data *od)
+int jack_setup(const opt_data *od)
 {
 	printf("Using jack for audio input\n");
 

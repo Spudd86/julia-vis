@@ -33,7 +33,6 @@ static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl)
         printf("Could not initialize SDL: %s.\n", SDL_GetError());
         exit(-1);
     }
-	atexit(SDL_Quit);
 	if(SDL_WasInit(SDL_INIT_AUDIO)) {
 		SDL_CloseAudio();
 		SDL_QuitSubSystem(SDL_INIT_AUDIO);

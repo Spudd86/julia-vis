@@ -42,7 +42,8 @@ endif
 ifdef DEBUG
 	CFLAGS += -ggdb -O0
 else
-	CFLAGS += -ggdb -O2 -finline-functions -maccumulate-outgoing-args -fdelete-null-pointer-checks 
+	CFLAGS += -DNDEBUG
+	CFLAGS += -g -O2 -finline-functions -maccumulate-outgoing-args -fdelete-null-pointer-checks 
 	CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller
 	CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear -funsafe-loop-optimizations 
 	CFLAGS += -fgcse-las -fgcse-sm -fmodulo-sched 
@@ -78,7 +79,7 @@ endif
 
 AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/portaudio.c 
 
-COMMON_SRCS = src/terminusIBM.c src/sdl-misc.c src/mtwist/mtwist.c src/pallet.c src/optproc.c src/points.c
+COMMON_SRCS = src/terminusIBM.c src/mtwist/mtwist.c src/pallet.c src/optproc.c src/points.c
 
 SOFT_SRCS = src/software/map.c src/software/maxsrc.c src/software/palletblit.c src/software/pixmisc.c
 
@@ -121,25 +122,25 @@ distclean: clean
 config.mk:
 	touch config.mk
 
-bin/sdl-test$(EXEEXT): src/software/sdl.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) src/points.h src/common.h Makefile config.mk
+bin/sdl-test$(EXEEXT): src/software/sdl.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
-	src/software/sdl.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) \
+	src/software/sdl.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
 
-bin/gl-test$(EXEEXT): src/opengl/sdlmain.c src/opengl/glmain.c src/opengl/glfract.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+bin/gl-test$(EXEEXT): src/opengl/sdlmain.c src/opengl/glmain.c src/opengl/glfract.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
 	src/opengl/sdlmain.c src/opengl/glmain.c src/opengl/glfract.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c \
-	$(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
+	src/sdl-misc.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -L/usr/X11R6/lib -lGL -lGLU -lGLEW -o $@
 
-bin/sdlthread-test$(EXEEXT): src/software/sdl-thread.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) src/points.h src/common.h Makefile config.mk
+bin/sdlthread-test$(EXEEXT): src/software/sdl-thread.c src/sdl-misc.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL -DTRIBUF_LOCKING \
-	src/software/sdl-thread.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) \
+	src/software/sdl-thread.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
 
 bin/dfb-test$(EXEEXT): src/software/directfb.c $(SOFT_SRCS) src/optproc.c $(TRIBUF_SRCS) src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_DIRECTFB \
-	src/software/directfb.c $(SOFT_SRCS) src/optproc.c $(TRIBUF_SRCS) \
+	src/software/directfb.c $(SOFT_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) \
 	$(DFB_FLAGS) $(AUDIO_FLAGS) -o $@
 
 bin/audio-test$(EXEEXT): $(AUDIO_SRCS) src/audio/test.c src/sdl-misc.c src/terminusIBM.c src/optproc.c $(TRIBUF_SRCS) src/software/line.c

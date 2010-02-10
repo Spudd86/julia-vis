@@ -20,11 +20,10 @@ MAP_FUNC_ATTR void soft_map_line_buff(uint16_t *restrict out, uint16_t *restrict
 int main(int argc, char **argv)
 {
 	optproc(argc, argv, &opts);
+	if(audio_init(&opts) < 0) exit(1);
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	int im_w = screen->w - screen->w%16, im_h = screen->h - screen->h%8;
 	printf("running with %dx%d bufs\n", im_w, im_h);
-
-	audio_init(&opts);
 
 	maxsrc_setup(im_w, im_h);
 	pallet_init(screen->format->BitsPerPixel == 8);
@@ -100,5 +99,7 @@ int main(int argc, char **argv)
 		cnt++;
 	}
 
+	audio_shutdown();
+	SDL_Quit();
     return 0;
 }

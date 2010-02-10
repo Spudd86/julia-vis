@@ -16,12 +16,9 @@
 #define USE_MIRRORED_REPEAT
 
 static inline float sqr(float v) {return v*v;}
-static Pixbuf *setup_point_16(int w, int h)
+static uint16_t *setup_point_16(int w, int h)
 {
-	Pixbuf *surf = malloc(sizeof(Pixbuf));
-	uint16_t *buf = surf->data = malloc(w * h * sizeof(*buf)); surf->bpp  = 16;
-	surf->w = w; surf->h = h; surf->pitch = surf->w*sizeof(*buf);
-
+	uint16_t *buf = malloc(w * h * sizeof(*buf));
 	for(int y=0; y < h; y++)  {
 		for(int x=0; x < w; x++) {
 #ifdef USE_MIRRORED_REPEAT
@@ -33,7 +30,7 @@ static Pixbuf *setup_point_16(int w, int h)
 			buf[y*w + x] = (uint16_t)(expf(-4.5f*log2f(u*u+v*v + 1)/2)*(UINT16_MAX));
 		}
 	}
-	return surf;
+	return buf;
 }
 
 static float tx=0, ty=0, tz=0;
@@ -92,19 +89,24 @@ static const char *pnt_shader_src =
 static const char *frag_src =
 	"uniform sampler2D prev;\n"
 	"invariant uniform mat2x3 R;\n"
-	"void main() {\n"
-	"	vec3 p = vec3(0.5f);\n"
-	"	{\n"
-	"		vec2 uv = gl_TexCoord[0].st;\n"
-//	"		float d = 0.96f*0.5f + (0.04f*0.5f)*log2(length(uv)*0.707106781186547f + 1);\n"
-	"		float d = 0.96f*0.5f + (0.04f*0.5f)*length(uv);\n"
-	"		p.yz = vec2(d); p = (uv.x*R[0] + uv.y*R[1])*p;\n" //NOTE: on mesa 7.6's compiler p*= generates more code for some reason
-	"	}\n"
-	"	vec4 c = texture2D(prev, p*R + 0.5f);\n"
 	"#ifdef FLOAT_PACK_PIX\n"
-	"	gl_FragData[0] = texture2D(prev, p*R + 0.5f)*(98.0f/100);\n"
+	FLOAT_PACK_FUNCS
+	"#endif\n"
+	"void main() {\n"
+	"	vec3 p;\n"
+	"	{\n"
+	"		const vec2 uv = gl_TexCoord[0].st;\n"
+	"		vec3 t = vec3(0.5f);\n"
+	"		t.yz = vec2(0.95f*0.5f + (0.05f*0.5f)*length(uv));\n"
+	"		p = (uv.x*R[0] + uv.y*R[1])*t;\n"
+	"	}\n"
+	"#ifdef FLOAT_PACK_PIX\n"
+	"	gl_FragData[0] = encode(decode(texture2D(prev, p*R + 0.5f))*0.978f);\n"
 	"#else"
-	"	gl_FragData[0] = (c - max(vec4(2/256.0f), c*(1.0f/100)));\n"
+	"	const vec4 c = texture2D(prev, p*R + 0.5f);\n"
+	"	gl_FragData[0] = vec4(c.x - max(2/256.0f, c.x*(1.0f/100)));\n"
+//	"	const vec4 c = texture2D(prev, p*R + 0.5f);\n"
+//	"	gl_FragData[0] = (c - max(vec4(2/256.0f), c*0.01f));\n"
 	"#endif"
 	"}\n";
 
@@ -122,8 +124,8 @@ static void bg_vtx(float u, float v, vec2f *restrict txco, const void *cb_data) 
 
 static GLuint pnt_tex = 0;
 static GLhandleARB shader_prog = 0, pnt_shader = 0;
-static GLuint max_fbo = 0, max_fbo_tex[2] = { 0, 0 };
-static int cur_tex = 0;
+static GLint shad_R_loc = -1;
+static GLuint max_fbo = 0, fbo_tex[2] = { 0, 0 };
 static int iw, ih;
 static int samp = 0;
 static float pw = 0, ph = 0;
@@ -134,10 +136,12 @@ GEN_MAP_CB(fixed_map_cb, bg_vtx);
 
 #define PNT_MIP_LEVELS 4
 
-void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLboolean force_fixed) {
+void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLboolean force_fixed)
+{CHECK_GL_ERR;
 	iw=width, ih=height;
 	pw = 0.5f*fmaxf(1.0f/24, 8.0f/iw), ph = 0.5f*fmaxf(1.0f/24, 8.0f/ih);
 	samp = (int)(8*fmaxf(1/pw,1/ph));
+//	samp = IMIN(IMAX(iw,ih)/4, 1023);
 	sco_verts = malloc(sizeof(float)*samp*5*4);
 
 	printf("maxsrc using %i points\n", samp);
@@ -148,6 +152,10 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 		shader_prog = compile_program_defs(defs, NULL, frag_src);
 		pnt_shader = compile_program_defs(defs, NULL, pnt_shader_src);
 		printf("maxsrc shader compiled\n");
+		glUseProgramObjectARB(shader_prog);
+		glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0);
+		shad_R_loc = glGetUniformLocationARB(shader_prog, "R");
+		glUseProgramObjectARB(0);
 	} else {
 		use_glsl = GL_FALSE;
 		fixed_map = map_new(24, fixed_map_cb);
@@ -156,9 +164,9 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
 	glGenFramebuffersEXT(1, &max_fbo);
-	glGenTextures(2, max_fbo_tex);
+	glGenTextures(2, fbo_tex);
 	for(int i=0; i<2; i++) {
-		glBindTexture(GL_TEXTURE_2D, max_fbo_tex[i]);
+		glBindTexture(GL_TEXTURE_2D, fbo_tex[i]);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -173,16 +181,14 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 
 		for(int lvl=0; lvl<PNT_MIP_LEVELS; lvl++) {
 			int size = pnt_tex_size>>lvl;
-			Pixbuf *src = setup_point_16(size, size);
-			uint16_t *data = src->data;
-			for(int y=0; y < size; y++) {
-				for(int x=0; x < size; x++, data++)
-					printf("%2X ", ((*data) >> 8)&0xFF);
-				printf("\n");
-			}
-			glTexImage2D(GL_TEXTURE_2D, lvl, GL_LUMINANCE, size, size, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, src->data);
-			free(src->data);
-			free(src);
+			uint16_t *data = setup_point_16(size, size);
+//			for(int y=0; y < size; y++) {
+//				for(int x=0; x < size; x++, data++)
+//					printf("%2X ", ((*data) >> 8)&0xFF);
+//				printf("\n");
+//			}
+			glTexImage2D(GL_TEXTURE_2D, lvl, GL_LUMINANCE, size, size, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, data);
+			free(data);
 		}
 		uint16_t tmp = 0xFFFF;
 		glTexImage2D(GL_TEXTURE_2D, PNT_MIP_LEVELS, GL_LUMINANCE, 1, 1, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, &tmp);
@@ -199,10 +205,11 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 	}
 
 	glPopAttrib();
+	CHECK_GL_ERR;
 }
 
 // render the old frame and distort it with GL shading language
-static void render_bg_glsl(float R[3][3])
+static void render_bg_glsl(float R[3][3], GLint tex)
 {
 	float Rt[][3] = {
 		{R[0][0], R[1][0], R[2][0]},
@@ -211,9 +218,8 @@ static void render_bg_glsl(float R[3][3])
 	};
 
 	glUseProgramObjectARB(shader_prog);
-	glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0); //TODO: only need to call glGetUniformLocationARB once
-	glUniformMatrix2x3fv(glGetUniformLocationARB(shader_prog, "R"), 1, 0, (float *)Rt);
-	glBindTexture(GL_TEXTURE_2D, max_fbo_tex[cur_tex]);
+	glUniformMatrix2x3fv(shad_R_loc, 1, 0, (float *)Rt);
+	glBindTexture(GL_TEXTURE_2D, tex);
 	glBegin(GL_QUADS);
 		glTexCoord2d(-1,-1); glVertex2d(-1, -1);
 		glTexCoord2d( 1,-1); glVertex2d( 1, -1);
@@ -221,10 +227,11 @@ static void render_bg_glsl(float R[3][3])
 		glTexCoord2d(-1, 1); glVertex2d(-1,  1);
 	glEnd();
 	glUseProgramObjectARB(0);
+	DEBUG_CHECK_GL_ERR;
 }
 
-static void render_bg_fixed(float R[3][3])
-{
+static void render_bg_fixed(float R[3][3], GLint tex)
+{DEBUG_CHECK_GL_ERR;
 	//TODO: try to come up with something that will run faster
 	glClearColor(1.0f/256, 1.0f/256,1.0f/256, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -234,21 +241,21 @@ static void render_bg_fixed(float R[3][3])
 	glBlendFunc(GL_CONSTANT_ALPHA, GL_ONE);
 	glBlendEquationEXT(GL_FUNC_SUBTRACT_EXT);
 	glBlendColor(0, 0, 0, 63.0f/64);
+	DEBUG_CHECK_GL_ERR;
 
-	glBindTexture(GL_TEXTURE_2D, max_fbo_tex[cur_tex]);
+	glBindTexture(GL_TEXTURE_2D, tex); DEBUG_CHECK_GL_ERR;
 	map_render(fixed_map, R);
 }
 
+static uint32_t frm = 0;
 void gl_maxsrc_update(void)
-{
-	int next_tex = (cur_tex+1)%2;
-	float dt = 1;
-//	static static Uint32 lastupdate = -1;
-//	if(lastupdate != -1) {
-////		dt = (now - lastupdate)*0.05f;
-//		if(now - lastupdate < 50) return; // limit FPS
-//	}
-//	lastupdate = now;
+{DEBUG_CHECK_GL_ERR;
+	static uint32_t lastupdate = 0;
+	const uint32_t now = get_ticks();
+	const float dt = (now - lastupdate)*24/1000.0f;
+	lastupdate = now;
+//	const float dt = 1;
+//	printf("maxsrc: dt = %8f\n", dt);
 
 	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz);
 	float sx=sinf(tx), sy=sinf(ty), sz=sinf(tz);
@@ -259,38 +266,45 @@ void gl_maxsrc_update(void)
 		{cx*sy         ,    -sx,  cy*cx}
 	};
 
+	GLint draw_tex = fbo_tex[frm%2];
+	GLint src_tex = fbo_tex[(frm+1)%2];
+	// GL_COLOR_BUFFER_BIT // for glBlend/alpha stuff
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, max_fbo);
-	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, max_fbo_tex[next_tex], 0);
+	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, draw_tex, 0);
 	setup_viewport(iw, ih);
 
-	if(use_glsl) render_bg_glsl(R);
-	else render_bg_fixed(R);
-	CHECK_GL_ERR;
+	if(use_glsl) render_bg_glsl(R, src_tex);
+	else render_bg_fixed(R, src_tex);
+	DEBUG_CHECK_GL_ERR;
 
-	// ******************* normal
+	// do the rotate/project ourselves because we can send less data to the card
+	// also it makes it easier to match the software implementation
 	audio_data ad; audio_get_samples(&ad);
 	for(int i=0; i<samp; i++) {
-		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
+		float s = getsamp(&ad, i*ad.len/(samp-1), ad.len/96);
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
-		float xt = (i - samp/2)*1.0f/samp, yt = 0.1f*s, zt = 0.0f;
+		float xt = (i - (samp-1)/2)*(1.0f/(samp-1)), yt = 0.2f*s, zt = 0.0f;
 		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
 		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
 		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
+		const float zvd = 1/(z+2);
+		x=x*zvd*4/3; y=y*zvd*4/3;
+
 #ifdef USE_MIRRORED_REPEAT
-		sco_verts[(i*4+0)*5+0] = 0; sco_verts[(i*4+0)*5+1] = 2; sco_verts[(i*4+0)*5+2] = x-pw; sco_verts[(i*4+0)*5+3] = y-ph; sco_verts[(i*4+0)*5+4] = z;
-		sco_verts[(i*4+1)*5+0] = 2; sco_verts[(i*4+1)*5+1] = 2; sco_verts[(i*4+1)*5+2] = x+pw; sco_verts[(i*4+1)*5+3] = y-ph; sco_verts[(i*4+1)*5+4] = z;
-		sco_verts[(i*4+2)*5+0] = 2; sco_verts[(i*4+2)*5+1] = 0; sco_verts[(i*4+2)*5+2] = x+pw; sco_verts[(i*4+2)*5+3] = y+ph; sco_verts[(i*4+2)*5+4] = z;
-		sco_verts[(i*4+3)*5+0] = 0; sco_verts[(i*4+3)*5+1] = 0; sco_verts[(i*4+3)*5+2] = x-pw; sco_verts[(i*4+3)*5+3] = y+ph; sco_verts[(i*4+3)*5+4] = z;
+		sco_verts[(i*4+0)*4+0] = 0; sco_verts[(i*4+0)*4+1] = 2; sco_verts[(i*4+0)*4+2] = x-pw; sco_verts[(i*4+0)*4+3] = y-ph;
+		sco_verts[(i*4+1)*4+0] = 2; sco_verts[(i*4+1)*4+1] = 2; sco_verts[(i*4+1)*4+2] = x+pw; sco_verts[(i*4+1)*4+3] = y-ph;
+		sco_verts[(i*4+2)*4+0] = 2; sco_verts[(i*4+2)*4+1] = 0; sco_verts[(i*4+2)*4+2] = x+pw; sco_verts[(i*4+2)*4+3] = y+ph;
+		sco_verts[(i*4+3)*4+0] = 0; sco_verts[(i*4+3)*4+1] = 0; sco_verts[(i*4+3)*4+2] = x-pw; sco_verts[(i*4+3)*4+3] = y+ph;
 #else
-		sco_verts[(i*4+0)*5+0] = 0; sco_verts[(i*4+0)*5+1] = 1; sco_verts[(i*4+0)*5+2] = x-pw; sco_verts[(i*4+0)*5+3] = y-ph; sco_verts[(i*4+0)*5+4] = z;
-		sco_verts[(i*4+1)*5+0] = 1; sco_verts[(i*4+1)*5+1] = 1; sco_verts[(i*4+1)*5+2] = x+pw; sco_verts[(i*4+1)*5+3] = y-ph; sco_verts[(i*4+1)*5+4] = z;
-		sco_verts[(i*4+2)*5+0] = 1; sco_verts[(i*4+2)*5+1] = 0; sco_verts[(i*4+2)*5+2] = x+pw; sco_verts[(i*4+2)*5+3] = y+ph; sco_verts[(i*4+2)*5+4] = z;
-		sco_verts[(i*4+3)*5+0] = 0; sco_verts[(i*4+3)*5+1] = 0; sco_verts[(i*4+3)*5+2] = x-pw; sco_verts[(i*4+3)*5+3] = y+ph; sco_verts[(i*4+3)*5+4] = z;
+		sco_verts[(i*4+0)*4+0] = 0; sco_verts[(i*4+0)*4+1] = 1; sco_verts[(i*4+0)*4+2] = x-pw; sco_verts[(i*4+0)*4+3] = y-ph;
+		sco_verts[(i*4+1)*4+0] = 1; sco_verts[(i*4+1)*4+1] = 1; sco_verts[(i*4+1)*4+2] = x+pw; sco_verts[(i*4+1)*4+3] = y-ph;
+		sco_verts[(i*4+2)*4+0] = 1; sco_verts[(i*4+2)*4+1] = 0; sco_verts[(i*4+2)*4+2] = x+pw; sco_verts[(i*4+2)*4+3] = y+ph;
+		sco_verts[(i*4+3)*4+0] = 0; sco_verts[(i*4+3)*4+1] = 0; sco_verts[(i*4+3)*4+2] = x-pw; sco_verts[(i*4+3)*4+3] = y+ph;
 #endif
 	}
 	audio_finish_samples();
@@ -302,7 +316,8 @@ void gl_maxsrc_update(void)
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 	glEnableClientState(GL_VERTEX_ARRAY); //FIXME
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-	glInterleavedArrays(GL_T2F_V3F, 0, sco_verts); //TODO: replace with seperate calls to glVertexPointer/glTexCoordPointer also maybe use VBOs and have a fixed VBO for tex-coords
+	glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts);
+	glVertexPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts + 2);
 	glDrawArrays(GL_QUADS, 0, samp*4);
 
 	if(!pnt_tex) glUseProgramObjectARB(0);
@@ -311,12 +326,12 @@ void gl_maxsrc_update(void)
 	glPopAttrib();
 
 	tx+=0.02*dt; ty+=0.01*dt; tz-=0.003*dt;
-	cur_tex = next_tex;
+	frm++;
 
-	CHECK_GL_ERR;
+	DEBUG_CHECK_GL_ERR;
 }
 
 GLuint gl_maxsrc_get(void) {
-	return max_fbo_tex[(cur_tex+1)%2];
-//	return max_fbo_tex[(cur_tex)];
+//	return fbo_tex[(frm+1)%2];
+	return fbo_tex[(frm)%2];
 }

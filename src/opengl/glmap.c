@@ -110,23 +110,22 @@ void map_destroy(Map *self)
 }
 
 void map_render(Map *self, const void *cb_data)
-{
-	CHECK_GL_ERR;
+{DEBUG_CHECK_GL_ERR;
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 
 	if(self->use_vbo) {
-		glBindBufferARB(GL_ARRAY_BUFFER_ARB, self->txco);
-		vec2f *ptr = glMapBufferARB(GL_ARRAY_BUFFER_ARB, GL_WRITE_ONLY_ARB);
+		glBindBufferARB(GL_ARRAY_BUFFER_ARB, self->txco); DEBUG_CHECK_GL_ERR;
+		vec2f *ptr = glMapBufferARB(GL_ARRAY_BUFFER_ARB, GL_WRITE_ONLY_ARB); DEBUG_CHECK_GL_ERR;
 		if(!ptr) {
 			printf("Map buffer failed!\n");
 			return;
 		}
 		self->callback(self->grid_size, ptr, cb_data);
 		glUnmapBufferARB(GL_ARRAY_BUFFER_ARB);
+		DEBUG_CHECK_GL_ERR;
 	} else
 		self->callback(self->grid_size, self->txco_buf, cb_data);
-	CHECK_GL_ERR;
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -137,8 +136,8 @@ void map_render(Map *self, const void *cb_data)
 		glBindBufferARB(GL_ARRAY_BUFFER_ARB, self->txco);
 		glTexCoordPointer(2, GL_FLOAT, 0, NULL);
 		glDrawElements(GL_QUADS, self->grid_size*self->grid_size*4, GL_UNSIGNED_INT, NULL);
-		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);
-		glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+//		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);
+//		glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
 	} else {
 		glTexCoordPointer(2, GL_FLOAT, 0, self->txco_buf);
 		glVertexPointer(2, GL_FLOAT, 0, self->vtx_buf);
@@ -146,5 +145,5 @@ void map_render(Map *self, const void *cb_data)
 	}
 	glPopClientAttrib();
 	glPopAttrib();
-	CHECK_GL_ERR;
+	DEBUG_CHECK_GL_ERR;
 }

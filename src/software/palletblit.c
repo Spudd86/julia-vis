@@ -351,14 +351,15 @@ void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int 
 }
 #endif
 
-#ifdef HAVE_DIRECTFB
+#ifdef USE_DIRECTFB
 #include <directfb.h>
-void pallet_blit_DFB(IDirectFBSurface *dst, uint16_t * restrict src, int w, int h, const uint32_t *restrict pal)
+void pallet_blit_DFB(IDirectFBSurface *dst, const uint16_t * restrict src, int w, int h)
 {
 	const int src_stride = w;
 	DFBSurfacePixelFormat dst_format;
 	void *dst_pixels = NULL;
 	int dst_pitch, dst_w, dst_h;
+	const void *pal = get_active_pal();
 
 	dst->GetSize(dst, &dst_w, &dst_h);
 	dst->GetPixelFormat(dst, &dst_format);

@@ -13,14 +13,12 @@
 #include "map.h"
 #include "audio/audio.h"
 
-#define IM_SIZE (384)
+#define IM_SIZE (512)
 
 static opt_data opts;
 static int im_w = 0, im_h = 0;
 static int running = 1;
 static float map_fps=0;
-
-MAP_FUNC_ATTR void soft_map_line_buff(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd);
 
 static int run_map_thread(tribuf *tb)
 {
@@ -28,6 +26,7 @@ static int run_map_thread(tribuf *tb)
 	unsigned int beats = beat_get_count();
 	unsigned int tick0, fps_oldtime, frmcnt=0, last_beat_time = 0;
 	tick0 = fps_oldtime = SDL_GetTicks();
+	uint32_t maxfrms = 0;
 
 	unsigned int fpstimes[40]; for(int i=0; i<40; i++) fpstimes[i] = 0;
 
@@ -35,12 +34,18 @@ static int run_map_thread(tribuf *tb)
     while(running) {
 		frmcnt++;
 
+		if((tick0-SDL_GetTicks())*opts.maxsrc_rate + (maxfrms*1000) > 1000) {
+			maxsrc_update();
+			maxfrms++;
+		}
+
 		uint16_t *map_dest = tribuf_get_write(tb);
 		if(!opts.rational_julia)
 //			soft_map_line_buff(map_dest, map_src, im_w, im_h, pd);
 			soft_map_interp(map_dest, map_src, im_w, im_h, pd);
 		else // really want to do maxblend first here, but can't because we'd have to modify map_src and it's shipped off for reading
 			soft_map_rational(map_dest, map_src, im_w, im_h, pd);
+//		soft_map_butterfly(map_dest, map_src, im_w, im_h, pd);
 
 		maxblend(map_dest, maxsrc_get(), im_w, im_h);
 
@@ -59,8 +64,8 @@ static int run_map_thread(tribuf *tb)
 		} else update_points(pd, now, 0);
 		beats = newbeat;
 
-		if(map_fps > 250)
-			SDL_Delay(3); // hard limit ourselves to ~250FPS because 1500FPS is just pointless use of CPU (except of course to say that we can do it)
+//		if(map_fps > 250)
+//			SDL_Delay(3); // hard limit ourselves to ~250FPS because 1500FPS is just pointless use of CPU (except of course to say that we can do it)
 							// also if we run at more that 1000FPS the point motion code might blow up without the microsecond accurate timers...
 							// high threshhold because we want it high enough that we don't notice if we jitter back
 							// and fourth across it
@@ -70,12 +75,10 @@ static int run_map_thread(tribuf *tb)
 
 int main(int argc, char **argv)
 {
-	optproc(argc, argv, &opts);
+	optproc(argc, argv, &opts); if(audio_init(&opts) < 0) exit(1);
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	im_w = screen->w - screen->w%16; im_h = screen->h - screen->h%8;
 	printf("running with %dx%d bufs\n", im_w, im_h);
-
-	audio_init(&opts);
 
 	maxsrc_setup(im_w, im_h);
 	pallet_init(screen->format->BitsPerPixel == 8);
@@ -131,11 +134,11 @@ int main(int argc, char **argv)
 			const unsigned int maxsrc_ps = opts.maxsrc_rate;
 			now = SDL_GetTicks();
 
-			if(tribuf_get_frmnum(map_tb) - prevfrm > 1 && (tick0+(maxfrms*1000)/maxsrc_ps) - now > 1000/maxsrc_ps) {
-				maxsrc_update();
-				maxfrms++;
-				prevfrm = tribuf_get_frmnum(map_tb);
-			}
+//			if(tribuf_get_frmnum(map_tb) - prevfrm > 1 && (tick0+(maxfrms*1000)/maxsrc_ps) - now > 1000/maxsrc_ps) {
+//				maxsrc_update();
+//				maxfrms++;
+//				prevfrm = tribuf_get_frmnum(map_tb);
+//			}
 
 			now = SDL_GetTicks();
 			int delay =  (tick0 + frmcnt*1000/opts.draw_rate) - now;
@@ -157,7 +160,8 @@ int main(int argc, char **argv)
 	SDL_WaitThread(map_thread, &status);
 
 	_mm_free(map_surf_mem);
-
+	audio_shutdown();
+	SDL_Quit();
     return 0;
 }
 

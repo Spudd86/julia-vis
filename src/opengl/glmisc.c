@@ -144,4 +144,5 @@ void draw_string(const char *str)
 		c++;
 	}
 	glPopClientAttrib();
+	DEBUG_CHECK_GL_ERR;
 }

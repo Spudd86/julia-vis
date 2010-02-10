@@ -56,6 +56,12 @@ void draw_string(const char *str);
 		glerr = glGetError();\
 	} while(0)
 
+#ifdef NDEBUG
+#define DEBUG_CHECK_GL_ERR
+#else
+#define DEBUG_CHECK_GL_ERR CHECK_GL_ERR
+#endif
+
 #define FLOAT_PACK_FUNCS \
 		"vec4 encode( float v ) {\n"\
 		"	vec4 enc = vec4(1.0, 255.0, 65025.0, 16581375.0) * clamp(v, 0, 1);\n"\

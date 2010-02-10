@@ -19,7 +19,7 @@ static int callback(const void *input,
 	return paContinue;
 }
 
-int audio_setup_pa(opt_data *od)
+int audio_setup_pa(const opt_data *od)
 {
 	printf("Using PortAudio\n");
 
@@ -27,7 +27,7 @@ int audio_setup_pa(opt_data *od)
 	if( err != paNoError ) { fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err)); exit(1); }
 
 	int usedev = (!od->audio_opts)?Pa_GetDefaultInputDevice():atoi(od->audio_opts);
-	if(usedev >= Pa_GetDeviceCount()) {
+	if(usedev < 0 || usedev >= Pa_GetDeviceCount()) {
 		fprintf(stderr, "bad device number %i\n", usedev);
 		return -1;
 	}

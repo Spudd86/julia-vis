@@ -24,12 +24,16 @@ static uint16_t *next_src;
 static uint16_t *point_src;
 static int pnt_w, pnt_h;
 static int iw, ih;
+static int samp = 0;
 
 void maxsrc_setup(int w, int h)
 {
 	pnt_w = IMAX(w/24, 8);
 	pnt_h = IMAX(h/24, 8);
 	iw = w; ih = h;
+	samp = IMIN(IMAX(iw,ih)/2, 1023);
+	printf("maxsrc using %i points\n", samp);
+
 	point_src = setup_point(pnt_w, pnt_h);
 
 	prev_src = _mm_malloc(2 * w * h * sizeof(uint16_t), 32);
@@ -116,8 +120,6 @@ static inline float getsamp(audio_data *d, int i, int w) {
 void maxsrc_update(void)
 {
 	uint16_t *dst = next_src;
-
-	int samp = IMAX(IMAX(iw,ih)/4, 1023);
 	//samp = 4;
 	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz);
 	float sx=sinf(tx), sy=sinf(ty), sz=sinf(tz);
@@ -144,10 +146,10 @@ void maxsrc_update(void)
 		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
 		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
 		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
-		float zvd = 1/(z+2);
+		float zvd = 0.75f/(z+2);
 
-		float xi = x*zvd*iw*3/4+iw/2 - pnt_w/2;
-		float yi = y*zvd*ih*3/4+ih/2 - pnt_h/2;
+		float xi = x*zvd*iw+iw/2 - pnt_w/2;
+		float yi = y*zvd*ih+ih/2 - pnt_h/2;
 		draw_point(dst, xi, yi);
 	}
 	audio_finish_samples();

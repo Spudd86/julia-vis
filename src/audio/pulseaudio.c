@@ -121,7 +121,7 @@ static int pulse_run()
 }
 static pthread_t pulse_thread;
 
-int pulse_setup(opt_data *od)
+int pulse_setup(const opt_data *od)
 {
 	setenv("PULSE_PROP_application.name", "Fractal Visualizer", 1);
 
@@ -134,7 +134,7 @@ int pulse_setup(opt_data *od)
         fprintf(stderr, "pa_context_new() failed.\n");
         goto quit;
     }
-	pa_context_set_state_callback(context, context_state_callback, od);
+	pa_context_set_state_callback(context, context_state_callback, (void *)od);
 
     if (pa_context_connect(context, NULL, PA_CONTEXT_NOAUTOSPAWN, NULL) < 0) {
         fprintf(stderr, "pa_context_connect() failed: %s", pa_strerror(pa_context_errno(context)));

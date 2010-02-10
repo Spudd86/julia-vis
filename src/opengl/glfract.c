@@ -25,8 +25,9 @@ static const char *map_frag_shader =
 	"uniform sampler2D prev;\n"
 	"uniform sampler2D maxsrc;\n"
 	"invariant uniform vec2 c;\n"
+
 	"#ifdef MAP_SAMP\n"
-	"vec4 smap(const vec2 s) {\n"
+	"vec4 smap(const in vec2 s) {\n"
 	"	const vec2 t = s*s;\n"
 	"	return texture2D(prev, vec2(t.x - t.y, 2*s.x*s.y) + c);\n"
 	"}\n"
@@ -56,15 +57,15 @@ static const char *map_frag_shader =
 	"#endif\n";
 	
 static const char *rat_map_frag_shader = 
-	"uniform sampler2D prev;\n"
-	"uniform sampler2D maxsrc;\n"
+	"const sampler2D prev = 1;\n"
+	"const sampler2D maxsrc = 0;\n"
 	"invariant uniform vec4 c;\n"
 	"#ifdef FLOAT_PACK_PIX\n"
 	FLOAT_PACK_FUNCS
 	"#else\n"
 	"#define encode(X) X\n#define decode(X) X\n"
 	"#endif\n"
-	"vec4 smap(const vec2 tmp) {\n"
+	"vec4 smap(const in vec2 tmp) {\n"
 	"	vec2 s = tmp*2.5;\n"
 	"	vec2 t = s*s;\n"
 	"	const float ab = s.x*s.y;\n"
@@ -99,7 +100,7 @@ static void map_vtx(float u, float v, vec2f *txco, const void *cb_data) {
 }
 static void rat_map_vtx(float u, float v, vec2f *txco, const void *cb_data) {
 	const struct point_data *pd = cb_data;
-	static const float xoom = 3.0f, moox = 1.0f/xoom;
+	static const float xoom = 3.0f, moox = 1.0f/3.0f;
 	const float cx0 = pd->p[0], cy0 = pd->p[1], cx1 = pd->p[2]*2, cy1 = pd->p[3]*2;
 
 	float a,b,c,d,sa,sb, cdivt, x, y;
@@ -114,9 +115,11 @@ static void rat_map_vtx(float u, float v, vec2f *txco, const void *cb_data) {
 GEN_MAP_CB(map_cb, map_vtx);
 GEN_MAP_CB(rat_map_cb, rat_map_vtx);
 
+#define NUM_FBO_TEX 2
+
 static GLint map_prog  = -1;
 static GLint map_c_loc=-1, map_prev_loc=-1, map_maxsrc_loc=-1;
-static GLuint fbo, fbo_tex[2];
+static GLuint fbo, fbo_tex[NUM_FBO_TEX];
 static GLboolean rational_julia = GL_FALSE;
 
 static Map *fixed_map = NULL;
@@ -125,34 +128,33 @@ static int im_w = -1, im_h = -1;
 static uint32_t frm  = 0;
 
 GLint fract_get_tex(void) {
-	return fbo_tex[frm%2];
+//	return fbo_tex[(frm+1)%NUM_FBO_TEX];
+	return fbo_tex[(frm+2)%NUM_FBO_TEX];
 }
 
 void render_fractal(struct point_data *pd)
-{	CHECK_GL_ERR;
-	GLint draw_tex = fbo_tex[frm%2];
-	GLint src_tex = fbo_tex[(frm+1)%2];
+{	DEBUG_CHECK_GL_ERR;
+	GLint draw_tex = fbo_tex[frm%NUM_FBO_TEX];
+	GLint src_tex = fbo_tex[(frm+1)%NUM_FBO_TEX];
 	
+	// GL_COLOR_BUFFER_BIT
+	// GL_VIEWPORT_BIT
+	// GL_TEXTURE_BIT
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
+//	glPushAttrib(GL_COLOR_BUFFER_BIT | GL_VIEWPORT_BIT | GL_TEXTURE_BIT);
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, draw_tex, 0);
 	setup_viewport(im_w, im_h);
-	CHECK_GL_ERR;
 
 	if(use_glsl) {
-		glActiveTextureARB(GL_TEXTURE1_ARB);
-		glBindTexture(GL_TEXTURE_2D, src_tex); CHECK_GL_ERR;
-		glActiveTextureARB(GL_TEXTURE0_ARB);
-		glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
-		CHECK_GL_ERR;
-
-		glUseProgramObjectARB(map_prog); CHECK_GL_ERR;
-		glUniform1iARB(map_maxsrc_loc, 0);CHECK_GL_ERR;
-		glUniform1iARB(map_prev_loc, 1);CHECK_GL_ERR;
+		glUseProgramObjectARB(map_prog);
 		if(!rational_julia) glUniform2fARB(map_c_loc, (pd->p[0]-0.5f)*0.25f + 0.5f, pd->p[1]*0.25f + 0.5f);
 		else glUniform4fARB(map_c_loc, pd->p[0], pd->p[1], pd->p[2], pd->p[3]);
-	
-		CHECK_GL_ERR;
+
+		glActiveTextureARB(GL_TEXTURE1_ARB);
+		glBindTexture(GL_TEXTURE_2D, src_tex);
+		glActiveTextureARB(GL_TEXTURE0_ARB);
+		glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
 		glBegin(GL_QUADS);
 			glMultiTexCoord2f(GL_TEXTURE0, 0.0, 1.0);
 			glMultiTexCoord2f(GL_TEXTURE1,-1.0, 1.0);
@@ -168,9 +170,6 @@ void render_fractal(struct point_data *pd)
 			glVertex2d(-1,-1);
 		glEnd();
 		glUseProgramObjectARB(0);
-		glActiveTextureARB(GL_TEXTURE1_ARB);
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glActiveTextureARB(GL_TEXTURE0_ARB);
 	} else {
 		glClearColor(1.0f/256, 1.0f/256,1.0f/256, 1);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -193,14 +192,13 @@ void render_fractal(struct point_data *pd)
 			glTexCoord2d( 0, 1); glVertex2d(-1,  1);
 		glEnd();
 	}
-
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glPopAttrib();
-	CHECK_GL_ERR;
+	DEBUG_CHECK_GL_ERR;
 	frm++;
 }
 
-void fractal_init(opt_data *opts, int width, int height, GLboolean force_fixed, GLboolean packed_intesity_pixels)
+void fractal_init(const opt_data *opts, int width, int height, GLboolean force_fixed, GLboolean packed_intesity_pixels)
 {CHECK_GL_ERR;
 	im_w = width; im_h = height;
 	rational_julia = opts->rational_julia;
@@ -208,8 +206,8 @@ void fractal_init(opt_data *opts, int width, int height, GLboolean force_fixed, 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 	glGenFramebuffersEXT(1, &fbo);
-	glGenTextures(2, fbo_tex);
-	for(int i=0; i<2; i++) {
+	glGenTextures(NUM_FBO_TEX, fbo_tex);
+	for(int i=0; i<NUM_FBO_TEX; i++) {
 		glBindTexture(GL_TEXTURE_2D, fbo_tex[i]);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, im_w, im_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 
@@ -222,6 +220,7 @@ void fractal_init(opt_data *opts, int width, int height, GLboolean force_fixed, 
 	}
 	glPopClientAttrib();
 	glPopAttrib();
+	CHECK_GL_ERR;
 
 	if(glewGetExtension("GL_ARB_shading_language_120") && !force_fixed) {
 		use_glsl = GL_TRUE;
@@ -249,6 +248,10 @@ void fractal_init(opt_data *opts, int width, int height, GLboolean force_fixed, 
 			map_prev_loc = glGetUniformLocationARB(map_prog, "prev");
 			map_maxsrc_loc = glGetUniformLocationARB(map_prog, "maxsrc");
 		}
+		glUseProgramObjectARB(map_prog);
+		glUniform1iARB(map_maxsrc_loc, 0);
+		glUniform1iARB(map_prev_loc, 1);
+		glUseProgramObjectARB(0);
 		printf("Map shader compiled\n");
 	} else {
 		if(!rational_julia)
