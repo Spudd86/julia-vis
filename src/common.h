@@ -55,6 +55,8 @@ typedef struct {
 	const char *audio_opts;
 
 	const char *gl_opts;
+
+	const char *map_name;
 }opt_data;
 
 void optproc(int argc, char **argv, opt_data *res);

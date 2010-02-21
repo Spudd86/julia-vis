@@ -1,5 +1,4 @@
 #include "common.h"
-#include <stdio.h>
 
 #include <SDL.h>
 #include <SDL_thread.h>
@@ -20,6 +19,8 @@ static int im_w = 0, im_h = 0;
 static int running = 1;
 static float map_fps=0;
 
+static soft_map_func map_func = soft_map_interp;
+
 static int run_map_thread(tribuf *tb)
 {
 	struct point_data *pd = new_point_data(opts.rational_julia?4:2);
@@ -34,19 +35,13 @@ static int run_map_thread(tribuf *tb)
     while(running) {
 		frmcnt++;
 
-		if((tick0-SDL_GetTicks())*opts.maxsrc_rate + (maxfrms*1000) > 1000) {
-			maxsrc_update();
-			maxfrms++;
-		}
+//		if((tick0-SDL_GetTicks())*opts.maxsrc_rate + (maxfrms*1000) > 1000) {
+//			maxsrc_update();
+//			maxfrms++;
+//		}
 
 		uint16_t *map_dest = tribuf_get_write(tb);
-		if(!opts.rational_julia)
-//			soft_map_line_buff(map_dest, map_src, im_w, im_h, pd);
-			soft_map_interp(map_dest, map_src, im_w, im_h, pd);
-		else // really want to do maxblend first here, but can't because we'd have to modify map_src and it's shipped off for reading
-			soft_map_rational(map_dest, map_src, im_w, im_h, pd);
-//		soft_map_butterfly(map_dest, map_src, im_w, im_h, pd);
-
+		map_func(map_dest, map_src, im_w, im_h, pd);
 		maxblend(map_dest, maxsrc_get(), im_w, im_h);
 
 		tribuf_finish_write(tb);
@@ -79,6 +74,17 @@ int main(int argc, char **argv)
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	im_w = screen->w - screen->w%16; im_h = screen->h - screen->h%8;
 	printf("running with %dx%d bufs\n", im_w, im_h);
+
+	if(strcmp(opts.map_name, "rational") == 0) {
+		map_func = soft_map_rational_interp;
+		if(opts.quality >= 1)  map_func = soft_map_rational;
+	}
+	else if(strcmp(opts.map_name, "butterfly") == 0) {
+//		map_func = soft_map_butterfly_interp;
+//		if(opts.quality >= 1)
+			map_func = soft_map_butterfly;
+	}
+	else if(opts.quality >= 1)  map_func = soft_map;
 
 	maxsrc_setup(im_w, im_h);
 	pallet_init(screen->format->BitsPerPixel == 8);
@@ -123,7 +129,7 @@ int main(int argc, char **argv)
 			tribuf_finish_read(map_tb);
 
 			char buf[64];
-			sprintf(buf,"%6.1f FPS %6.1f UPS", map_fps, scr_fps);
+			sprintf(buf,"%6.1f FPS %6.1f UPS %6.2f", map_fps, scr_fps, maxfrms*1000.0f/(now-tick0));
 			DrawText(screen, buf);
 			SDL_Flip(screen);
 
@@ -131,14 +137,11 @@ int main(int argc, char **argv)
 			if(newbeat != beats) pallet_start_switch(newbeat);
 			beats = newbeat;
 
-			const unsigned int maxsrc_ps = opts.maxsrc_rate;
-			now = SDL_GetTicks();
-
-//			if(tribuf_get_frmnum(map_tb) - prevfrm > 1 && (tick0+(maxfrms*1000)/maxsrc_ps) - now > 1000/maxsrc_ps) {
-//				maxsrc_update();
-//				maxfrms++;
-//				prevfrm = tribuf_get_frmnum(map_tb);
-//			}
+			if(tribuf_get_frmnum(map_tb) - prevfrm >= 1 && (tick0-SDL_GetTicks())*opts.maxsrc_rate + (maxfrms*1000) > 1000) {
+				maxsrc_update();
+				maxfrms++;
+				prevfrm = tribuf_get_frmnum(map_tb);
+			}
 
 			now = SDL_GetTicks();
 			int delay =  (tick0 + frmcnt*1000/opts.draw_rate) - now;

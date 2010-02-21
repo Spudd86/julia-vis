@@ -14,6 +14,10 @@ static const char *helpstr =
 "\t-s screen update rate [default 30, threaded only]\n"
 "\t-d try to enable double buffering\n"
 
+"\t-m <name>\n"
+"\t\twhere name is one of default,rational,butterfly\n"
+"\t\t Note: default and rational are implemented for opengl\n"
+
 "\t-q quality\n"
 "\t\tglsl: control # of samples\n"
 "\t\t\t 0 take 1 sample (default)\n"
@@ -64,7 +68,9 @@ void optproc(int argc, char **argv, opt_data *res)
 	res->audio_opts = NULL;
 	res->gl_opts = NULL;
 
-	while((opt = getopt(argc, argv, "w:h:s:a:i:q:g:rftpd")) != -1) {
+	res->map_name = "default";
+
+	while((opt = getopt(argc, argv, "w:h:s:a:i:q:g:m:rftpd")) != -1) {
 		switch(opt) {
 			case 'w':
 				res->w = atoi(optarg);
@@ -77,6 +83,11 @@ void optproc(int argc, char **argv, opt_data *res)
 				break;
 			case 'r':
 				res->rational_julia = 1;
+				break;
+			case 'm':
+				res->map_name = optarg;
+				if(strcmp("rational", res->map_name) == 0)
+					res->rational_julia = 1;
 				break;
 			case 'f':
 				res->fullscreen = 1;

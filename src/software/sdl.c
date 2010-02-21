@@ -15,11 +15,17 @@
 
 static opt_data opts;
 
-MAP_FUNC_ATTR void soft_map_line_buff(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd);
+static soft_map_func map_func = soft_map_interp;
 
 int main(int argc, char **argv)
 {
 	optproc(argc, argv, &opts);
+	if(strcmp(opts.map_name, "rational") == 0) {
+		if(opts.quality == 0) map_func = soft_map_rational_interp;
+		else if(opts.quality >= 1)  map_func = soft_map_rational;
+	}
+	else if(strcmp(opts.map_name, "butterfly") == 0) map_func = soft_map_butterfly;
+	else if(opts.quality >= 1)  map_func = soft_map;
 	if(audio_init(&opts) < 0) exit(1);
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	int im_w = screen->w - screen->w%16, im_h = screen->h - screen->h%8;
@@ -54,15 +60,13 @@ int main(int argc, char **argv)
 		m = (m+1)&0x1;
 
 		if(!opts.rational_julia) {
-			soft_map_interp(map_surf[m], map_surf[(m+1)&0x1], im_w, im_h, pd);
-//			soft_map_line_buff(map_surf[m], map_surf[(m+1)&0x1], im_w, im_h, pd);
+			map_func(map_surf[m], map_surf[(m+1)&0x1], im_w, im_h, pd);
 			maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
 		}
 
 		if(opts.rational_julia) {
 			maxblend(map_surf[(m+1)&0x1], maxsrc_get(), im_w, im_h);
-			//~ soft_map_butterfly(map_surf[m], map_surf[(m+1)&0x1], im_w, im_h, pd);
-			soft_map_rational(map_surf[m], map_surf[(m+1)&0x1], im_w, im_h,  pd);
+			map_func(map_surf[m], map_surf[(m+1)&0x1], im_w, im_h,  pd);
 		}
 
 		if((now - lastpalstep)*256/1024 >= 1) { // want pallet switch to take ~2 seconds

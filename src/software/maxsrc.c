@@ -49,51 +49,113 @@ static void draw_point(void *restrict dest, float px, float py)
 {
 	int ipx = lrintf(px*256), ipy = lrintf(py*256);
 	uint yf = ipy&0xff, xf = ipx&0xff;
-	uint a00 = (yf*xf)/2;
-	uint a01 = (yf*(255-xf))/2;
-	uint a10 = ((255-yf)*xf)/2;
-	uint a11 = ((255-yf)*(255-xf))/2;
+	uint a00 = (yf*xf);
+	uint a01 = (yf*(255-xf));
+	uint a10 = ((255-yf)*xf);
+	uint a11 = ((255-yf)*(255-xf));
 
 	unsigned int off = (ipy/256)*iw + ipx/256;
 
 	uint16_t *restrict dst = dest;
 	for(int y=0; y < pnt_h; y++) {
 		for(int x=0; x < pnt_w; x++) {
-			uint32_t res = (point_src[(pnt_w+1)*y+x]*a00 + point_src[(pnt_w+1)*y+x+1]*a01
-					+ point_src[(pnt_w+1)*(y+1)+x]*a10   + point_src[(pnt_w+1)*(y+1)+x+1]*a11)>>15;
+			uint16_t res = (point_src[(pnt_w+1)*y+x]*a00 + point_src[(pnt_w+1)*y+x+1]*a01
+					+ point_src[(pnt_w+1)*(y+1)+x]*a10   + point_src[(pnt_w+1)*(y+1)+x+1]*a11)>>16;
 			dst[off+iw*y+x] = IMAX(res, dst[off+iw*y+x]);
 		}
 	}
 }
 
+#define BLOCK_SIZE 16
+
 static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, float R[3][3])
 {
-	float xstep = 2.0f/w, ystep = 2.0f/h;
-	for(int yd = 0; yd < h; yd++) {
-		float v = yd*ystep - 1.0f;
-		for(int xd = 0; xd < w; xd++) {
-			float u = xd*xstep - 1.0f;
+	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
+	float v0 = -1.0f;
+	for(int yd = 0; yd < h; yd+=BLOCK_SIZE) {
+		float v1 = v0+vstep;
 
-			float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
-			float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
+		float x, y;
+
+		{	const float u = -1.0f, v = v0;
+			const float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
+			const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 				(u*R[0][0] + v*R[0][1]),
 				(u*R[1][0] + v*R[1][1])*d,
 				(u*R[2][0] + v*R[2][1])*d
 			};
-
-			// rotate back and shift/scale to [0, 1]
-			float x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
-			float y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
-
-			int xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
-			int ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
-			int x1 = xs>>8, x2 = IMIN(x1+1,w-1), xf = xs&0xFF;
-			int y1 = ys>>8, y2 = IMIN(y1+1,h-1), yf = ys&0xFF;
-
-			uint16_t r = ((in[y1*w + x1]*(0xff - xf) + in[y1*w + x2]*xf)*(0xff-yf) +
-						  (in[y2*w + x1]*(0xff - xf) + in[y2*w + x2]*xf)*yf) >> 16;
-			*(out++) = r;
+			x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
+			y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
 		}
+		int x0 = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
+		int y0 = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
+
+		{	const float u = -1.0f, v = v1;
+			const float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
+			const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
+				(u*R[0][0] + v*R[0][1]),
+				(u*R[1][0] + v*R[1][1])*d,
+				(u*R[2][0] + v*R[2][1])*d
+			};
+			x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
+			y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
+		}
+		int x0s = (IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256) - x0)/BLOCK_SIZE;
+		int y0s = (IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256) - y0)/BLOCK_SIZE;
+
+		float u1 = -1.0f;
+		for(int xd = 0; xd < w; xd+=BLOCK_SIZE) {
+			u1 = u1+ustep;
+
+			{	const float u = u1, v = v0;
+				const float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
+				const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
+					(u*R[0][0] + v*R[0][1]),
+					(u*R[1][0] + v*R[1][1])*d,
+					(u*R[2][0] + v*R[2][1])*d
+				};
+				x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
+				y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
+			}
+			const int x1 = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
+			const int y1 = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
+
+			{	const float u = u1, v = v1;
+				const float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
+				const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
+					(u*R[0][0] + v*R[0][1]),
+					(u*R[1][0] + v*R[1][1])*d,
+					(u*R[2][0] + v*R[2][1])*d
+				};
+				x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
+				y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
+			}
+			const int x1s = (IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256) - x1)/BLOCK_SIZE;
+			const int y1s = (IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256) - y1)/BLOCK_SIZE;
+
+			const int xsts = (x1s - x0s)/BLOCK_SIZE;
+			const int ysts = (y1s - y0s)/BLOCK_SIZE;
+			int xst = (x1 - x0)/BLOCK_SIZE;
+			int yst = (y1 - y0)/BLOCK_SIZE;
+
+			for(int yt=0; yt<BLOCK_SIZE; yt++, x0+=x0s, y0+=y0s, xst += xsts, yst += ysts) {
+				for(int xt=0, x = x0, y = y0; xt<BLOCK_SIZE; xt++, x+=xst, y+=yst) {
+					const int xs=x/256, ys=y/256;
+					const int xf=x&0xFF, yf=y&0xFF;
+					const int xi1 = xs;
+					const int yi1 = ys*w;
+					const int xi2 = IMIN(xi1+1,w-1);
+					const int yi2 = IMIN(yi1+w,(h-1)*w);
+
+					uint32_t tmp = ((in[yi1 + xi1]*(255 - xf) + in[yi1 + xi2]*xf)*(255-yf) +
+								(in[yi2 + xi1]*(255 - xf) + in[yi2 + xi2]*xf)*yf);
+					out[(yd+yt)*w+xd+xt] = ((255*98/100)*(tmp>>8)) >> 16;
+				}
+			}
+			x0 = x1; y0 = y1;
+			x0s = x1s; y0s = y1s;
+		}
+		v0=v1;
 	}
 }
 
@@ -120,7 +182,7 @@ static inline float getsamp(audio_data *d, int i, int w) {
 void maxsrc_update(void)
 {
 	uint16_t *dst = next_src;
-	//samp = 4;
+//	samp = 4;
 	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz);
 	float sx=sinf(tx), sy=sinf(ty), sz=sinf(tz);
 
@@ -131,15 +193,14 @@ void maxsrc_update(void)
 	};
 
 	zoom(dst, prev_src, iw, ih, R);
-	fade_pix(dst, iw, ih, 255*98/100);
 
 	audio_data ad;
 	audio_get_samples(&ad);
 	for(int i=0; i<samp; i++) {
-		float s = getsamp(&ad, i*ad.len/samp, ad.len/96);
+		float s = getsamp(&ad, i*ad.len/(samp-1), ad.len/96);
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
-		float xt = (i - samp/2)*1.0f/samp;
+		float xt = (i - (samp-1)/2.0f)*(1.0f/(samp-1));
 		float yt = 0.2f*s;
 		float zt = 0.0f;
 
