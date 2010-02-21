@@ -9,8 +9,6 @@ void pallet_blit_SDL(SDL_Surface *dst, const uint16_t * restrict src, int w, int
 // require w%16 == 0
 // requires (h*w)%32 == 0
 void maxblend(void *dest, void *src, int w, int h);
-void fade_pix(void *buf, int w, int h, uint8_t fade);
-
 
 uint16_t *maxsrc_get(void);
 void maxsrc_setup(int w, int h);
