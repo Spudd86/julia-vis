@@ -20,7 +20,7 @@ static IDirectFBSurface *primary = NULL;
 static DFBBoolean exclusive = DFB_FALSE;
 static int im_w = 0, im_h = 0;
 #define FPS_HIST_LEN 32
-static float map_fps=0;
+static float map_fps = 0.0f;
 
 //~ static void* run_map_thread(void *parm)
 static void* run_map_thread(DirectThread *thread, void *parm)
@@ -37,10 +37,10 @@ static void* run_map_thread(DirectThread *thread, void *parm)
 	fps_oldtime = tick0 = direct_clock_get_abs_millis();
 	uint16_t *map_src = tribuf_get_read_nolock(tb);
     while(1) {
-    	if((tick0-direct_clock_get_abs_millis())*opts.maxsrc_rate + maxfrms*1000 > 1000) {
-			maxsrc_update();
-			maxfrms++;
-		}
+//    	if((tick0-direct_clock_get_abs_millis())*opts.maxsrc_rate + maxfrms*1000 > 1000) {
+//			maxsrc_update();
+//			maxfrms++;
+//		}
 
     	uint16_t *map_dest = tribuf_get_write(tb);
 		if(!opts.rational_julia)
@@ -58,9 +58,6 @@ static void* run_map_thread(DirectThread *thread, void *parm)
 		map_fps = FPS_HIST_LEN*1000.0f/totframetime;
 		frmcnt++;
 
-//		float fpsd = (now - fpstimes[frmcnt%40])/1000.0f;
-//		fpstimes[frmcnt%40] = now;
-//		map_fps = 40.0f / fpsd;
 		int newbeat = beat_get_count();
 		if(newbeat != beats && now - last_beat_time > 1000) {
 			last_beat_time = now;
@@ -128,16 +125,13 @@ int main(int argc, char **argv)
 	for(int i=0; i<3; i++)
 		map_surf[i] = map_surf_mem + i * im_w * im_h * sizeof(uint16_t);
 	memset(map_surf_mem, 0, 3 * im_w * im_h * sizeof(uint16_t));
-	tribuf *map_tb = tribuf_new((void **)map_surf, 0);
+	tribuf *map_tb = tribuf_new((void **)map_surf, 1);
 
 	DirectThread *map_thread = direct_thread_create(DTT_DEFAULT, &run_map_thread, map_tb, "MAP_THREAD");
 
-	const int maxsrc_ps = opts.maxsrc_rate;
-	uint32_t beats = 0, prevfrm = 0, frmcnt = 0, lastdrawn=0, maxfrms = 0;
+	uint32_t beats = 0, prevfrm = 0, maxfrms = 0, lastdrawn=0;
 	uint64_t lastpalstep, lastupdate, lasttime; lastpalstep = lastupdate = lasttime = 0;
 	uint64_t tick0 = direct_clock_get_abs_millis();
-	uint64_t fpstimes[opts.draw_rate]; for(int i=0; i<opts.draw_rate; i++) fpstimes[i] = tick0;
-	float scr_fps = 0;
 
 	IDirectFBEventBuffer *eb;
 	DFBCHECK (dfb->CreateInputEventBuffer(dfb,  DICAPS_KEYS , DFB_FALSE, &eb));
@@ -150,56 +144,45 @@ int main(int argc, char **argv)
 				break;
 		} else if(r != DFB_BUFFEREMPTY ) DFBCHECK(r);
 
-		uint64_t nextfrm = tribuf_get_frmnum(map_tb);
-//		if(r == DFB_TIMEOUT) {
-			lastdrawn = nextfrm;
-			uint32_t now = direct_clock_get_abs_millis() - tick0;
-			if(now - lastpalstep >= 2048/256) { // want pallet switch to take ~2 seconds
-				pallet_step(IMIN((now - lastpalstep)*256/2048, 64));
-				lastpalstep = now;
-			}
+		uint32_t now = direct_clock_get_abs_millis() - tick0;
+		if(now - lastpalstep >= 2048/256) { // want pallet switch to take ~2 seconds
+			pallet_step(IMIN((now - lastpalstep)*256/2048, 64));
+			lastpalstep = now;
+		}
 
-			if(!(prim_caps & DSCAPS_FLIPPING) || exclusive) {
+		if(!(prim_caps & DSCAPS_FLIPPING) || exclusive) {
 //				printf("waiting for vsync\n");
-				DFBCHECK(dfb->WaitForSync(dfb)); // broken!
-			}
+			DFBCHECK(dfb->WaitForSync(dfb)); // broken!
+		}
+
+		float fps = map_fps;
+		fps = (fps>0.1f)?fps:0.1f;
+		uint64_t nextfrm = tribuf_get_frmnum(map_tb);
+		if(nextfrm != lastdrawn) { // skip drawing if nothing has changed
 			pallet_blit_DFB(primary, tribuf_get_read(map_tb), im_w, im_h);
 			tribuf_finish_read(map_tb);
+			lastdrawn = nextfrm;
 
 			char buf[32];
-			sprintf(buf,"%6.1f FPS", map_fps);
+			sprintf(buf,"%6.1f FPS", fps);
 			DFBCHECK (primary->SetColor (primary, 0xFF, 0xFF, 0xFF, 0xFF));
 			primary->DrawString (primary, buf, -1, 0, 20, DSTF_LEFT);
 
 			if(prim_caps & DSCAPS_FLIPPING) primary->Flip(primary, NULL, DSFLIP_WAITFORSYNC);
-//			if(prim_caps & DSCAPS_FLIPPING) primary->Flip(primary, NULL, DSFLIP_NONE);
 
-			DFBSurfaceFlipFlags flags;
+			if((tick0-direct_clock_get_abs_millis())*opts.maxsrc_rate + maxfrms*1000 > 1000) {
+				maxsrc_update();
+				maxfrms++;
+			}
 
-			int newbeat = beat_get_count();
-			if(newbeat != beats) pallet_start_switch(newbeat);
-			beats = newbeat;
+		} else {
+			//TODO: need tp delay here a little bit so we don't burn CPU for no reason
+			usleep(10000/(2*fps)); // 10 milliseconds
+		}
 
-//			now = direct_clock_get_abs_millis() - tick0;
-//			if(tribuf_get_frmnum(map_tb) - prevfrm > 1 && (tick0+(maxfrms*1000)/maxsrc_ps) - now > 1000/maxsrc_ps) {
-//				maxsrc_update();
-//				maxfrms++;
-//				prevfrm = tribuf_get_frmnum(map_tb);
-//				lasttime = now;
-//			}
-//
-//			now = direct_clock_get_abs_millis() - tick0;
-//			int delay =  (frmcnt*1000/opts.draw_rate) - now;
-//			if(delay > 0) usleep(delay*100); //TODO: check delay (needs *1000?)
-//			float fpsd = now - fpstimes[frmcnt%opts.draw_rate];
-//			fpstimes[frmcnt%opts.draw_rate] = now;
-//			scr_fps = opts.draw_rate * 1000.0f/ fpsd;
-//			frmcnt++;
-//		} else if(r == DFB_OK) {
-//			DFBCHECK(eb->GetEvent(eb, (DFBEvent *)&event));
-//			if((event.type == DIET_KEYPRESS && event.key_id == DIKI_ESCAPE))
-//				break;
-//		} else DFBCHECK(r);
+		int newbeat = beat_get_count();
+		if(newbeat != beats) pallet_start_switch(newbeat);
+		beats = newbeat;
 	}
 
 	direct_thread_destroy(map_thread);
