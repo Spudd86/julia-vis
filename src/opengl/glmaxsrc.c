@@ -288,7 +288,7 @@ void gl_maxsrc_update(void)
 		float s = getsamp(&ad, i*ad.len/(samp-1), ad.len/96);
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
-		float xt = (i - (samp-1)/2)*(1.0f/(samp-1)), yt = 0.2f*s, zt = 0.0f;
+		float xt = (i - (samp-1)/2.0f)*(1.0f/(samp-1)), yt = 0.2f*s, zt = 0.0f;
 		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
 		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
 		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;

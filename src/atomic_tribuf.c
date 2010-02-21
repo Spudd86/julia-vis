@@ -2,8 +2,6 @@
 #include "common.h"
 #include "tribuf.h"
 
-#include <stdio.h>
-
 #define tribuf_error(s) do {\
 		fflush(stdout); \
 		fprintf(stderr, "ERROR: %s:%i ", __FILE__, __LINE__); \
