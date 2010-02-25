@@ -30,7 +30,7 @@ static const char *map_frag_shader =
 	"}\n"
 	"void main() {\n"
 	"#if MAP_SAMP == 4\n"
-	"	vec2 dx = dFdx(gl_TexCoord[1].s); vec2 dy = dFdy(gl_TexCoord[1].st);\n"
+	"	vec2 dx = dFdx(gl_TexCoord[1].st); vec2 dy = dFdy(gl_TexCoord[1].st);\n"
 	"	float r = (254/(4*256.0f))*(\n"
 	"			smap(gl_TexCoord[1].st-0.485852f*dx+0.142659f*dy) +\n"
 	"			smap(gl_TexCoord[1].st+0.485852f*dx-0.142659f*dy) +\n"
