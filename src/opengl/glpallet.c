@@ -79,7 +79,7 @@ static const char *pal_frag_mix =
 	"}";
 
 static const char *pal_frag_shader =
-	"#version 100\n"
+	"#version 110\n"
 	"uniform sampler2D src;\n"
 	"uniform sampler1D pal;\n"
 	"void main() {\n"
