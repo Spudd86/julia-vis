@@ -289,9 +289,7 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 	glPopAttrib();
 	CHECK_GL_ERR;
 
-	if(glewGetExtension("GL_ARB_shading_language_120") && !force_fixed) {
-		use_glsl = GL_TRUE;
-
+	if(!force_fixed) {
 		printf("Compiling map shader:\n");
 		const char *map_defs = "#version 120\n";
 		if(!packed_intesity_pixels) {
@@ -307,24 +305,24 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 			else if(opts->quality == 4) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 9\n";
 		}
 		
-		if(rational_julia) {
+		if(rational_julia)
 			map_prog = compile_program_defs(map_defs, NULL, rat_map_frag_shader);
-			map_c_loc = glGetUniformLocationARB(map_prog, "c");
-			map_prev_loc = glGetUniformLocationARB(map_prog, "prev");
-			map_maxsrc_loc = glGetUniformLocationARB(map_prog, "maxsrc");
-			printf("rational map\n");
-		} else {
+		else
 			map_prog = compile_program_defs(map_defs, NULL, map_frag_shader);
+
+		if(map_prog) {
+			use_glsl = GL_TRUE;
+			glUseProgramObjectARB(map_prog);
 			map_c_loc = glGetUniformLocationARB(map_prog, "c");
 			map_prev_loc = glGetUniformLocationARB(map_prog, "prev");
 			map_maxsrc_loc = glGetUniformLocationARB(map_prog, "maxsrc");
+			glUniform1iARB(map_maxsrc_loc, 0);
+			glUniform1iARB(map_prev_loc, 1);
+			glUseProgramObjectARB(0);
+			printf("Map shader compiled\n");
 		}
-		glUseProgramObjectARB(map_prog);
-		glUniform1iARB(map_maxsrc_loc, 0);
-		glUniform1iARB(map_prev_loc, 1);
-		glUseProgramObjectARB(0);
-		printf("Map shader compiled\n");
-	} else {
+	}
+	if(!use_glsl) {
 		if(!rational_julia)
 			fixed_map = map_new(97, map_cb);
 		else

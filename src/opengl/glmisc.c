@@ -66,7 +66,8 @@ GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, cons
 			printf("%s\n\n", frag_shader);
 		}
 
-		exit(1);
+//		exit(1);
+		return 0;
 	}
 	return prog;
 }

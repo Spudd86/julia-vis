@@ -140,21 +140,22 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 	sco_verts = malloc(sizeof(float)*samp*5*4);
 
 	printf("maxsrc using %i points\n", samp);
-	if(glewGetExtension("GL_ARB_shading_language_120") && !force_fixed) {
-		use_glsl = GL_TRUE;
+	if(!force_fixed) {
 		printf("Compiling maxsrc shader:\n");
 		const char *defs = packed_intesity_pixels?"#version 120\n#define FLOAT_PACK_PIX\n":"#version 120\n";
 		shader_prog = compile_program_defs(defs, NULL, frag_src);
-		pnt_shader = compile_program_defs(defs, NULL, pnt_shader_src);
-		printf("maxsrc shader compiled\n");
-		glUseProgramObjectARB(shader_prog);
-		glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0);
-		shad_R_loc = glGetUniformLocationARB(shader_prog, "R");
-		glUseProgramObjectARB(0);
-	} else {
-		use_glsl = GL_FALSE;
-		fixed_map = map_new(24, fixed_map_cb);
+		if(shader_prog) { // compile succeed
+			pnt_shader = compile_program_defs(defs, NULL, pnt_shader_src);
+			printf("maxsrc shader compiled\n");
+			glUseProgramObjectARB(shader_prog);
+			glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0);
+			shad_R_loc = glGetUniformLocationARB(shader_prog, "R");
+			glUseProgramObjectARB(0);
+			use_glsl = GL_TRUE;
+		}
 	}
+	if(!use_glsl)
+		fixed_map = map_new(24, fixed_map_cb);
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 

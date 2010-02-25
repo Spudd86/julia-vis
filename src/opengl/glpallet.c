@@ -86,8 +86,20 @@ static const char *pal_frag_shader =
 	"	gl_FragColor = texture1D(pal, texture2D(src, gl_TexCoord[0].xy).x);\n"
 	"}";
 
-static void pal_init_glsl(GLboolean float_packed_pixels)
+static bool pal_init_glsl(GLboolean float_packed_pixels)
 {CHECK_GL_ERR;
+	printf("Compiling pallet shader:\n");
+	if(!float_packed_pixels)
+		pal_prog = compile_program(NULL, pal_frag_shader);
+	else
+		pal_prog = compile_program(NULL, pal_frag_mix);
+
+	if(!pal_prog) return false;
+
+	pal_loc = glGetUniformLocationARB(pal_prog, "pal");
+	src_loc = glGetUniformLocationARB(pal_prog, "src");
+	printf("Pallet shader compiled\n");
+
 	glPushAttrib(GL_TEXTURE_BIT);
 	glGenTextures(1, &pal_tex);
 	glBindTexture(GL_TEXTURE_1D, pal_tex);
@@ -98,15 +110,8 @@ static void pal_init_glsl(GLboolean float_packed_pixels)
 	glPopAttrib();
 	DEBUG_CHECK_GL_ERR;
 
-	printf("Compiling pallet shader:\n");
-	if(!float_packed_pixels)
-		pal_prog = compile_program(NULL, pal_frag_shader);
-	else
-		pal_prog = compile_program(NULL, pal_frag_mix);
-	pal_loc = glGetUniformLocationARB(pal_prog, "pal");
-	src_loc = glGetUniformLocationARB(pal_prog, "src");
-	printf("Pallet shader compiled\n");
 	CHECK_GL_ERR;
+	return true;
 }
 
 // ********* FIXED FUNCTION STUFF
@@ -283,8 +288,10 @@ void pal_init(int width, int height, GLboolean packed_intesity_pixels, GLboolean
 	active_pal = get_active_pal();
 	im_w = width, im_h = height;
 	use_glsl = GLEW_ARB_shading_language_100 && !force_fixed;
-	if(use_glsl) pal_init_glsl(packed_intesity_pixels);
-	else pal_init_fixed();
+	if(!(use_glsl && pal_init_glsl(packed_intesity_pixels))) {
+		use_glsl = false;
+		pal_init_fixed();
+	}
 	CHECK_GL_ERR;
 }
 
