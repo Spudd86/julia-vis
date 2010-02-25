@@ -6,6 +6,9 @@
 #ifndef GLMISC_H_
 #define GLMISC_H_
 
+#include <GL/glew.h>
+#include <GL/glu.h>
+
 void swap_buffers(void);
 uint32_t get_ticks(void);
 void dodelay(uint32_t ms);

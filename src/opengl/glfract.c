@@ -2,11 +2,6 @@
 #define GL_GLEXT_PROTOTYPES
 
 #include "common.h"
-
-#include <GL/glew.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
-
 #include "points.h"
 #include "glmisc.h"
 #include "glmaxsrc.h"

@@ -8,8 +8,6 @@
 #include "common.h"
 
 #include <SDL.h>
-#include <GL/glew.h>
-#include <GL/glut.h>
 
 #include "sdl-misc.h"
 #include "glmisc.h"

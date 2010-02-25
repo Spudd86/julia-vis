@@ -4,10 +4,6 @@
  */
 
 #include "common.h"
-
-#include <SDL.h>
-#include <GL/glew.h>
-
 #include "glmisc.h"
 
 typedef GLint quadind[4];

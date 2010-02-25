@@ -4,11 +4,6 @@
  */
 
 #include "common.h"
-
-#include <GL/glew.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
-
 #include "glmisc.h"
 #include "pallet.h"
 #include "glpallet.h"
@@ -30,6 +25,8 @@ static void draw_palleted_glsl(GLuint draw_tex)
 		glBindTexture(GL_TEXTURE_1D, pal_tex);
 		glUniform1iARB(src_loc, 0);
 		glUniform1iARB(pal_loc, 1);
+
+		//TODO: scale for aspect ration correction
 
 		glBegin(GL_QUADS);
 			glTexCoord2d(0.0,1.0); glVertex2d(-1, -1);
@@ -188,9 +185,14 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 		DEBUG_CHECK_GL_ERR;
 	}
 
-#ifdef PALLET_OFFSCREEN_TEMP
-	glPushAttrib(GL_VIEWPORT_BIT); CHECK_GL_ERR;
+	#ifdef PALLET_OFFSCREEN_TEMP
+//	glPushAttrib(GL_VIEWPORT_BIT); CHECK_GL_ERR;
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	if(rbow != vp_w || rboh != vp_h) {
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo); CHECK_GL_ERR;
+		glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, 0);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0); CHECK_GL_ERR;
+//		glFlush();
 //		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
 //		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, vp_w, vp_h);
 		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbos[0]);
@@ -198,6 +200,7 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbos[1]);
 		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, vp_w, vp_h);
 		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+//		glFlush();
 		rbow = vp_w; rboh = vp_h;
 		printf("Changed RBO size!\n");
 	}
@@ -222,8 +225,11 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, srcpbos[(frm+1)%2]);
 		glReadPixels(0, 0, vp_w, vp_h, GL_BGRA, GL_UNSIGNED_BYTE, 0);
 #ifdef PALLET_OFFSCREEN_TEMP
+//		glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, 0);
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+		glMatrixMode(GL_PROJECTION);
 		glPopAttrib();
+//		glFlush();
 #endif
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbos[(frm+1)%2]);
 
@@ -253,9 +259,11 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 		if(dstdata) { glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB); }
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, 0);
+//		glFlush();
 	} else {
 		glReadPixels(0, 0, vp[2], vp[3], GL_BGRA, GL_UNSIGNED_BYTE, fxdsrcbuf);
 #ifdef PALLET_OFFSCREEN_TEMP
+		glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, 0);
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 		glPopAttrib();
 #endif

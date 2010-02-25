@@ -6,10 +6,6 @@
 
 
 #include "common.h"
-
-#include <SDL.h>
-#include <GL/glew.h>
-#include <GL/glut.h>
 #include "glmisc.h"
 
 static void check_gl_obj_msg(GLhandleARB obj);
