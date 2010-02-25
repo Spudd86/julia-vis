@@ -36,7 +36,12 @@ void maxsrc_setup(int w, int h)
 
 	point_src = setup_point(pnt_w, pnt_h);
 
+#ifdef HAVE_MMAP
+	// use mmap here since it'll give us a nice page aligned chunk (malloc will probably be using it anyway...)
+	prev_src = mmap(NULL, 2 * w * h * sizeof(uint16_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, 0, 0);
+#else
 	prev_src = _mm_malloc(2 * w * h * sizeof(uint16_t), 32);
+#endif
 	memset(prev_src, 0, 2*w*h*sizeof(uint16_t));
 	next_src = prev_src + w*h;
 }

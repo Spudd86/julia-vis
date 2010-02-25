@@ -56,7 +56,7 @@ static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl)
 
     const SDL_VideoInfo *vid_info = SDL_GetVideoInfo();
 
-	int vidflags = SDL_ASYNCBLIT | SDL_ANYFORMAT | SDL_HWPALETTE;
+	int vidflags = SDL_ASYNCBLIT | SDL_ANYFORMAT;
 	if(opts->doublebuf) vidflags |= SDL_DOUBLEBUF;
 	if(vid_info->hw_available) vidflags |= SDL_HWSURFACE;
 	if(vid_info->blit_hw) vidflags |= SDL_HWACCEL;
@@ -64,6 +64,12 @@ static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl)
 
 	if(enable_gl) {
 		vidflags |= SDL_OPENGL;
+//		if(opts->doublebuf)
+			SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1);
+		SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
+		SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
+	} else {
+
 	}
 
 	SDL_Rect **modes = SDL_ListModes(vid_info->vfmt, vidflags);
@@ -71,8 +77,6 @@ static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl)
 		printf("No modes available!\n");
 		exit(-1);
 	}
-
-	SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1);
 
 	SDL_Surface *screen;
 	if (modes == (SDL_Rect**)-1) {

@@ -5,8 +5,8 @@ AC_PREREQ([2.61])
 AC_INIT([julia-opengl], [0.1], [BUG-REPORT-ADDRESS])
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_SRCDIR([src/optproc.c])
-#INCLUDES = 'AC_INCLUDES_DEFAULT'
 
+AC_USE_SYSTEM_EXTENSIONS
 USE_LANGUAGES=gnu99
 
 AC_ARG_ENABLE([mmx], AS_HELP_STRING([--enable-mmx], [enable use of mmx instructions (default: disabled)]))
@@ -33,7 +33,7 @@ AC_PROG_CC_C99
 AC_C_CONST
 AC_TYPE_SIZE_T
 AC_EXEEXT
-AC_CHECK_LIB([m], [sqrt])
+AC_CHECK_LIB([m], [sqrt]) #see if libm exists, if it does we probably need it
 
 PKG_CHECK_MODULES([SDL], [sdl])
 AC_SUBST(SDL_CFLAGS)
@@ -126,11 +126,12 @@ AC_TYPE_UINT64_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT16_T
 AC_TYPE_UINT8_T
+AC_HEADER_STDBOOL
+#AC_CHECK_HEADERS_ONCE([sys/mman.h])
 
 # Checks for library functions.
-AC_CHECK_FUNCS([atexit])
+AC_FUNC_MMAP
 
-#AH_BOTTOM(echo 'AC_INCLUDES_DEFAULT')
 AC_CONFIG_FILES(Makefile, echo timestamp > stamp-h)
 
 AC_OUTPUT

@@ -16,7 +16,7 @@ static const char *helpstr =
 
 "\t-m <name>\n"
 "\t\twhere name is one of default,rational,butterfly\n"
-"\t\t Note: default and rational are implemented for opengl\n"
+"\t\t Note: default and rational are implemented for opengl\n\n"
 
 "\t-q quality\n"
 "\t\tglsl: control # of samples\n"
@@ -24,13 +24,15 @@ static const char *helpstr =
 "\t\t\t 1 take 5 samples\n"
 "\t\t\t 2 take 7 samples\n"
 "\t\tfixed function gl: currently no effect\n"
-"\t\tsoftware: currently no effect\n"
+"\t\tsoftware: control map quality\n"
+"\t\t\t 0 interpolate map function across 8x8 squares\n"
+"\t\t\t 1 calculate map at every pixel\n\n"
 
 "\t-g opt1:opt2:...\n"
 "\t\tgeneric opengl options\n"
 "\t\t\tfixed\tforce use fixed function GL\n"
 "\t\t\tpintens\tuse packed intensity pixel values (precision boost)\n"
-"\t\t\trboos\tdouble internal resolution\n"
+"\t\t\trboos\tdouble internal resolution\n\n"
 
 "\t-i <driver>[:opts] select audio input driver\n"
 "\t\tdrivers:\n"
@@ -39,7 +41,7 @@ static const char *helpstr =
 "\t\t  jack: optionally specify a pattern of ports to connect to\n"
 #endif
 #ifdef HAVE_PULSE
-"\t\t  pulse: use pulseaudio no options\n"
+"\t\t  pulse: use pulseaudio, takes a source name\n"
 #endif
 
 ;

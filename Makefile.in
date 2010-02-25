@@ -30,7 +30,7 @@ ENABLE_DIRECTFB=@enable_directfb@
 
 -include config.mk
 
-CFLAGS += -D_GNU_SOURCE=1 -Wall -Wextra -fno-strict-aliasing -fsingle-precision-constant 
+CFLAGS += -Wall -Wextra -fno-strict-aliasing -fsingle-precision-constant 
 #-Wunsafe-loop-optimizations 
 CFLAGS += -I "./src" 
 
@@ -125,7 +125,7 @@ config.mk:
 bin/sdl-test$(EXEEXT): src/software/sdl.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
 	src/software/sdl.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) \
-	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
+	$(SDL_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
 bin/gl-test$(EXEEXT): src/opengl/sdlmain.c src/opengl/glmain.c src/opengl/glfract.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
@@ -136,17 +136,17 @@ bin/gl-test$(EXEEXT): src/opengl/sdlmain.c src/opengl/glmain.c src/opengl/glfrac
 bin/sdlthread-test$(EXEEXT): src/software/sdl-thread.c src/sdl-misc.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL -DTRIBUF_LOCKING \
 	src/software/sdl-thread.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) \
-	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
+	$(SDL_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
 bin/dfb-test$(EXEEXT): src/software/directfb.c $(SOFT_SRCS) src/optproc.c $(TRIBUF_SRCS) src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_DIRECTFB \
 	src/software/directfb.c $(SOFT_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) \
-	$(DFB_FLAGS) $(AUDIO_FLAGS) -o $@
+	$(DFB_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
 bin/audio-test$(EXEEXT): $(AUDIO_SRCS) src/audio/test.c src/sdl-misc.c src/terminusIBM.c src/optproc.c $(TRIBUF_SRCS) src/software/line.c
 	$(CC) $(CFLAGS) -DFFT_TRIBUF -DUSE_SDL \
 	$(AUDIO_SRCS) src/audio/test.c src/sdl-misc.c src/terminusIBM.c src/optproc.c $(TRIBUF_SRCS) src/software/line.c \
-	$(SDL_FLAGS) $(AUDIO_FLAGS) -o $@
+	$(SDL_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
 
 src/audio/%.o: src/audio/%.c Makefile config.mk
