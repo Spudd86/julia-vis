@@ -31,8 +31,32 @@ static GLboolean do_shader_compile_defs(GLhandleARB shader, const char *defs, co
 		return do_shader_compile(shader, 1, &source);
 }
 
+void dump_shader_src(const char *defs, const char *shad)
+{
+	int lineno = 1;
+	if(defs) {
+		char *src = strdup(defs);
+		const char *cur_line = strtok(src, "\n");
+		do {
+			printf("%3i: %s\n", lineno, cur_line);
+			lineno++;
+		} while((cur_line = strtok(NULL, "\n")));
+		free(src);
+//		printf("%s", defs);
+	}
+	char *src = strdup(shad);
+	const char *cur_line = strtok(src, "\n");
+	do {
+		printf("%3i: %s\n", lineno, cur_line);
+		lineno++;
+	} while((cur_line = strtok(NULL, "\n")));
+	free(src);
+	printf("\n\n");
+}
+
 //TODO: add stuff to allow a second set of code for functions
-GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, const char *frag_shader) {
+GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, const char *frag_shader)
+{
 	GLhandleARB vert=0, frag=0;
 
 	if(!GLEW_ARB_shading_language_100) return 0;
@@ -59,13 +83,11 @@ GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, cons
 		printf("Link failed shader dump:\n\n");
 		if(vert_shader) {
 			printf("Vertex Shader dump:\n");
-			if(defs) printf("%s", defs);
-			printf("%s\n\n", vert_shader);
+			dump_shader_src(defs, vert_shader);
 		}
 		if(frag_shader) {
 			printf("Fragment Shader dump:\n");
-			if(defs) printf("%s", defs);
-			printf("%s\n\n", frag_shader);
+			dump_shader_src(defs, frag_shader);
 		}
 
 //		exit(1);
