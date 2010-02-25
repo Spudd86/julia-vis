@@ -18,8 +18,10 @@ static const char *map_frag_shader =
 	"#ifdef FLOAT_PACK_PIX\n"
 	FLOAT_PACK_FUNCS
 	"#else\n"
-	"#define encode(X) (X)\n"
-	"#define decode(X) (X)\n"
+	"#ifdef MAP_SAMP\n"
+	"#define encode(X) vec4(X)\n#define decode(X) (X).x\n"
+	"#else\n#define encode(X) (X)\n#define decode(X) (X)\n"
+	"#endif\n"
 	"#endif\n"
 
 	"uniform sampler2D prev;\n"
@@ -27,24 +29,57 @@ static const char *map_frag_shader =
 	"invariant uniform vec2 c;\n"
 
 	"#ifdef MAP_SAMP\n"
-	"vec4 smap(const in vec2 s) {\n"
+	"float smap(const in vec2 s) {\n"
 	"	const vec2 t = s*s;\n"
-	"	return texture2D(prev, vec2(t.x - t.y, 2*s.x*s.y) + c);\n"
+	"	return max(decode(texture2D(prev, vec2(t.x - t.y, 2*s.x*s.y) + c)), decode(texture2D(maxsrc, gl_TexCoord[0].st)));\n"
 	"}\n"
 	"void main() {\n"
+	"#if MAP_SAMP == 4\n"
+	"	const vec2 dx = dFdx(gl_TexCoord[1].s); const vec2 dy = dFdy(gl_TexCoord[1].st);\n"
+	"	const float r = (254/(4*256.0f))*(\n"
+	"			smap(gl_TexCoord[1].st-0.485852f*dx+0.142659f*dy) +\n"
+	"			smap(gl_TexCoord[1].st+0.485852f*dx-0.142659f*dy) +\n"
+	"			smap(gl_TexCoord[1].st+0.142659f*dx+0.485852f*dy) +\n"
+	"			smap(gl_TexCoord[1].st-0.142659f*dx-0.485852f*dy) );\n"
+	"#elif MAP_SAMP == 5\n"
+	"	const vec2 dx = dFdx(gl_TexCoord[1].st); const vec2 dy = dFdy(gl_TexCoord[1].st);\n"
+	"	const float r = smap(gl_TexCoord[1].st)*(0.201260f*254/256) + \n"
+	"			(smap(gl_TexCoord[1].st+0.23594f*dx+0.50000f*dy) + "
+	"			 smap(gl_TexCoord[1].st+0.50000f*dx-0.23594f*dy) +\n"
+	"			 smap(gl_TexCoord[1].st-0.23594f*dx-0.50000f*dy) +"
+	"			 smap(gl_TexCoord[1].st-0.50000f*dx+0.23594f*dy))*(0.199685f*254/256);\n"
+	"#elif MAP_SAMP == 8\n"
+	"	const vec2 dx = dFdx(gl_TexCoord[1].st); const vec2 dy = dFdy(gl_TexCoord[1].st);\n"
+	"	const float r = (253.0f/(8*256.0f))*(\n"
+	"			smap(gl_TexCoord[1].st-0.500f*dx+0.143f*dy) +\n"
+	"			smap(gl_TexCoord[1].st+0.288f*dx+0.500f*dy) +\n"
+	"			smap(gl_TexCoord[1].st+0.429f*dx+0.288f*dy) +\n"
+	"			smap(gl_TexCoord[1].st-0.143f*dx+0.429f*dy) +\n"
+	"			smap(gl_TexCoord[1].st+0.500f*dx-0.143f*dy) +\n"
+	"			smap(gl_TexCoord[1].st-0.288f*dx-0.500f*dy) +\n"
+	"			smap(gl_TexCoord[1].st-0.429f*dx-0.288f*dy) +\n"
+	"			smap(gl_TexCoord[1].st+0.143f*dx-0.429f*dy) );\n"
+//	"	const float dx = dFdx(gl_TexCoord[1].s);\n"
+//	"	const float r = (253.0f/(8*256.0f))*(\n"
+//	"			smap(gl_TexCoord[1].st+vec2(-0.500f,+0.143f)*dx) +\n"
+//	"			smap(gl_TexCoord[1].st+vec2(+0.288f,+0.500f)*dx) +\n"
+//	"			smap(gl_TexCoord[1].st+vec2(+0.429f,+0.288f)*dx) +\n"
+//	"			smap(gl_TexCoord[1].st+vec2(-0.143f,+0.429f)*dx) +\n"
+//	"			smap(gl_TexCoord[1].st+vec2(+0.500f,-0.143f)*dx) +\n"
+//	"			smap(gl_TexCoord[1].st+vec2(-0.288f,-0.500f)*dx) +\n"
+//	"			smap(gl_TexCoord[1].st+vec2(-0.429f,-0.288f)*dx) +\n"
+//	"			smap(gl_TexCoord[1].st+vec2(+0.143f,-0.429f)*dx) );\n"
+	"#elif MAP_SAMP == 9\n"
 	"	const vec2 dx = dFdx(gl_TexCoord[1].st)*0.5f; const vec2 dy = dFdy(gl_TexCoord[1].st)*0.5f;\n"
-	"#if MAP_SAMP == 5\n"
-	"	const vec4 r = (253/(8*256.0f))*(smap(gl_TexCoord[1].st)*4 + \n"
+	"	const float r = (253.0f/(9*256.0f))*(smap(gl_TexCoord[1].st) + \n"
 	"			smap(gl_TexCoord[1].st+dy) + smap(gl_TexCoord[1].st+dx) +\n"
-	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx) );\n"
-	"#elif MAP_SAMP == 7\n"
-	"	const vec4 r = (253.0f/4096)*(smap(gl_TexCoord[1].st)*4 + \n"
-	"			(smap(gl_TexCoord[1].st+dy) + smap(gl_TexCoord[1].st+dx) +\n"
-	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx))*2 +\n"
-	"			(smap(gl_TexCoord[1].st+dy+dx) + smap(gl_TexCoord[1].st+dy-dx) +\n"
-	"			smap(gl_TexCoord[1].st-dx-dy) + smap(gl_TexCoord[1].st-dy+dx)) );\n"
+	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx) +\n"
+	"			smap(gl_TexCoord[1].st+dy+dx) + smap(gl_TexCoord[1].st+dy-dx) +\n"
+	"			smap(gl_TexCoord[1].st-dx-dy) + smap(gl_TexCoord[1].st-dy+dx) );\n"
 	"#endif\n"
-	"	gl_FragData[0] = encode(max(decode(r), decode(texture2D(maxsrc, gl_TexCoord[0].st))));\n"
+//	"	gl_FragData[0] = r;\n"
+	"	gl_FragData[0] = encode(r);\n"
+//	"	gl_FragData[0] = encode(max(decode(r), decode(texture2D(maxsrc, gl_TexCoord[0].st))));\n"
 	"}\n"
 	"#else\n"
 	"void main() {\n"
@@ -57,41 +92,76 @@ static const char *map_frag_shader =
 	"#endif\n";
 	
 static const char *rat_map_frag_shader = 
-	"const sampler2D prev = 1;\n"
-	"const sampler2D maxsrc = 0;\n"
+	"const sampler2D prev;\n"
+	"const sampler2D maxsrc;\n"
 	"invariant uniform vec4 c;\n"
 	"#ifdef FLOAT_PACK_PIX\n"
 	FLOAT_PACK_FUNCS
 	"#else\n"
+	"#ifdef MAP_SAMP\n"
+	"#define encode(X) vec4(X)\n#define decode(X) (X).x\n"
+	"#else\n"
 	"#define encode(X) X\n#define decode(X) X\n"
 	"#endif\n"
-	"vec4 smap(const in vec2 tmp) {\n"
+	"#endif\n"
+	"#ifndef MAP_SAMP\n"
+	"void main() {\n"
+	"	vec2 s = gl_TexCoord[1].st*2.5;\n"
+	"	vec2 t = s*s;\n"
+	"	const float ab = s.x*s.y;\n"
+	"	s = vec2(4*ab*(t.x - t.y), t.x*t.x - 6*t.x*t.y + t.y*t.y) + c.xy;\n"
+	"	t = vec2(t.x - t.y, 2*ab)+c.zw;\n"
+	"	gl_FragColor = encode(max(decode(texture2D(prev,(0.5f/2.5)*vec2(dot(s,t), dot(s,t.yx))/dot(t,t)+0.5f)), decode(texture2D(maxsrc, gl_TexCoord[0].st))));\n"
+	"}\n"
+	"#else\n"
+	"float smap(const in vec2 tmp) {\n"
 	"	vec2 s = tmp*2.5;\n"
 	"	vec2 t = s*s;\n"
 	"	const float ab = s.x*s.y;\n"
 	"	s = vec2(4*ab*(t.x - t.y), t.x*t.x - 6*t.x*t.y + t.y*t.y) + c.xy;\n"
 	"	t = vec2(t.x - t.y, 2*ab)+c.zw;\n"
-	"	return texture2D(prev,(0.5f/2.5)*vec2(dot(s,t), dot(s,t.yx))/dot(t,t)+0.5f);\n"
+	"	return max(decode(texture2D(prev,(0.5f/2.5)*vec2(dot(s,t), dot(s,t.yx))/dot(t,t)+0.5f)), decode(texture2D(maxsrc, gl_TexCoord[0].st)));\n"
 	"}\n"
 	"void main() {\n"
-	"#ifdef MAP_SAMP\n"
-	"	const vec2 dx = dFdx(gl_TexCoord[1].st)*0.5f; const vec2 dy = dFdy(gl_TexCoord[1].st)*0.5f;\n"
-	"#if MAP_SAMP == 5\n"
-	"	const vec4 r = (254/(8*256.0f))*(smap(gl_TexCoord[1].st)*4 + \n"
-	"			smap(gl_TexCoord[1].st+dy) + smap(gl_TexCoord[1].st+dx) +\n"
-	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx) );\n"
-	"#elif MAP_SAMP == 7\n"
-	"	const vec4 r = (253.0f/4096)*(smap(gl_TexCoord[1].st)*4 + \n"
+	"#if MAP_SAMP == 4\n"
+	"	const vec2 dx = dFdx(gl_TexCoord[1].st); const vec2 dy = dFdy(gl_TexCoord[1].st);\n"
+	"	const float r = (254/(4*256.0f))*(\n"
+	"			smap(gl_TexCoord[1].st-0.485852f*dx+0.142659f*dy) +\n"
+	"			smap(gl_TexCoord[1].st+0.485852f*dx-0.142659f*dy) +\n"
+	"			smap(gl_TexCoord[1].st+0.142659f*dx+0.485852f*dy) +\n"
+	"			smap(gl_TexCoord[1].st-0.142659f*dx-0.485852f*dy) );\n"
+	"#elif MAP_SAMP == 5\n"
+	"	const vec2 dx = dFdx(gl_TexCoord[1].st); const vec2 dy = dFdy(gl_TexCoord[1].st);\n"
+	"	const float r = smap(gl_TexCoord[1].st)*(0.201260f*254/(256.0f)) + \n"
+	"			(smap(gl_TexCoord[1].st+0.23594f*dx+0.50000f*dy) + "
+	"			 smap(gl_TexCoord[1].st+0.50000f*dx-0.23594f*dy) +\n"
+	"			 smap(gl_TexCoord[1].st-0.23594f*dx-0.50000f*dy) +"
+	"			 smap(gl_TexCoord[1].st-0.50000f*dx+0.23594f*dy))*(0.199685f*254/(256.0f));\n"
+	"#elif MAP_SAMP == 8\n"
+	"	const vec2 dx = dFdx(gl_TexCoord[1].st); const vec2 dy = dFdy(gl_TexCoord[1].st);\n"
+//	"	const vec2 dx = vec2(1.0f/1024, 0); const vec2 dy = vec2(0,1.0f/1024);"
+	"	const float r = (253.0f/(8*256.0f))*(\n"
+	"			smap(gl_TexCoord[1].st-0.500f*dx+0.143f*dy) +\n"
+	"			smap(gl_TexCoord[1].st+0.288f*dx+0.500f*dy) +\n"
+	"			smap(gl_TexCoord[1].st+0.429f*dx+0.288f*dy) +\n"
+	"			smap(gl_TexCoord[1].st-0.143f*dx+0.429f*dy) +\n"
+
+	"			smap(gl_TexCoord[1].st+0.500f*dx-0.143f*dy) +\n"
+	"			smap(gl_TexCoord[1].st-0.288f*dx-0.500f*dy) +\n"
+	"			smap(gl_TexCoord[1].st-0.429f*dx-0.288f*dy) +\n"
+	"			smap(gl_TexCoord[1].st+0.143f*dx-0.429f*dy) );\n"
+	"#elif MAP_SAMP == 9\n"
+	"	const vec2 dx = dFdx(gl_TexCoord[1].st); const vec2 dy = dFdy(gl_TexCoord[1].st);\n"
+	"	const float r = (253.0f/(9*256.0f))*(smap(gl_TexCoord[1].st) + \n"
 	"			(smap(gl_TexCoord[1].st+dy) + smap(gl_TexCoord[1].st+dx) +\n"
-	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx))*2 +\n"
+	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx)) +\n"
 	"			(smap(gl_TexCoord[1].st+dy+dx) + smap(gl_TexCoord[1].st+dy-dx) +\n"
 	"			smap(gl_TexCoord[1].st-dx-dy) + smap(gl_TexCoord[1].st-dy+dx)) );\n"
 	"#endif\n"
-	"	gl_FragData[0] = encode(max(decode(r), decode(texture2D(maxsrc, gl_TexCoord[0].st))));\n"
-	"#else\n"
-	"	gl_FragData[0] = encode(max((253.0f/256.0f)*decode(smap(gl_TexCoord[1].st)), decode(texture2D(maxsrc, gl_TexCoord[0].st))));\n"
-	"#endif\n"
-	"}\n";
+//	"	gl_FragData[0] = encode(max(decode(r), decode(texture2D(maxsrc, gl_TexCoord[0].st))));\n"
+	"	gl_FragData[0] = encode(r);\n"
+	"}\n"
+	"#endif\n";
 
 static void map_vtx(float u, float v, vec2f *txco, const void *cb_data) {
 	const struct point_data *pd = cb_data;
@@ -203,6 +273,8 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 	im_w = width; im_h = height;
 	rational_julia = opts->rational_julia;
 
+//	glHint(GL_FRAGMENT_SHADER_DERIVATIVE_HINT_ARB, GL_NICEST);
+
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 	glGenFramebuffersEXT(1, &fbo);
@@ -228,12 +300,16 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 		printf("Compiling map shader:\n");
 		const char *map_defs = "#version 120\n";
 		if(!packed_intesity_pixels) {
-			if(opts->quality == 1) map_defs = "#version 120\n#define MAP_SAMP 5\n\n";
-			else if(opts->quality == 2) map_defs = "#version 120\n#define MAP_SAMP 7\n";
+			if(opts->quality == 1) map_defs = "#version 120\n#define MAP_SAMP 4\n\n";
+			else if(opts->quality == 2) map_defs = "#version 120\n#define MAP_SAMP 5\n";
+			else if(opts->quality == 3) map_defs = "#version 120\n#define MAP_SAMP 8\n";
+			else if(opts->quality == 4) map_defs = "#version 120\n#define MAP_SAMP 9\n";
 		} else {
 			map_defs = "#version 120\n#define FLOAT_PACK_PIX\n";
-			if(opts->quality == 1) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 5\n";
-			else if(opts->quality == 2) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 7\n";
+			if(opts->quality == 1) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 4\n";
+			else if(opts->quality == 2) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 5\n";
+			else if(opts->quality == 3) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 8\n";
+			else if(opts->quality == 4) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 9\n";
 		}
 		
 		if(rational_julia) {
