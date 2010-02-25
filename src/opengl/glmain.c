@@ -32,10 +32,11 @@ static int make_pow2(int x) {
 #define FPS_HIST_LEN 32
 
 static GLboolean packed_intesity_pixels = GL_FALSE;
-static int im_w = -1, im_h = -1;
-static int scr_w = -1, scr_h = -1;
+static int im_w = 0, im_h = 0;
+static int scr_w = 0, scr_h = 0;
 static struct point_data *pd = NULL;
 static const opt_data *opts = NULL;
+static uint32_t totframetime = 0;
 static uint32_t frametimes[FPS_HIST_LEN];
 static uint32_t tick0 = 0;
 
@@ -109,12 +110,12 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	pd = new_point_data(opts->rational_julia?4:2);
 
 	memset(frametimes, 0, sizeof(frametimes));
+	totframetime = frametimes[0] = MIN(1000/opts->draw_rate, 1);
 	tick0 = get_ticks();
 }
 
 void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_mandel, GLboolean show_fps_hist)
 {
-	static uint32_t totframetime = 0;
 	static int cnt = 0;
 	static uint32_t maxfrms = 0;
 	static uint32_t last_beat_time = 0, lastpalstep = 0, fps_oldtime = 0;
