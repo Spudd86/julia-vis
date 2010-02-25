@@ -54,7 +54,18 @@ GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, cons
 	glGetObjectParameterivARB(prog, GL_OBJECT_LINK_STATUS_ARB, &linked);
 	check_gl_obj_msg(prog);
 	if (!linked) {
-		printf("Link failed\n");
+		printf("Link failed shader dump:\n\n");
+		if(vert_shader) {
+			printf("Vertex Shader dump:\n");
+			if(defs) printf("%s", defs);
+			printf("%s\n\n", vert_shader);
+		}
+		if(frag_shader) {
+			printf("Fragment Shader dump:\n");
+			if(defs) printf("%s", defs);
+			printf("%s\n\n", frag_shader);
+		}
+
 		exit(1);
 	}
 	return prog;
