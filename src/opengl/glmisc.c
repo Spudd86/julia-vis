@@ -35,6 +35,8 @@ static GLboolean do_shader_compile_defs(GLhandleARB shader, const char *defs, co
 GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, const char *frag_shader) {
 	GLhandleARB vert=0, frag=0;
 
+	if(!GLEW_ARB_shading_language_100) return 0;
+
 	if(vert_shader != NULL) {
 		vert = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
 		do_shader_compile_defs(vert, defs, vert_shader);
