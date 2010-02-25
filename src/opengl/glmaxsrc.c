@@ -97,12 +97,12 @@ static const char *frag_src =
 	"	}\n"
 	"#ifdef FLOAT_PACK_PIX\n"
 	"	gl_FragData[0] = encode(decode(texture2D(prev, p*R + 0.5f))*0.978f);\n"
-	"#else"
+	"#else\n"
 	"	vec4 c = texture2D(prev, p*R + 0.5f);\n"
 	"	gl_FragData[0] = vec4(c.x - max(2/256.0f, c.x*(1.0f/100)));\n"
 //	"	const vec4 c = texture2D(prev, p*R + 0.5f);\n"
 //	"	gl_FragData[0] = (c - max(vec4(2/256.0f), c*0.01f));\n"
-	"#endif"
+	"#endif\n"
 	"}\n";
 
 static void bg_vtx(float u, float v, vec2f *restrict txco, const void *cb_data) {
