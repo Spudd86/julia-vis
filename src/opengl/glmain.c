@@ -3,8 +3,6 @@
  *
  */
 
-#define GL_GLEXT_PROTOTYPES
-
 #include "common.h"
 #include "points.h"
 #include "sdl-misc.h"

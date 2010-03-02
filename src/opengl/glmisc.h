@@ -6,6 +6,8 @@
 #ifndef GLMISC_H_
 #define GLMISC_H_
 
+#define GL_GLEXT_PROTOTYPES 1
+
 #include <GL/glew.h>
 #include <GL/glu.h>
 

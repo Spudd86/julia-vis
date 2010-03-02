@@ -1,6 +1,4 @@
 
-#define GL_GLEXT_PROTOTYPES
-
 #include "common.h"
 #include "points.h"
 #include "glmisc.h"
@@ -292,6 +290,8 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 	if(!force_fixed) {
 		printf("Compiling map shader:\n");
 		const char *map_defs = "#version 120\n";
+		//TODO: try to fall back to -q 0 if we fail to compile
+		//TODO: might need to die if we don't get the packed pixels shader to compile...
 		if(!packed_intesity_pixels) {
 			if(opts->quality == 1) map_defs = "#version 120\n#define MAP_SAMP 4\n\n";
 			else if(opts->quality == 2) map_defs = "#version 120\n#define MAP_SAMP 5\n";

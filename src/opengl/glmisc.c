@@ -2,8 +2,6 @@
  * glmisc.c
  *
  */
-#define GL_GLEXT_PROTOTYPES
-
 
 #include "common.h"
 #include "glmisc.h"
