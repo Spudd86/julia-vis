@@ -37,24 +37,38 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 void render_fractal(struct point_data *pd);
 GLint fract_get_tex(void);
 
+bool check_res(int w, int h) {
+	GLint width = 0;
+	glTexImage2D(GL_PROXY_TEXTURE_2D_EXT, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glGetTexLevelParameteriv(GL_PROXY_TEXTURE_2D_EXT, 0, GL_TEXTURE_WIDTH, &width);
+	CHECK_GL_ERR; return width != 0;
+}
+
 void init_gl(const opt_data *opt_data, int width, int height)
-{
+{ CHECK_GL_ERR;
 	opts = opt_data;
 	GLboolean force_fixed = opts->gl_opts != NULL && strstr(opts->gl_opts, "fixed") != NULL;
 	GLboolean res_boost = opts->gl_opts != NULL && strstr(opts->gl_opts, "rboost") != NULL;
 	packed_intesity_pixels = opts->gl_opts != NULL && strstr(opts->gl_opts, "pintens") != NULL;
 	scr_w = width; scr_h = height;
-	im_w = IMAX(make_pow2(IMAX(scr_w, scr_h)), 128)<<res_boost; im_h = im_w; //TODO: nearest power of two
+	im_w = IMAX(make_pow2(IMAX(scr_w, scr_h)), 128)<<res_boost; im_h = im_w;
+	while(!check_res(im_w, im_h)) { // shrink textures until they work
+		printf(" %ix%i Too big! Shrink texture\n", im_h, im_w);
+		im_w = im_w/2;
+		im_h = im_h/2;
+	}
+
 	printf("Using internel resolution of %ix%i\n\n", im_h, im_w);
 
-	glewInit();
-	setup_viewport(scr_w, scr_h);
-	glHint(GL_CLIP_VOLUME_CLIPPING_HINT_EXT, GL_FASTEST);
-	glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST);
+	CHECK_GL_ERR;
+	glewInit(); CHECK_GL_ERR;
+	setup_viewport(scr_w, scr_h); CHECK_GL_ERR;
+	glHint(GL_CLIP_VOLUME_CLIPPING_HINT_EXT, GL_FASTEST);CHECK_GL_ERR;
+	glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST);CHECK_GL_ERR;
 
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT); CHECK_GL_ERR;
 	glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));
-	draw_string("Loading... "); swap_buffers();
+	draw_string("Loading... "); swap_buffers(); CHECK_GL_ERR;
 
 	printf("GL_VENDOR: %s\n", glGetString(GL_VENDOR));
 	printf("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
@@ -66,8 +80,8 @@ void init_gl(const opt_data *opt_data, int width, int height)
 		printf("missing required gl extension EXT_blend_minmax!\n");
 		exit(1);
 	}
-	if(!GLEW_EXT_framebuffer_object) {
-		printf("missing required gl extension ARB_framebuffer_object!\n");
+	if(!GLEW_EXT_framebuffer_object && !GLEW_ARB_framebuffer_object) {
+		printf("missing required gl extension EXT_framebuffer_object!\n");
 		exit(1);
 	}
 
@@ -85,14 +99,15 @@ void init_gl(const opt_data *opt_data, int width, int height)
 		printf("Fixed function code forced\n");
 		packed_intesity_pixels = GL_FALSE;
 	}
+	CHECK_GL_ERR;
 
 	if(packed_intesity_pixels) printf("Packed intensity enabled\n");
 
-	glEnable(GL_TEXTURE_2D);
+	glEnable(GL_TEXTURE_2D); CHECK_GL_ERR;
 
-	init_mandel();
+	init_mandel(); CHECK_GL_ERR;
 
-	draw_string("Done\n"); swap_buffers();
+	draw_string("Done\n"); swap_buffers(); CHECK_GL_ERR;
 	if(glewGetExtension("GL_ARB_shading_language_120") && !force_fixed) {
 		draw_string("Compiling Shaders..."); swap_buffers();
 	}
