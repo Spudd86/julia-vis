@@ -72,7 +72,8 @@ static const char *pnt_shader_src =
 //	"			+ uv2flt(uv+dx) + uv2flt(uv+dy)"
 //	"			+ uv2flt(uv-dx) + uv2flt(uv-dy)));"
 //	"	gl_FragColor = encode(v);\n"
-	"	gl_FragColor = encode(exp(-4.5f*uv2flt(uv)));\n"
+//	"	gl_FragColor = encode(exp(-4.5f*uv2flt(uv)));\n"
+	"	gl_FragColor = vec4(clamp(exp(-4.5f*uv2flt(uv)), 0.0, 1.0-1.0/255.0), 0.0,0.0,0.0);\n"
 	"}\n";
 
 //TODO: use 2 basis vectors to find p instead of matrix op
