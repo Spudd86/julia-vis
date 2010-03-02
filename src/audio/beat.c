@@ -10,7 +10,7 @@ static int count = 0;
 static int beat_count = 0;
 static int lastbeat = 0;
 static int beat_bands[BANDS];
-static float dF[BANDS];
+//static float dF[BANDS];
 static float Eh[BANDS][HIST*2];
 static float V[BANDS];
 static float E[BANDS];
@@ -21,7 +21,7 @@ void beat_setup() {
 	memset(Eh, 0, sizeof(Eh));
 	memset(V, 0, sizeof(V));
 	memset(E, 0, sizeof(E));
-	memset(dF, 0, sizeof(dF));
+//	memset(dF, 0, sizeof(dF));
 }
 
 int beat_get_count(void) { return __sync_add_and_fetch(&beat_count, 0); }
@@ -32,7 +32,7 @@ void beat_get_data(beat_data *ad) {
 	ad->counts = beat_bands;
 	ad->stddev = V;
 	ad->means  = E;
-	ad->df = dF;
+//	ad->df = dF;
 	ad->hist = (void *)Eh;
 }
 
@@ -70,8 +70,7 @@ void beat_update(float *fft, int fft_len)
 		
 
 //		dF[b] = (3*log2f(1+31*Eh[b][hi])/5 - 4*log2f(1+31*Eh[b][(hi + 2*HIST - 1)%(HIST*2)])/5 +log2f(1+31* Eh[b][(hi + 2*HIST - 2)%(HIST*2)])/5)/2;
-
-		dF[b] = log2f(1+31*Eh[b][hi])/5 - 2*log2f(1+31*Eh[b][(hi + 2*HIST - 1)%(HIST*2)])/5 + log2f(1+31*Eh[b][(hi + 2*HIST - 2)%(HIST*2)])/5;
+//		dF[b] = log2f(1+31*Eh[b][hi])/5 - 2*log2f(1+31*Eh[b][(hi + 2*HIST - 1)%(HIST*2)])/5 + log2f(1+31*Eh[b][(hi + 2*HIST - 2)%(HIST*2)])/5;
 
 		//float C = -0.0025714*V[b]+1.5142857;
 		float C = -0.00025714*V[b]+1.5142857*2.5;

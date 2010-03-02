@@ -15,7 +15,6 @@ typedef struct {
 	float *means;
 	float *stddev;
 	float *hist;
-	float *df;
 } beat_data;
 
 static inline float beat_gethist(beat_data *b, int band, int i) {
