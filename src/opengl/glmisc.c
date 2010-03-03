@@ -53,21 +53,6 @@ void dump_shader_src(const char *defs, const char *shad)
 	printf("\n\n");
 }
 
-//void dump_shader_src(GLhandleARB shader) {
-//	char *src = malloc(8192*sizeof(char)); // lots of space
-//	//glGetShaderSourceARB(handleARB obj, sizei maxLength, sizei *length, charARB *source)
-//	GLsizei len;
-//	glGetShaderSourceARB(shader, 8192*sizeof(char), &len, src);
-//	int lineno = 1;
-//	const char *cur_line = strtok(src, "\n");
-//	do {
-//		printf("%3i: %s\n", lineno, cur_line);
-//		lineno++;
-//	} while((cur_line = strtok(NULL, "\n")));
-//	free(src);
-//	printf("\n\n");
-//}
-
 //TODO: add stuff to allow a second set of code for functions
 GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, const char *frag_shader)
 {
@@ -148,7 +133,6 @@ void setup_viewport(int width, int height) {
 	glViewport(0, 0, width, height);
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-//	glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 }
