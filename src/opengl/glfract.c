@@ -7,6 +7,14 @@
 #include "audio/audio.h"
 #include "glpallet.h"
 
+
+static const char *vtx_shader =
+		"void main() {\n"
+		"	gl_TexCoord[0] = gl_MultiTexCoord0;\n"
+		"	gl_TexCoord[1] = gl_MultiTexCoord0*2-1;\n"
+		"	gl_Position = gl_Vertex;\n"
+		"}";
+
 static const char *map_frag_shader =
 	"#ifdef FLOAT_PACK_PIX\n"
 	FLOAT_PACK_FUNCS
@@ -219,18 +227,10 @@ void render_fractal(struct point_data *pd)
 		glActiveTextureARB(GL_TEXTURE0_ARB);
 		glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
 		glBegin(GL_QUADS);
-			glMultiTexCoord2f(GL_TEXTURE0, 0.0, 1.0);
-			glMultiTexCoord2f(GL_TEXTURE1,-1.0, 1.0);
-			glVertex2d(-1,  1);
-			glMultiTexCoord2f(GL_TEXTURE0, 1.0, 1.0);
-			glMultiTexCoord2f(GL_TEXTURE1, 1.0, 1.0);
-			glVertex2d( 1,  1);
-			glMultiTexCoord2f(GL_TEXTURE0, 1.0, 0.0);
-			glMultiTexCoord2f(GL_TEXTURE1, 1.0,-1.0);
-			glVertex2d( 1,-1);
-			glMultiTexCoord2f(GL_TEXTURE0, 0.0, 0.0);
-			glMultiTexCoord2f(GL_TEXTURE1,-1.0,-1.0);
-			glVertex2d(-1,-1);
+			glTexCoord2d( 0, 0); glVertex2d(-1, -1);
+			glTexCoord2d( 1, 0); glVertex2d( 1, -1);
+			glTexCoord2d( 1, 1); glVertex2d( 1,  1);
+			glTexCoord2d( 0, 1); glVertex2d(-1,  1);
 		glEnd();
 		glUseProgramObjectARB(0);
 	} else {
@@ -306,9 +306,9 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 		}
 		
 		if(rational_julia)
-			map_prog = compile_program_defs(map_defs, NULL, rat_map_frag_shader);
+			map_prog = compile_program_defs(map_defs, vtx_shader, rat_map_frag_shader);
 		else
-			map_prog = compile_program_defs(map_defs, NULL, map_frag_shader);
+			map_prog = compile_program_defs(map_defs, vtx_shader, map_frag_shader);
 
 		if(map_prog) {
 			use_glsl = GL_TRUE;

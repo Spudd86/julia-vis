@@ -41,46 +41,44 @@ static inline float getsamp(audio_data *d, int i, int w) {
 }
 
 static const char *pnt_vtx_shader =
-		"varying vec4 gl_TexCoord[1];"
-		"void main() {\n"
-		"	gl_TexCoord[0] = gl_MultiTexCoord0;\n"
-		"	gl_Position = gl_Vertex;\n"
-		"}";
+	"void main() {\n"
+	"#ifdef FLOAT_PACK_PIX\n"
+#ifdef USE_MIRRORED_REPEAT
+	"	gl_TexCoord[0] = gl_MultiTexCoord0-1;\n"
+#else
+	"	gl_TexCoord[0] = gl_MultiTexCoord0*2-1;\n"
+#endif
+	"#else\n"
+	"	gl_TexCoord[0] = gl_MultiTexCoord0;\n"
+	"#endif\n"
+	"	gl_Position = gl_Vertex;\n"
+	"}";
 
 static const char *pnt_shader_src =
 	"#ifdef FLOAT_PACK_PIX\n"
-	FLOAT_PACK_FUNCS
-	"#else\n"
-	"#define encode(X) vec4(X)\n"
-	"#endif\n"
 	"#define uv2flt(uv) 0.5f*(log2(dot((uv),(uv))+1))\n"
-//	"#define uv2flt(uv) (dot((uv),(uv)))\n"
 	"void main() {\n"
-#ifdef USE_MIRRORED_REPEAT
-	"	vec2 uv = gl_TexCoord[0].st-1;\n"
-//	"	vec2 dx = dFdx(gl_TexCoord[0].st)*0.5f; vec2 dy = dFdy(gl_TexCoord[0].st)*0.5f;\n"
-#else
-	"	vec2 uv = gl_TexCoord[0].st*2-1;\n"
-//	"	vec2 dx = dFdx(gl_TexCoord[0].st); vec2 dy = dFdy(gl_TexCoord[0].st);\n"
-#endif
-//	"	float v = (1.0f/8)*("
-//	"			4*exp(-4.5f*uv2flt(uv))"
-//	"			+ exp(-4.5f*uv2flt(uv+dx)) + exp(-4.5f*uv2flt(uv+dy))"
-//	"			+ exp(-4.5f*uv2flt(uv-dx)) + exp(-4.5f*uv2flt(uv-dy)));"
-//	"	float v = exp((-4.5f/8)*("
-//	"			4*uv2flt(uv)"
-//	"			+ uv2flt(uv+dx) + uv2flt(uv+dy)"
-//	"			+ uv2flt(uv-dx) + uv2flt(uv-dy)));"
-//	"	gl_FragColor = encode(v);\n"
-//	"	gl_FragColor = encode(exp(-4.5f*uv2flt(uv)));\n"
+	"	vec2 uv = gl_TexCoord[0].st;\n"
 	"	gl_FragColor = vec4(clamp(exp(-4.5f*uv2flt(uv)), 0.0, 1.0-1.0/255.0), 0.0,0.0,0.0);\n"
-	"}\n";
+	"}\n"
+	"#else\n"
+	"uniform sampler2D tex;\n"
+	"void main() {\n"
+	"	gl_FragColor = texture2D(tex, gl_TexCoord[0].st);\n"
+	"}\n"
+	"#endif\n";
 
 //TODO: use 2 basis vectors to find p instead of matrix op
 // ie, uniform vec3 a,b; 
 //     where a = <1,0,0>*R, b = <0, 1, 0>*R
 // then vec3 p = (uv.x*a + uv.y*b)*vec3(1,d,d);
 // and final co-ords are still R*p, except we can make R a mat3x2 and maybe save some MAD's
+
+static const char *vtx_shader =
+	"void main() {\n"
+	"	gl_TexCoord[0] = gl_MultiTexCoord0;\n"
+	"	gl_Position = gl_Vertex;\n"
+	"}";
 
 static const char *frag_src =
 	"uniform sampler2D prev;\n"
@@ -97,12 +95,12 @@ static const char *frag_src =
 	"		p = (uv.x*R[0] + uv.y*R[1])*t;\n"
 	"	}\n"
 	"#ifdef FLOAT_PACK_PIX\n"
-	"	gl_FragData[0] = encode(decode(texture2D(prev, p*R + 0.5f))*0.978f);\n"
+	"	gl_FragColor = encode(decode(texture2D(prev, p*R + 0.5f))*0.978f);\n"
 	"#else\n"
 	"	vec4 c = texture2D(prev, p*R + 0.5f);\n"
-	"	gl_FragData[0] = vec4(c.x - max(2/256.0f, c.x*(1.0f/100)));\n"
+	"	gl_FragColor = vec4(c.x - max(2/256.0f, c.x*(1.0f/100)));\n"
 //	"	const vec4 c = texture2D(prev, p*R + 0.5f);\n"
-//	"	gl_FragData[0] = (c - max(vec4(2/256.0f), c*0.01f));\n"
+//	"	gl_FragColor = (c - max(vec4(2/256.0f), c*0.01f));\n"
 	"#endif\n"
 	"}\n";
 
@@ -116,6 +114,13 @@ static void bg_vtx(float u, float v, vec2f *restrict txco, const void *cb_data) 
 	};
 	txco->x = (p[0]*R[0*3+0] + p[1]*R[1*3+0] + p[2]*R[2*3+0]+1.0f)*0.5f;
 	txco->y = (p[0]*R[0*3+1] + p[1]*R[1*3+1] + p[2]*R[2*3+1]+1.0f)*0.5f;
+//
+//		(u*R[0*3+0] + v*R[1*3+0]),
+//		(u*R[0*3+1] + v*R[1*3+1])*d,
+//		(u*R[0*3+2] + v*R[1*3+2])*d
+//	};
+//	txco->x = (p[0]*R[0*3+0] + p[1]*R[0*3+1] + p[2]*R[0*3+2]+1.0f)*0.5f;
+//	txco->y = (p[0]*R[1*3+0] + p[1]*R[1*3+1] + p[2]*R[1*3+2]+1.0f)*0.5f;
 }
 
 static GLuint pnt_tex = 0;
@@ -145,9 +150,9 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 	if(!force_fixed) {
 		printf("Compiling maxsrc shader:\n");
 		const char *defs = packed_intesity_pixels?"#version 120\n#define FLOAT_PACK_PIX\n":"#version 120\n";
-		shader_prog = compile_program_defs(defs, NULL, frag_src);
+		shader_prog = compile_program_defs(defs, vtx_shader, frag_src);
 		if(shader_prog) { // compile succeed
-			pnt_shader = compile_program_defs(defs, NULL, pnt_shader_src);
+			pnt_shader = compile_program_defs(defs, pnt_vtx_shader, pnt_shader_src);
 			printf("maxsrc shader compiled\n");
 			glUseProgramObjectARB(shader_prog);
 			glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0);
@@ -190,6 +195,13 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 		}
 		uint16_t tmp = 0xFFFF;
 		glTexImage2D(GL_TEXTURE_2D, PNT_MIP_LEVELS, GL_LUMINANCE, 1, 1, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, &tmp);
+
+		if(pnt_shader) {
+			glUseProgramObjectARB(pnt_shader);
+			glUniform1iARB(glGetUniformLocationARB(pnt_shader, "tex"), 0);
+			glUseProgramObjectARB(0);
+			CHECK_GL_ERR;
+		}
 
 #ifdef USE_MIRRORED_REPEAT
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT_ARB);
@@ -253,14 +265,8 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 // render the old frame and distort it with GL shading language
 static void render_bg_glsl(float R[3][3], GLint tex)
 {
-	float Rt[][3] = {
-		{R[0][0], R[1][0], R[2][0]},
-		{R[0][1], R[1][1], R[2][1]},
-		{R[0][2], R[1][2], R[2][2]}
-	};
-
 	glUseProgramObjectARB(shader_prog);
-	glUniformMatrix2x3fv(shad_R_loc, 1, 0, (float *)Rt);
+	glUniformMatrix2x3fv(shad_R_loc, 1, 0, (float *)R);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glBegin(GL_QUADS);
 		glTexCoord2d(-1,-1); glVertex2d(-1, -1);
@@ -310,7 +316,6 @@ void gl_maxsrc_update(void)
 
 	GLint draw_tex = fbo_tex[frm%2];
 	GLint src_tex = fbo_tex[(frm+1)%2];
-	// GL_COLOR_BUFFER_BIT // for glBlend/alpha stuff
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 
@@ -370,16 +375,16 @@ void gl_maxsrc_update(void)
 
 	glEnable(GL_BLEND);
 	glBlendEquationEXT(GL_MAX_EXT);
-	if(!pnt_tex) glUseProgramObjectARB(pnt_shader);
-	else glBindTexture(GL_TEXTURE_2D, pnt_tex);
+	if(pnt_shader) glUseProgramObjectARB(pnt_shader);
+	if(pnt_tex) glBindTexture(GL_TEXTURE_2D, pnt_tex);
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-	glEnableClientState(GL_VERTEX_ARRAY); //FIXME
+	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts);
 	glVertexPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts + 2);
 	glDrawElements(GL_QUADS, samp*4*3, GL_UNSIGNED_INT, sco_ind);
 
-	if(!pnt_tex) glUseProgramObjectARB(0);
+	if(pnt_shader) glUseProgramObjectARB(0);
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glPopClientAttrib();
 	glPopAttrib();

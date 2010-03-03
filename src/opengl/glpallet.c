@@ -86,11 +86,19 @@ static const char *pal_frag_shader =
 	"	gl_FragColor = texture1D(pal, texture2D(src, gl_TexCoord[0].xy).x);\n"
 	"}";
 
+static const char *vtx_shader =
+	"#version 110\n"
+	"void main() {\n"
+	"	gl_TexCoord[0] = gl_MultiTexCoord0;\n"
+	"	gl_TexCoord[1] = gl_MultiTexCoord0*2-1;\n"
+	"	gl_Position = gl_Vertex;\n"
+	"}";
+
 static bool pal_init_glsl(GLboolean float_packed_pixels)
 {CHECK_GL_ERR;
 	printf("Compiling pallet shader:\n");
 	if(!float_packed_pixels)
-		pal_prog = compile_program(NULL, pal_frag_shader);
+		pal_prog = compile_program(vtx_shader, pal_frag_shader);
 	else
 		pal_prog = compile_program(NULL, pal_frag_mix);
 
@@ -121,7 +129,7 @@ static void pallet_blit32(uint32_t *restrict dest, const uint32_t *restrict src,
 static GLhandleARB pbos[2] = {-1, -1}, srcpbos[2] = {-1, -1};
 static GLuint disp_texture = 0;
 static void *fxdsrcbuf = NULL, *fxddstbuf = NULL;
-static GLboolean have_pbo = GL_FALSE;
+static bool use_pbo = false;
 static int buf_w = 0,  buf_h = 0;
 #ifdef PALLET_OFFSCREEN_TEMP
 static GLint fbo = -1;
@@ -151,7 +159,7 @@ static void pal_init_fixed() //FIXME
 	//TODO: remove requirment for NPOT textures... (easy but broken on my laptop's mesa)
 	if(GLEW_ARB_pixel_buffer_object) {
 //	if(0) {
-		have_pbo = GL_TRUE;
+		use_pbo = GL_TRUE;
 		glGenBuffersARB(2, pbos);
 		glGenBuffersARB(2, srcpbos);
 	} else {
@@ -176,7 +184,7 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 	const GLint vp_w = vp[2], vp_h = vp[3];
 
 	DEBUG_CHECK_GL_ERR;
-	if(have_pbo && buf_w != vp_w && buf_h != vp_h) {
+	if(use_pbo && buf_w != vp_w && buf_h != vp_h) {
 		buf_w = vp_w; buf_h = vp_h;
 		for(int i=0; i<2; i++) {
 			glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbos[i]);
@@ -226,7 +234,7 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 	glReadBuffer(read_buf);
 
 	//TODO: figure out how to make sure this uses a fast format
-	if(have_pbo) {
+	if(use_pbo) {
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, srcpbos[(frm+1)%2]);
 		glReadPixels(0, 0, vp_w, vp_h, GL_BGRA, GL_UNSIGNED_BYTE, 0);
 #ifdef PALLET_OFFSCREEN_TEMP
