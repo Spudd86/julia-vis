@@ -107,8 +107,9 @@ GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, cons
 		}
 	}
 
-	if(vert_shader != NULL) { glDeleteObjectARB(vert); }
-	if(frag_shader != NULL) { glDeleteObjectARB(frag); }
+	// mesa crashes at quit if we do this...
+//	if(vert_shader != NULL) { glDeleteObjectARB(vert); }
+//	if(frag_shader != NULL) { glDeleteObjectARB(frag); }
 	return prog;
 }
 
