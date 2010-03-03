@@ -125,7 +125,8 @@ static GLuint max_fbo = 0, fbo_tex[2] = { 0, 0 };
 static int iw, ih;
 static int samp = 0;
 static float pw = 0, ph = 0;
-static float *sco_verts = NULL;
+static GLfloat *sco_verts = NULL;
+static GLint sco_ind[128*4*3];
 static GLboolean use_glsl = GL_FALSE;
 static Map *fixed_map = NULL;
 GEN_MAP_CB(fixed_map_cb, bg_vtx);
@@ -136,9 +137,9 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 {CHECK_GL_ERR;
 	iw=width, ih=height;
 	pw = 0.5f*fmaxf(1.0f/24, 8.0f/iw), ph = 0.5f*fmaxf(1.0f/24, 8.0f/ih);
-	samp = (int)(8*fmaxf(1/pw,1/ph));
-//	samp = IMIN(IMAX(iw,ih)/4, 1023);
-	sco_verts = malloc(sizeof(float)*samp*5*4);
+	samp = (int)fminf(fminf(iw/2,ih/2), 128);
+	sco_verts = malloc(sizeof(float)*samp*8*4);
+	//TODO: try to use buffer objects for texco/vertco/ind
 
 	printf("maxsrc using %i points\n", samp);
 	if(!force_fixed) {
@@ -199,6 +200,50 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 #endif
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
+
+//		int it = i*3;
+//		sco_verts[(it*4+0)*4+0] = 0; sco_verts[(it*4+0)*4+1] = 2;
+//		sco_verts[(it*4+1)*4+0] = 1; sco_verts[(it*4+1)*4+1] = 2;
+//		sco_verts[(it*4+2)*4+0] = 1; sco_verts[(it*4+2)*4+1] = 0;
+//		sco_verts[(it*4+3)*4+0] = 0; sco_verts[(it*4+3)*4+1] = 0;
+//		it++;
+//		sco_verts[(it*4+0)*4+0] = 1; sco_verts[(it*4+0)*4+1] = 2;
+//		sco_verts[(it*4+1)*4+0] = 1; sco_verts[(it*4+1)*4+1] = 2;
+//		sco_verts[(it*4+2)*4+0] = 1; sco_verts[(it*4+2)*4+1] = 0;
+//		sco_verts[(it*4+3)*4+0] = 1; sco_verts[(it*4+3)*4+1] = 0;
+//		it++;
+//		sco_verts[(it*4+0)*4+0] = 1; sco_verts[(it*4+0)*4+1] = 2;
+//		sco_verts[(it*4+1)*4+0] = 2; sco_verts[(it*4+1)*4+1] = 2;
+//		sco_verts[(it*4+2)*4+0] = 2; sco_verts[(it*4+2)*4+1] = 0;
+//		sco_verts[(it*4+3)*4+0] = 1; sco_verts[(it*4+3)*4+1] = 0;
+#ifdef USE_MIRRORED_REPEAT
+	for(int i=0; i<samp; i++) {
+		sco_verts[(i*8+0)*4+0] = 0; sco_verts[(i*8+0)*4+1] = 2;
+		sco_verts[(i*8+1)*4+0] = 0; sco_verts[(i*8+1)*4+1] = 0;
+		sco_verts[(i*8+2)*4+0] = 1; sco_verts[(i*8+2)*4+1] = 2;
+		sco_verts[(i*8+3)*4+0] = 1; sco_verts[(i*8+3)*4+1] = 0;
+		sco_verts[(i*8+4)*4+0] = 1; sco_verts[(i*8+4)*4+1] = 2;
+		sco_verts[(i*8+5)*4+0] = 1; sco_verts[(i*8+5)*4+1] = 0;
+		sco_verts[(i*8+6)*4+0] = 2; sco_verts[(i*8+6)*4+1] = 2;
+		sco_verts[(i*8+7)*4+0] = 2; sco_verts[(i*8+7)*4+1] = 0;
+	}
+#else
+	for(int i=0; i<samp; i++) {
+		sco_verts[(i*8+0)*4+0] = 0; sco_verts[(i*8+0)*4+1] = 1;
+		sco_verts[(i*8+1)*4+0] = 0; sco_verts[(i*8+1)*4+1] = 0;
+		sco_verts[(i*8+2)*4+0] = 0.5f; sco_verts[(i*8+2)*4+1] = 1;
+		sco_verts[(i*8+3)*4+0] = 0.5f; sco_verts[(i*8+3)*4+1] = 0;
+		sco_verts[(i*8+4)*4+0] = 0.5f; sco_verts[(i*8+4)*4+1] = 1;
+		sco_verts[(i*8+5)*4+0] = 0.5f; sco_verts[(i*8+5)*4+1] = 0;
+		sco_verts[(i*8+6)*4+0] = 1; sco_verts[(i*8+6)*4+1] = 1;
+		sco_verts[(i*8+7)*4+0] = 1; sco_verts[(i*8+7)*4+1] = 0;
+	}
+#endif
+	for(int i=0; i<samp; i++) {
+		sco_ind[(i*3+0)*4+0] = i*8+0; sco_ind[(i*3+0)*4+1] = i*8+2; sco_ind[(i*3+0)*4+2] = i*8+3; sco_ind[(i*3+0)*4+3] = i*8+1;
+		sco_ind[(i*3+1)*4+0] = i*8+2; sco_ind[(i*3+1)*4+1] = i*8+4; sco_ind[(i*3+1)*4+2] = i*8+5; sco_ind[(i*3+1)*4+3] = i*8+3;
+		sco_ind[(i*3+2)*4+0] = i*8+4; sco_ind[(i*3+2)*4+1] = i*8+6; sco_ind[(i*3+2)*4+2] = i*8+7; sco_ind[(i*3+2)*4+3] = i*8+5;
 	}
 
 	glPopAttrib();
@@ -281,29 +326,46 @@ void gl_maxsrc_update(void)
 	// do the rotate/project ourselves because we can send less data to the card
 	// also it makes it easier to match the software implementation
 	audio_data ad; audio_get_samples(&ad);
+
+	float px, py;
+	{
+		float s = getsamp(&ad, 0, ad.len/96);
+		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
+		float xt = -0.5f, yt = 0.2f*s, zt = 0.0f;
+		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
+		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
+		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
+		const float zvd = 1/(z+2);
+		px=x*zvd*4/3; py=y*zvd*4/3;
+	}
+
 	for(int i=0; i<samp; i++) {
-		float s = getsamp(&ad, i*ad.len/(samp-1), ad.len/96);
+		float s = getsamp(&ad, (i+1)*ad.len/(samp), ad.len/96);
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
-		float xt = (i - (samp-1)/2.0f)*(1.0f/(samp-1)), yt = 0.2f*s, zt = 0.0f;
+		float xt = (i+1 - (samp)/2.0f)*(1.0f/(samp)), yt = 0.2f*s, zt = 0.0f;
 		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
 		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
 		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
 		const float zvd = 1/(z+2);
 		x=x*zvd*4/3; y=y*zvd*4/3;
 
-#ifdef USE_MIRRORED_REPEAT
-		sco_verts[(i*4+0)*4+0] = 0; sco_verts[(i*4+0)*4+1] = 2; sco_verts[(i*4+0)*4+2] = x-pw; sco_verts[(i*4+0)*4+3] = y-ph;
-		sco_verts[(i*4+1)*4+0] = 2; sco_verts[(i*4+1)*4+1] = 2; sco_verts[(i*4+1)*4+2] = x+pw; sco_verts[(i*4+1)*4+3] = y-ph;
-		sco_verts[(i*4+2)*4+0] = 2; sco_verts[(i*4+2)*4+1] = 0; sco_verts[(i*4+2)*4+2] = x+pw; sco_verts[(i*4+2)*4+3] = y+ph;
-		sco_verts[(i*4+3)*4+0] = 0; sco_verts[(i*4+3)*4+1] = 0; sco_verts[(i*4+3)*4+2] = x-pw; sco_verts[(i*4+3)*4+3] = y+ph;
-#else
-		sco_verts[(i*4+0)*4+0] = 0; sco_verts[(i*4+0)*4+1] = 1; sco_verts[(i*4+0)*4+2] = x-pw; sco_verts[(i*4+0)*4+3] = y-ph;
-		sco_verts[(i*4+1)*4+0] = 1; sco_verts[(i*4+1)*4+1] = 1; sco_verts[(i*4+1)*4+2] = x+pw; sco_verts[(i*4+1)*4+3] = y-ph;
-		sco_verts[(i*4+2)*4+0] = 1; sco_verts[(i*4+2)*4+1] = 0; sco_verts[(i*4+2)*4+2] = x+pw; sco_verts[(i*4+2)*4+3] = y+ph;
-		sco_verts[(i*4+3)*4+0] = 0; sco_verts[(i*4+3)*4+1] = 0; sco_verts[(i*4+3)*4+2] = x-pw; sco_verts[(i*4+3)*4+3] = y+ph;
-#endif
+		const float dx=x-px, dy=y-py;
+		const float d = 1/sqrt(dx*dx + dy*dy);
+		const float tx=dx*d*pw, ty=dy*d*pw;
+		const float nx=-dy*d*pw, ny=dx*d*ph;
+
+		sco_verts[(i*8+0)*4+2] = px-nx-tx; sco_verts[(i*8+0)*4+3] = py-ny-ty;
+		sco_verts[(i*8+1)*4+2] = px+nx-tx; sco_verts[(i*8+1)*4+3] = py+ny-ty;
+		sco_verts[(i*8+2)*4+2] = px-nx   ; sco_verts[(i*8+2)*4+3] = py-ny;
+		sco_verts[(i*8+3)*4+2] = px+nx   ; sco_verts[(i*8+3)*4+3] = py+ny;
+		sco_verts[(i*8+4)*4+2] =  x-nx   ; sco_verts[(i*8+4)*4+3] =  y-ny;
+		sco_verts[(i*8+5)*4+2] =  x+nx   ; sco_verts[(i*8+5)*4+3] =  y+ny;
+		sco_verts[(i*8+6)*4+2] =  x-nx+tx; sco_verts[(i*8+6)*4+3] =  y-ny+ty;
+		sco_verts[(i*8+7)*4+2] =  x+nx+tx; sco_verts[(i*8+7)*4+3] =  y+ny+ty;
+		px=x,py=y;
 	}
+
 	audio_finish_samples();
 
 	glEnable(GL_BLEND);
@@ -315,7 +377,7 @@ void gl_maxsrc_update(void)
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts);
 	glVertexPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts + 2);
-	glDrawArrays(GL_QUADS, 0, samp*4);
+	glDrawElements(GL_QUADS, samp*4*3, GL_UNSIGNED_INT, sco_ind);
 
 	if(!pnt_tex) glUseProgramObjectARB(0);
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
