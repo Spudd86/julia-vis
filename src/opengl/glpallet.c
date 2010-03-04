@@ -23,16 +23,11 @@ static void draw_palleted_glsl(GLuint draw_tex)
 		glBindTexture(GL_TEXTURE_2D, draw_tex);
 		glActiveTextureARB(GL_TEXTURE1_ARB);
 		glBindTexture(GL_TEXTURE_1D, pal_tex);
-		glUniform1iARB(src_loc, 0);
-		glUniform1iARB(pal_loc, 1);
-
-		//TODO: scale for aspect ration correction
-
-		glBegin(GL_QUADS);
-			glTexCoord2d(0.0,1.0); glVertex2d(-1, -1);
-			glTexCoord2d(1.0,1.0); glVertex2d( 1, -1);
-			glTexCoord2d(1.0,0.0); glVertex2d( 1,  1);
-			glTexCoord2d(0.0,0.0); glVertex2d(-1,  1);
+		glBegin(GL_QUADS); //TODO: scale for aspect ration correction
+			glTexCoord2d( 0, 0); glVertex2d(-1, -1);
+			glTexCoord2d( 1, 0); glVertex2d( 1, -1);
+			glTexCoord2d( 1, 1); glVertex2d( 1,  1);
+			glTexCoord2d( 0, 1); glVertex2d(-1,  1);
 		glEnd();
 		glUseProgramObjectARB(0);
 	glPopAttrib();
@@ -104,8 +99,12 @@ static bool pal_init_glsl(GLboolean float_packed_pixels)
 
 	if(!pal_prog) return false;
 
+	glUseProgramObjectARB(pal_prog);
 	pal_loc = glGetUniformLocationARB(pal_prog, "pal");
 	src_loc = glGetUniformLocationARB(pal_prog, "src");
+	glUniform1iARB(src_loc, 0);
+	glUniform1iARB(pal_loc, 1);
+	glUseProgramObjectARB(0);
 	printf("Pallet shader compiled\n");
 
 	glPushAttrib(GL_TEXTURE_BIT);
@@ -116,8 +115,6 @@ static bool pal_init_glsl(GLboolean float_packed_pixels)
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glPopAttrib();
-	DEBUG_CHECK_GL_ERR;
-
 	CHECK_GL_ERR;
 	return true;
 }
@@ -169,6 +166,7 @@ static void pal_init_fixed() //FIXME
 
 	glPopClientAttrib();
 	glPopAttrib();
+	CHECK_GL_ERR;
 }
 
 static GLuint frm = 0;
@@ -202,9 +200,9 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 //	glPushAttrib(GL_VIEWPORT_BIT); CHECK_GL_ERR;
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	if(rbow != vp_w || rboh != vp_h) {
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo); CHECK_GL_ERR;
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo); DEBUG_CHECK_GL_ERR;
 		glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, 0);
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0); CHECK_GL_ERR;
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0); DEBUG_CHECK_GL_ERR;
 //		glFlush();
 //		glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, rbo);
 //		glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_RGBA, vp_w, vp_h);
@@ -217,7 +215,7 @@ static void draw_palleted_fixed(GLint srctex) //FIXME
 		rbow = vp_w; rboh = vp_h;
 		printf("Changed RBO size!\n");
 	}
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo); CHECK_GL_ERR;
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo); DEBUG_CHECK_GL_ERR;
 //	glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, rbo);
 	glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, rbos[frm%2]);
 	setup_viewport(vp_w, vp_h);

@@ -1,9 +1,9 @@
-#include "../common.h"
-#include <stdio.h>
+#include "common.h"
 
 #include <portaudio.h>
 
 #include "audio.h"
+#include "audio-private.h"
 
 static PaStream *stream;
 

@@ -1,5 +1,6 @@
 #include "common.h"
 #include "audio.h"
+#include "audio-private.h"
 
 #define BANDS (64)
 // about a seconds worth

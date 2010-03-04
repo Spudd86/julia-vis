@@ -31,7 +31,6 @@ void beat_get_data(beat_data *);
 void beat_update(float *fft, int fft_len);
 
 int audio_init(const opt_data *);
-int audio_setup(int sr);
 void audio_shutdown();
 void audio_update(const float *in, int n);
 int audio_get_buf_count(void);

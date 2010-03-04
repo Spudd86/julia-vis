@@ -1,11 +1,9 @@
-#include "../common.h"
+#include "common.h"
 
 #ifdef HAVE_PULSE
 
-#include <string.h>
-#include <stdio.h>
-
 #include "audio.h"
+#include "audio-private.h"
 
 //TODO: make this whole thing suck less
 #include <pulse/pulseaudio.h>

@@ -1,10 +1,9 @@
-#include "../common.h"
-#include <string.h>
-#include <stdio.h>
+#include "common.h"
 
 #include <jack/jack.h>
 
 #include "audio.h"
+#include "audio-private.h"
 
 static jack_port_t *in_port;
 

@@ -1,9 +1,6 @@
-#include "../common.h"
-#include <stdio.h>
-
-#include "../sdl-misc.h"
+#include "common.h"
+#include "sdl-misc.h"
 #include "audio.h"
-
 
 #define IM_SIZE (768)
 
@@ -82,7 +79,14 @@ int main(int argc, char **argv)
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
 	int im_w = screen->w, im_h = screen->h ;
 
-	SDL_Surface *voice_print = SDL_CreateRGBSurface(SDL_HWSURFACE, im_w, im_h/2, screen->format->BitsPerPixel, screen->format->Rmask, screen->format->Gmask, screen->format->Bmask, screen->format->Amask);
+	SDL_Surface *voice_print = SDL_CreateRGBSurface(SDL_SWSURFACE,
+	                                                im_w,
+	                                                im_h/2,
+	                                                screen->format->BitsPerPixel,
+	                                                screen->format->Rmask,
+	                                                screen->format->Gmask,
+	                                                screen->format->Bmask,
+	                                                screen->format->Amask);
 	if(!voice_print) { printf("failed to create voice_print\n"); exit(1); }
 
 	audio_init(&opts);
@@ -120,7 +124,6 @@ int main(int argc, char **argv)
 		beat_get_data(&bd);
 		audio_get_fft(&d);
 		//TODO: make copy of fft so we can finish read sooner
-
 
 		if(SDL_MUSTLOCK(voice_print) && SDL_LockSurface(voice_print) < 0) { printf("failed to lock voice_print\n"); break; }
 

@@ -7,6 +7,23 @@
 #include "audio/audio.h"
 #include "glpallet.h"
 
+static const char *map_defs_list[2][5] =
+{
+ {
+  "#version 120\n",
+  "#version 120\n#define MAP_SAMP 4\n\n",
+  "#version 120\n#define MAP_SAMP 5\n\n",
+  "#version 120\n#define MAP_SAMP 8\n\n",
+  "#version 120\n#define MAP_SAMP 9\n\n",
+ },
+ {
+  "#version 120\n#define FLOAT_PACK_PIX\n",
+  "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 4\n",
+  "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 5\n",
+  "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 8\n",
+  "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 9\n",
+ }
+};
 
 static const char *vtx_shader =
 		"void main() {\n"
@@ -274,7 +291,7 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 	glGenTextures(NUM_FBO_TEX, fbo_tex);
 	for(int i=0; i<NUM_FBO_TEX; i++) {
 		glBindTexture(GL_TEXTURE_2D, fbo_tex[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, im_w, im_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, im_w, im_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
@@ -289,22 +306,11 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 
 	if(!force_fixed) {
 		printf("Compiling map shader:\n");
-		const char *map_defs = "#version 120\n";
+		int quality = MIN(opts->quality, 4);
+		const char *map_defs = map_defs_list[packed_intesity_pixels][quality];
+		
 		//TODO: try to fall back to -q 0 if we fail to compile
 		//TODO: might need to die if we don't get the packed pixels shader to compile...
-		if(!packed_intesity_pixels) {
-			if(opts->quality == 1) map_defs = "#version 120\n#define MAP_SAMP 4\n\n";
-			else if(opts->quality == 2) map_defs = "#version 120\n#define MAP_SAMP 5\n";
-			else if(opts->quality == 3) map_defs = "#version 120\n#define MAP_SAMP 8\n";
-			else if(opts->quality == 4) map_defs = "#version 120\n#define MAP_SAMP 9\n";
-		} else {
-			map_defs = "#version 120\n#define FLOAT_PACK_PIX\n";
-			if(opts->quality == 1) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 4\n";
-			else if(opts->quality == 2) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 5\n";
-			else if(opts->quality == 3) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 8\n";
-			else if(opts->quality == 4) map_defs = "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 9\n";
-		}
-		
 		if(rational_julia)
 			map_prog = compile_program_defs(map_defs, vtx_shader, rat_map_frag_shader);
 		else
@@ -330,7 +336,3 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 	}
 	CHECK_GL_ERR;
 }
-
-
-
-

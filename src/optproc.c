@@ -6,37 +6,43 @@
 #endif
 
 static const char *helpstr =
-"Usage: %s [-w width] [-h height] [-s screen updates/second] [-fdpu] [-j<pattern>]\n"
+"Usage: %s [-w width] [-h height] [-s screen updates/second] [-fdpu]\n"
 "\t-r use rational map\n"
-"\t-p try to set an 8bpp mode (hardware pallets)\n"
+"\t-p try to set an 8bpp mode (hardware pallets, software versions only)\n"
 "\t-f go fullscreen\n"
-"\t-a oscolliscope update rate [default 12]\n"
-"\t-s screen update rate [default 30, threaded only]\n"
-"\t-d try to enable double buffering\n"
+"\t-a oscolliscope update rate [default 24]\n"
+"\t-s screen update rate [default 60]\n"
+"\t-d try to enable double buffering (opengl version always double buffers)\n"
 
 "\t-m <name>\n"
 "\t\twhere name is one of default,rational,butterfly\n"
+#ifdef HAVE_GL
 "\t\t Note: default and rational are implemented for opengl\n\n"
+#endif
 
 "\t-q quality\n"
+#ifdef HAVE_GL
 "\t\tglsl: control # of samples\n"
 "\t\t\t 0 take 1 sample (default)\n"
 "\t\t\t 1 take 5 samples\n"
 "\t\t\t 2 take 7 samples\n"
 "\t\tfixed function gl: currently no effect\n"
 "\t\tsoftware: control map quality\n"
+#endif
 "\t\t\t 0 interpolate map function across 8x8 squares\n"
 "\t\t\t 1 calculate map at every pixel\n\n"
 
+#ifdef HAVE_GL
 "\t-g opt1:opt2:...\n"
 "\t\tgeneric opengl options\n"
 "\t\t\tfixed\tforce use fixed function GL\n"
 "\t\t\tpintens\tuse packed intensity pixel values (precision boost)\n"
 "\t\t\trboos\tdouble internal resolution\n\n"
+#endif
 
 "\t-i <driver>[:opts] select audio input driver\n"
 "\t\tdrivers:\n"
-"\t\t  portaudio: default, optionally specify a device number (they are listed at startup)\n"
+"\t\t  portaudio: optionally specify a device number (they are listed at startup)\n"
 #ifdef HAVE_JACK
 "\t\t  jack: optionally specify a pattern of ports to connect to\n"
 #endif
@@ -66,7 +72,11 @@ void optproc(int argc, char **argv, opt_data *res)
 
 	res->quality = 0;
 
+#ifdef HAVE_PULSE
+	res->audio_driver = AUDIO_PULSE;
+#else
 	res->audio_driver = AUDIO_PORTAUDIO;
+#endif
 	res->audio_opts = NULL;
 	res->gl_opts = NULL;
 
@@ -82,6 +92,10 @@ void optproc(int argc, char **argv, opt_data *res)
 				break;
 			case 'q':
 				res->quality = atoi(optarg);
+				if(res->quality < 0) {
+					fprintf(stderr, "Invalid quality arg, clamping to 0\n");
+					res->quality = 0;
+				}
 				break;
 			case 'r':
 				res->rational_julia = 1;
@@ -100,23 +114,25 @@ void optproc(int argc, char **argv, opt_data *res)
 			case 'p':
 				res->hw_pallet = 1;
 				break;
+#ifdef HAVE_GL
 			case 'g':
 				res->gl_opts = strdup(optarg);
 				break;
+#endif
 			case 'i': {
 				char *drvstr = strdup(optarg);
 				char *drvopt = strchr(drvstr, ':');
 				if(drvopt != NULL) { *drvopt = '\0'; drvopt++;}
 //				printf("driver = '%s'\n", drvstr);
 				res->audio_opts = drvopt;
-				if(!strcmp(drvstr, "portaudio")) ;
+				if(!strcmp(drvstr, "portaudio")) res->audio_driver = AUDIO_PORTAUDIO;
 #ifdef HAVE_PULSE
-				else if(!strcmp(drvstr, "pulse")) {res->audio_driver = AUDIO_PULSE; }
+				else if(!strcmp(drvstr, "pulse")) res->audio_driver = AUDIO_PULSE;
 #endif
 #ifdef HAVE_JACK
 				else if(!strcmp(drvstr, "jack")) res->audio_driver = AUDIO_JACK;
 #endif
-				else fprintf(stderr, "Bad audio driver name %s, using portaudio\n", drvstr);
+				else fprintf(stderr, "Bad audio driver name %s, using default\n", drvstr);
 			} break;
 			case 's':
 				res->draw_rate = atoi(optarg);
