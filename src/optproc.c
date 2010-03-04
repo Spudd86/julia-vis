@@ -8,36 +8,35 @@
 static const char *helpstr =
 "Usage: %s [-w width] [-h height] [-s screen updates/second] [-fdpu]\n"
 "\t-r use rational map\n"
-"\t-p try to set an 8bpp mode (hardware pallets, software versions only)\n"
 "\t-f go fullscreen\n"
 "\t-a oscolliscope update rate [default 24]\n"
 "\t-s screen update rate [default 60]\n"
+#ifndef USE_GL
+"\t-p try to set an 8bpp mode (hardware pallets, software versions only)\n"
 "\t-d try to enable double buffering (opengl version always double buffers)\n"
-
+#endif
 "\t-m <name>\n"
 "\t\twhere name is one of default,rational,butterfly\n"
-#ifdef HAVE_GL
-"\t\t Note: default and rational are implemented for opengl\n\n"
+#ifdef USE_GL
+"\t\t Note: only default and rational are implemented for opengl\n\n"
 #endif
 
+#ifdef USE_GL
 "\t-q quality\n"
-#ifdef HAVE_GL
 "\t\tglsl: control # of samples\n"
-"\t\t\t 0 take 1 sample (default)\n"
-"\t\t\t 1 take 5 samples\n"
-"\t\t\t 2 take 7 samples\n"
+"\t\t  0 take 1 sample (default)\n"
+"\t\t  1 take 5 samples\n"
+"\t\t  2 take 7 samples\n"
 "\t\tfixed function gl: currently no effect\n"
-"\t\tsoftware: control map quality\n"
-#endif
-"\t\t\t 0 interpolate map function across 8x8 squares\n"
-"\t\t\t 1 calculate map at every pixel\n\n"
-
-#ifdef HAVE_GL
 "\t-g opt1:opt2:...\n"
 "\t\tgeneric opengl options\n"
 "\t\t\tfixed\tforce use fixed function GL\n"
 "\t\t\tpintens\tuse packed intensity pixel values (precision boost)\n"
 "\t\t\trboos\tdouble internal resolution\n\n"
+#else
+"\t-q control map quality\n"
+"\t\t  0 interpolate map function across 8x8 squares\n"
+"\t\t  1 calculate map at every pixel\n\n"
 #endif
 
 "\t-i <driver>[:opts] select audio input driver\n"
@@ -114,7 +113,7 @@ void optproc(int argc, char **argv, opt_data *res)
 			case 'p':
 				res->hw_pallet = 1;
 				break;
-#ifdef HAVE_GL
+#ifdef USE_GL
 			case 'g':
 				res->gl_opts = strdup(optarg);
 				break;
