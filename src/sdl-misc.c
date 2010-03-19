@@ -104,7 +104,7 @@ static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl)
         fprintf(stderr, "Unable to set video: %s\n", SDL_GetError());
         exit(1);
     }
-	SDL_WM_SetCaption("SDL test for fractal map", "sdl-test");
+	SDL_WM_SetCaption("Julia Set Fractal Visualizer", "sdl-test");
 
 	vid_info = SDL_GetVideoInfo();
 	printf("\nusing mode %dx%d-%d\n", vid_info->current_w, vid_info->current_h, vid_info->vfmt->BitsPerPixel);
