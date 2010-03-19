@@ -130,11 +130,22 @@ static GLuint max_fbo = 0, fbo_tex[2] = { 0, 0 };
 static int iw, ih;
 static int samp = 0;
 static float pw = 0, ph = 0;
-static GLfloat *sco_verts = NULL;
+static GLfloat sco_verts[128*8*4];
 static GLint sco_ind[128*4*3];
 static GLboolean use_glsl = GL_FALSE;
 static Map *fixed_map = NULL;
 GEN_MAP_CB(fixed_map_cb, bg_vtx);
+
+#define USE_VBO
+#ifdef USE_VBO
+static union {
+	GLuint handles[3];
+	struct {
+		GLuint ind, txco, vtx;
+	};
+}bufobjs;
+static bool use_vbo = false;
+#endif
 
 #define PNT_MIP_LEVELS 4
 
@@ -143,8 +154,6 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 	iw=width, ih=height;
 	pw = 0.5f*fmaxf(1.0f/24, 8.0f/iw), ph = 0.5f*fmaxf(1.0f/24, 8.0f/ih);
 	samp = (int)fminf(fminf(iw/2,ih/2), 128);
-	sco_verts = malloc(sizeof(float)*samp*8*4);
-	//TODO: try to use buffer objects for texco/vertco/ind
 
 	printf("maxsrc using %i points\n", samp);
 	if(!force_fixed) {
@@ -170,7 +179,7 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 	glGenTextures(2, fbo_tex);
 	for(int i=0; i<2; i++) {
 		glBindTexture(GL_TEXTURE_2D, fbo_tex[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -213,6 +222,7 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	}
+	glPopAttrib();
 
 //		int it = i*3;
 //		sco_verts[(it*4+0)*4+0] = 0; sco_verts[(it*4+0)*4+1] = 2;
@@ -258,15 +268,36 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 		sco_ind[(i*3+2)*4+0] = i*8+4; sco_ind[(i*3+2)*4+1] = i*8+6; sco_ind[(i*3+2)*4+2] = i*8+7; sco_ind[(i*3+2)*4+3] = i*8+5;
 	}
 
-	glPopAttrib();
+#ifdef USE_VBO
+	if(GLEE_ARB_vertex_buffer_object) {
+		use_vbo = true;
+//		glGenBuffersARB(3, bufobjs.handles);
+		glGenBuffersARB(1, &bufobjs.ind);
+		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, bufobjs.ind);
+		glBufferDataARB(GL_ELEMENT_ARRAY_BUFFER_ARB, sizeof(GLint)*samp*4*3, sco_ind, GL_STATIC_DRAW_ARB);
+		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);
+//		CHECK_GL_ERR;
+//		glBindBufferARB(GL_ARRAY_BUFFER_ARB, bufobjs.vtx);
+//		glBufferDataARB(GL_ARRAY_BUFFER_ARB, sizeof(GLfloat)*samp*8*2, NULL, GL_STREAM_DRAW_ARB);
+//		glBindBufferARB(GL_ARRAY_BUFFER_ARB, bufobjs.txco);
+//		glBufferDataARB(GL_ARRAY_BUFFER_ARB, sizeof(GLfloat)*samp*8*2, NULL, GL_STATIC_DRAW_ARB);
+//		glBindBufferARB(GL_ARRAY_BUFFER_ARB, 0);
+	}
+#endif
 	CHECK_GL_ERR;
 }
 
 // render the old frame and distort it with GL shading language
 static void render_bg_glsl(float R[3][3], GLint tex)
 {
+	const float Rt[9] =
+	{
+	 R[0][0], R[1][0], R[2][0],
+	 R[0][1], R[1][1], R[2][1],
+	 R[0][2], R[1][2], R[2][2],
+	};
 	glUseProgramObjectARB(shader_prog);
-	glUniformMatrix2x3fv(shad_R_loc, 1, 0, (float *)R);
+	glUniformMatrix2x3fv(shad_R_loc, 1, 0, Rt);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glBegin(GL_QUADS);
 		glTexCoord2d(-1,-1); glVertex2d(-1, -1);
@@ -331,7 +362,6 @@ void gl_maxsrc_update(void)
 	// do the rotate/project ourselves because we can send less data to the card
 	// also it makes it easier to match the software implementation
 	audio_data ad; audio_get_samples(&ad);
-
 	float px, py;
 	{
 		float s = getsamp(&ad, 0, ad.len/96);
@@ -370,7 +400,6 @@ void gl_maxsrc_update(void)
 		sco_verts[(i*8+7)*4+2] =  x+nx+tx; sco_verts[(i*8+7)*4+3] =  y+ny+ty;
 		px=x,py=y;
 	}
-
 	audio_finish_samples();
 
 	glEnable(GL_BLEND);
@@ -382,13 +411,22 @@ void gl_maxsrc_update(void)
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts);
 	glVertexPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts + 2);
+#ifdef USE_VBO
+	if(use_vbo) {
+		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, bufobjs.ind);
+		glDrawElements(GL_QUADS, samp*4*3, GL_UNSIGNED_INT, NULL);
+		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);
+	} else {
+		glDrawElements(GL_QUADS, samp*4*3, GL_UNSIGNED_INT, sco_ind);
+	}
+#else
 	glDrawElements(GL_QUADS, samp*4*3, GL_UNSIGNED_INT, sco_ind);
+#endif
 
 	if(pnt_shader) glUseProgramObjectARB(0);
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glPopClientAttrib();
 	glPopAttrib();
-
 	tx+=0.02*dt; ty+=0.01*dt; tz-=0.003*dt;
 	frm++;
 
