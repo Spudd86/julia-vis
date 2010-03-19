@@ -8,28 +8,23 @@
 //TODO: make this whole thing suck less
 #include <pulse/pulseaudio.h>
 
-#include <pthread.h>
-
-
-//static pa_threaded_mainloop *pulse_ml = NULL;
-static pa_mainloop *pulse_ml = NULL;
+static pa_threaded_mainloop *pulse_ml = NULL;
 static pa_mainloop_api *mainloop_api = NULL;
 static pa_context *context = NULL;
 static pa_stream *stream = NULL;
-static void quit(int ret) { mainloop_api->quit(mainloop_api, ret); }
-//static void quit(int ret) { pa_threaded_mainloop_stop(pulse_ml); pa_threaded_mainloop_free(pulse_ml); }
 
 void pulse_shutdown(void) {
-
-	quit(0);
+	pa_threaded_mainloop_stop(pulse_ml);
+	pa_threaded_mainloop_free(pulse_ml);
 }
 
 
-static void stream_read_callback(pa_stream *s, size_t length, void *userdata) { (void)userdata;
+static void stream_read_callback(pa_stream *s, size_t length, void *userdata)
+{ (void)userdata;
 	const void *data = NULL;
     if (pa_stream_peek(s, &data, &length) < 0) {
         fprintf(stderr, "pa_stream_peek() failed: %s\n", pa_strerror(pa_context_errno(context)));
-        quit(1);
+//        pulse_shutdown();
         return;
     }
 	audio_update(data, length/sizeof(float));
@@ -47,21 +42,23 @@ static void stream_state_callback(pa_stream *s, void *userdata)
             break;
         case PA_STREAM_FAILED:
         default:
-            fprintf(stderr, "Stream errror: %s\n", pa_strerror(pa_context_errno(pa_stream_get_context(s))));
-            quit(1);
+            fprintf(stderr, "pulseaudio: Stream errror: %s\n", pa_strerror(pa_context_errno(pa_stream_get_context(s))));
+            pulse_shutdown();
+            abort();
     }
 }
 
 static const pa_sample_spec sample_spec = { .format = PA_SAMPLE_FLOAT32NE, .rate = 44100, .channels = 1 };
-static const pa_buffer_attr buf_attr = { -1, -1, -1, -1, 1024*4 };
+static const pa_buffer_attr buf_attr = { -1, -1, -1, -1, 1024*sizeof(float) };
 
-static void connect_sink_info_callback(pa_context  *c, const pa_sink_info  *i, int eol, void *userdata) {(void)userdata;(void)eol;
+static void connect_sink_info_callback(pa_context  *c, const pa_sink_info  *i, int eol, void *userdata)
+{(void)userdata;(void)eol;
 	stream = pa_stream_new(c, "foo", &sample_spec, NULL);
     pa_stream_set_state_callback(stream, stream_state_callback, NULL);
 //    pa_stream_set_read_callback(stream, stream_read_callback, NULL);
 	// TODO use PA_STREAM_FIX_RATE
 	if(i != NULL) {
-		printf("Connecting to source '%s'\n", i->monitor_source_name);
+		printf("pulseaudio: Connecting to source '%s'\n", i->monitor_source_name);
 		pa_stream_connect_record(stream, i->monitor_source_name, &buf_attr, PA_STREAM_ADJUST_LATENCY);
 	} else {
 //		printf("Didn't get default sink, not using monitor, try default source instead!\n");
@@ -69,14 +66,17 @@ static void connect_sink_info_callback(pa_context  *c, const pa_sink_info  *i, i
 	}
 }
 
-static void connect_server_info_callback(pa_context *c, const pa_server_info *i, void *userdata) { (void)userdata;
+static void connect_server_info_callback(pa_context *c, const pa_server_info *i, void *userdata)
+{ (void)userdata;
 	if(i->default_sink_name) printf("Default sink is '%s'\n", i->default_sink_name);
 	pa_context_get_sink_info_by_name(c, i->default_sink_name, connect_sink_info_callback, NULL);
 	//TODO: try just appending '.monitor' to name?
 }
 
 /* This is called whenever the context status changes */
-static void context_state_callback(pa_context *c, void *userdata) { opt_data *od = userdata;
+static void context_state_callback(pa_context *c, void *userdata)
+{
+	opt_data *od = userdata;
     switch (pa_context_get_state(c)) {
         case PA_CONTEXT_CONNECTING:
         case PA_CONTEXT_AUTHORIZING:
@@ -98,35 +98,32 @@ static void context_state_callback(pa_context *c, void *userdata) { opt_data *od
         }
 
         case PA_CONTEXT_TERMINATED:
-            quit(0);
+            pulse_shutdown();
             break;
 
         case PA_CONTEXT_FAILED:
         default:
-            fprintf(stderr, "Connection failure: %s\n", pa_strerror(pa_context_errno(c)));
-            quit(1);
+            fprintf(stderr, "pulseaudio: Connection failure: %s\n", pa_strerror(pa_context_errno(c)));
+            pulse_shutdown();
+            abort();
     }
 }
-
-
-static int pulse_run()
-{
-	int ret; if (pa_mainloop_run(pulse_ml, &ret) < 0) {
-        fprintf(stderr, "pa_mainloop_run() failed.\n");
-		abort();
-    }
-	return ret;
-}
-static pthread_t pulse_thread;
 
 int pulse_setup(const opt_data *od)
 {
-	setenv("PULSE_PROP_application.name", "Fractal Visualizer", 1);
+	setenv("PULSE_PROP_application.name", "Julia Set Fractal Visualizer", 1);
 
 	audio_setup(44100);
-	pulse_ml = pa_mainloop_new();
-//	pulse_ml = pa_threaded_mainloop_new();
-	mainloop_api = pa_mainloop_get_api(pulse_ml);
+	pulse_ml = pa_threaded_mainloop_new();
+
+	if (pa_threaded_mainloop_start(pulse_ml) < 0) {
+        fprintf(stderr, "pa_threaded_mainloop_run() failed.\n");
+		return 1;
+    }
+
+	pa_threaded_mainloop_lock(pulse_ml);
+
+	mainloop_api = pa_threaded_mainloop_get_api(pulse_ml);
 
 	if (!(context = pa_context_new(mainloop_api, "fractal_test"))) {
         fprintf(stderr, "pa_context_new() failed.\n");
@@ -139,8 +136,7 @@ int pulse_setup(const opt_data *od)
         goto quit;
     }
 
-//	pa_threaded_mainloop_start(pulse_ml);
-	pthread_create(&pulse_thread, NULL, (void*)&pulse_run, NULL);
+    pa_threaded_mainloop_unlock(pulse_ml);
 
 	return 0;
 
@@ -152,10 +148,8 @@ quit:
         pa_context_unref(context);
 
     if (pulse_ml) {
-//    	pa_threaded_mainloop_stop(pulse_ml);
-//    	pa_threaded_mainloop_free(pulse_ml);
-        pa_signal_done();
-        pa_mainloop_free(pulse_ml);
+    	pa_threaded_mainloop_stop(pulse_ml);
+    	pa_threaded_mainloop_free(pulse_ml);
     }
 	return 1;
 }
