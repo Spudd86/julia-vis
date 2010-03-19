@@ -76,9 +76,7 @@ AC_SUBST(enable_jack)
 AC_ARG_ENABLE([pulseaudio], AS_HELP_STRING([--enable-pulseaudio], [enable using pulseaudio for audio input (default: disabled)]))
 if test "x$enable_pulseaudio" = xyes; then
 	PKG_CHECK_MODULES([PULSE], [libpulse],
-		[AC_DEFINE([HAVE_PULSE], [1], [Define if pulseaudio is enabled])
-		 
-		],
+		[AC_DEFINE([HAVE_PULSE], [1], [Define if pulseaudio is enabled])],
 		[AC_MSG_FAILURE([--enable-pulseaudio was given, but test for pulseaudio failed])]
 	)
 fi
@@ -101,6 +99,11 @@ fi
 AC_SUBST(GL_CFLAGS)
 AC_SUBST(GL_LIBS)
 
+AC_ARG_ENABLE([systemglee], AS_HELP_STRING([--enable-system-glee], [enable system copy of glee (default: disabled)]))
+if test "x$enable_systemglee" = xyes; then
+	AC_DEFINE([USE_SYSTEM_GLEE], [1], [Define if we should use system GLee])
+fi
+AC_SUBST(enable_systemglee)
 
 AC_ARG_ENABLE([orc], AS_HELP_STRING([--enable-orc], [enable using orc (default: disabled)]))
 if test "x$enable_orc" = xyes; then

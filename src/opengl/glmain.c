@@ -61,10 +61,9 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	printf("Using internel resolution of %ix%i\n\n", im_h, im_w);
 
 	CHECK_GL_ERR;
-	glewInit(); CHECK_GL_ERR;
 	setup_viewport(scr_w, scr_h); CHECK_GL_ERR;
-	glHint(GL_CLIP_VOLUME_CLIPPING_HINT_EXT, GL_FASTEST);CHECK_GL_ERR;
-	glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST);CHECK_GL_ERR;
+	glHint(GL_CLIP_VOLUME_CLIPPING_HINT_EXT, GL_FASTEST); CHECK_GL_ERR;
+	glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST); CHECK_GL_ERR;
 
 	glClear(GL_COLOR_BUFFER_BIT); CHECK_GL_ERR;
 	glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));
@@ -73,27 +72,24 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	printf("GL_VENDOR: %s\n", glGetString(GL_VENDOR));
 	printf("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
 	printf("GL_VERSION: %s\n", glGetString(GL_VERSION));
-	if(GLEW_ARB_shading_language_100) printf("GL_SL_VERSION: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+	if(GLEE_ARB_shading_language_100) printf("GL_SL_VERSION: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+	printf("GL_EXTENSIONS: %s\n", glGetString(GL_EXTENSIONS));
 	printf("\n\n");
 
-	if(!GLEW_EXT_blend_minmax) {
+	if(!GLEE_EXT_blend_minmax) {
 		printf("missing required gl extension EXT_blend_minmax!\n");
 		exit(1);
 	}
-	if(!GLEW_EXT_framebuffer_object && !GLEW_ARB_framebuffer_object) {
+	if(!GLEE_EXT_framebuffer_object && !GLEE_ARB_framebuffer_object) {
 		printf("missing required gl extension EXT_framebuffer_object!\n");
 		exit(1);
 	}
 
-	if(!GLEW_ARB_shading_language_100)
+	if(!GLEE_ARB_shading_language_100)
 		printf("No GLSL using all fixed function! (might be slow)\n");
-	else if(!glewGetExtension("GL_ARB_shading_language_120")) {
-		printf("GLSL support not good enough. Using (mostly) fixed function\n");
-		packed_intesity_pixels = GL_FALSE;
-	}
 
-	if(!GLEW_ARB_shading_language_100 && !GLEW_ARB_pixel_buffer_object)
-		printf("Missing GLSL and pixel buffer objects, WILL be slow!\n");
+	if(!GLEE_ARB_shading_language_100 && !GLEE_ARB_pixel_buffer_object)
+		printf("Missing GLSL and no pixel buffer objects, WILL be slow!\n");
 
 	if(force_fixed) {
 		printf("Fixed function code forced\n");
@@ -108,7 +104,7 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	init_mandel(); CHECK_GL_ERR;
 
 	draw_string("Done\n"); swap_buffers(); CHECK_GL_ERR;
-	if(glewGetExtension("GL_ARB_shading_language_120") && !force_fixed) {
+	if(GLEE_ARB_shading_language_100 && !force_fixed) {
 		draw_string("Compiling Shaders..."); swap_buffers();
 	}
 	CHECK_GL_ERR;

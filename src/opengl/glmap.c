@@ -11,8 +11,8 @@ typedef GLfloat vtx[2];
 
 struct Map_s {
 	union {
-		struct { GLhandleARB ind, vtx, txco; };
-		GLhandleARB handles[3];
+		struct { GLuint ind, vtx, txco; };
+		GLuint handles[3];
 	};
 	vec2f *txco_buf;
 	vec2f *vtx_buf;
@@ -58,11 +58,12 @@ Map *map_new(int grid_size, map_texco_cb callback)
 	const float step = 2.0f/(self->grid_size);
 	for(int yd=0; yd<=self->grid_size; yd++) {
 		vec2f *row = vtx_buf + yd*(self->grid_size+1);
-		for(int xd=0; xd<=self->grid_size; xd++)
+		//casts shut gcc up
+		for(int xd=0; (unsigned)xd<=(unsigned)self->grid_size; xd++)
 			row[xd].x = xd*step - 1.0f, row[xd].y = yd*step - 1.0f;
 	}
 
-	if(GLEW_ARB_vertex_buffer_object) {
+	if(GLEE_ARB_vertex_buffer_object) {
 //	if(0) {
 		self->use_vbo = GL_TRUE;
 		glPushAttrib(GL_ALL_ATTRIB_BITS);

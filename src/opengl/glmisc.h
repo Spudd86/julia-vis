@@ -6,9 +6,12 @@
 #ifndef GLMISC_H_
 #define GLMISC_H_
 
-#define GL_GLEXT_PROTOTYPES 1
-
-#include <GL/glew.h>
+//#include <GL/glew.h>
+#ifndef USE_SYSTEM_GLEE
+#include "GLee/GLee.h"
+#else
+#include <GL/glee.h>
+#endif
 #include <GL/glu.h>
 
 void swap_buffers(void);

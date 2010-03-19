@@ -154,7 +154,7 @@ static void pal_init_fixed() //FIXME
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	//TODO: remove requirment for NPOT textures... (easy but broken on my laptop's mesa)
-	if(GLEW_ARB_pixel_buffer_object) {
+	if(GLEE_ARB_pixel_buffer_object) {
 //	if(0) {
 		use_pbo = GL_TRUE;
 		glGenBuffersARB(2, pbos);
@@ -293,7 +293,7 @@ void pal_init(int width, int height, GLboolean packed_intesity_pixels, GLboolean
 	pallet_init(0);
 	active_pal = get_active_pal();
 	im_w = width, im_h = height;
-	use_glsl = GLEW_ARB_shading_language_100 && !force_fixed;
+	use_glsl = GLEE_ARB_shading_language_100 && !force_fixed;
 	if(!(use_glsl && pal_init_glsl(packed_intesity_pixels))) {
 		use_glsl = false;
 		pal_init_fixed();

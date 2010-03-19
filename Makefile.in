@@ -72,7 +72,14 @@ PULSE_FLAGS = @PULSE_CFLAGS@ @PULSE_LIBS@
 AUDIO_FLAGS = $(PA_FLAGS) $(JACK_FLAGS) $(PULSE_FLAGS)
 SDL_FLAGS = @SDL_CFLAGS@ @SDL_LIBS@
 DFB_FLAGS = @DIRECTFB_CFLAGS@ @DIRECTFB_LIBS@
-GL_CFLAGS = @GL_CFLAGS@ @GL_LIBS@ -lGLEW
+GL_CFLAGS = @GL_CFLAGS@
+GL_LIBS = @GL_LIBS@
+
+ifeq (@enable_systemglee@,yes)
+GLEE = -lGLEE
+else 
+GLEE = src/opengl/GLee/GLee.o
+endif
 
 ALL_BINS := bin/sdl-test$(EXEEXT) bin/sdlthread-test$(EXEEXT) bin/audio-test$(EXEEXT)
 ifeq ($(ENABLE_GL),yes) 
@@ -129,11 +136,14 @@ bin/sdl-test$(EXEEXT): src/software/sdl.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_
 	src/software/sdl.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
-bin/gl-test$(EXEEXT): src/opengl/sdlmain.c src/opengl/glmain.c src/opengl/glfract.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+bin/gl-test$(EXEEXT): $(GLEE) src/opengl/sdlmain.c src/opengl/glmain.c src/opengl/glfract.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL -DUSE_GL \
 	src/opengl/sdlmain.c src/opengl/glmain.c src/opengl/glfract.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c \
 	src/sdl-misc.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
-	$(SDL_FLAGS) $(AUDIO_FLAGS) $(GL_CFLAGS) -o $@
+	$(SDL_FLAGS) $(AUDIO_FLAGS) $(GL_CFLAGS) $(GL_LIBS) $(GLEE) -o $@
+
+src/opengl/GLee/GLee.o: src/opengl/GLee/GLee.c
+	$(CC) -g -O2 $(GL_CFLAGS) -c $< -o $@
 
 bin/sdlthread-test$(EXEEXT): src/software/sdl-thread.c src/sdl-misc.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL -DTRIBUF_LOCKING \

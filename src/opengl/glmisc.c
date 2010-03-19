@@ -58,7 +58,7 @@ GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, cons
 {
 	GLhandleARB vert=0, frag=0;
 
-	if(!GLEW_ARB_shading_language_100) return 0;
+	if(!GLEE_ARB_shading_language_100) return 0;
 
 	if(vert_shader != NULL) {
 		vert = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);

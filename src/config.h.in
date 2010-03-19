@@ -97,6 +97,9 @@
 #endif
 
 
+/* Define if we should use system GLee */
+#undef USE_SYSTEM_GLEE
+
 /* Define to 1 if on MINIX. */
 #undef _MINIX
 
