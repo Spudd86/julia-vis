@@ -144,7 +144,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 		glPopAttrib();
 	}
 
-	if(show_mandel) render_mandel(pd); //TODO: enable click to change target
+	if(show_mandel) render_mandel(pd); //TODO: enable click to change c
 
 	//TODO: figure out what attrib to push to save color
 	if(debug_pal || debug_maxsrc) { glPushAttrib(GL_TEXTURE_BIT); if(packed_intesity_pixels) glColor3f(1.0f, 0.0f, 0.0f); }
@@ -168,8 +168,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	}
 	if(debug_pal || debug_maxsrc) { glPopAttrib(); if(packed_intesity_pixels) glColor3f(1.0f, 1.0f, 1.0f); }
 
-	if(show_fps_hist) {
-		glMatrixMode(GL_MODELVIEW);
+	if(show_fps_hist) { DEBUG_CHECK_GL_ERR;
 		glPushMatrix();
 		glScalef(0.25, 0.25, 1);
 		glTranslatef(-3, 3, 0);
@@ -190,7 +189,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 		char buf[64];
 		sprintf(buf,"%6.1f FPS %6.1f\n", FPS_HIST_LEN*1000.0f/totframetime, maxfrms*1000.0f/(now-tick0));
 		glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));
-		draw_string(buf);
+		draw_string(buf); DEBUG_CHECK_GL_ERR;
 	}
 	swap_buffers(); CHECK_GL_ERR;
 
