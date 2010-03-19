@@ -19,8 +19,8 @@ static pa_stream *stream = NULL;
 static void quit(int ret) { mainloop_api->quit(mainloop_api, ret); }
 //static void quit(int ret) { pa_threaded_mainloop_stop(pulse_ml); pa_threaded_mainloop_free(pulse_ml); }
 
+void pulse_shutdown(void) {
 
-void pulse_shutdown() {
 	quit(0);
 }
 

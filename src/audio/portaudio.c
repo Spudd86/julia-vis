@@ -63,7 +63,7 @@ error:
 	return -1;
 }
 
-void audio_stop_pa()
+void audio_stop_pa(void)
 {
 	PaError err;
 	err = Pa_StopStream( stream ); if( err != paNoError ) goto error;
