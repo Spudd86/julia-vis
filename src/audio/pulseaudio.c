@@ -5,7 +5,6 @@
 #include "audio.h"
 #include "audio-private.h"
 
-//TODO: make this whole thing suck less
 #include <pulse/pulseaudio.h>
 
 static pa_threaded_mainloop *pulse_ml = NULL;
