@@ -5,9 +5,15 @@
 #include "pixmisc.h"
 #include <mm_malloc.h>
 
-static uint16_t *setup_point(int w, int h)
+typedef struct {
+	uint16_t *restrict data;
+	uint16_t w,h;
+} MxSurf;
+
+static void point_init(MxSurf *res, int w, int h)
 {
-	uint16_t *buf = malloc((w+1) * (h+1) * sizeof(uint16_t));
+	res->w = w; res->h = h;
+	uint16_t *buf = xmalloc((w+1) * (h+1) * sizeof(uint16_t));
 	memset(buf, 0, (w+1)*(h+1)*sizeof(uint16_t));
 	int stride = w+1;
 	for(int y=0; y < h; y++)  {
@@ -16,43 +22,57 @@ static uint16_t *setup_point(int w, int h)
 			buf[y*stride + x] = (uint16_t)(expf(-4.5f*(u*u+v*v))*(UINT16_MAX));
 		}
 	}
-	return buf;
+
+	res->data = buf;
+	return res;
 }
 
+static void *buf = NULL;
 static uint16_t *prev_src;
 static uint16_t *next_src;
-static uint16_t *point_src;
-static int pnt_w, pnt_h;
 static int iw, ih;
 static int samp = 0;
 
+static MxSurf _pnt_src_;
+static MxSurf *pnt_src = &_pnt_src_;
+
 void maxsrc_setup(int w, int h)
 {
-	pnt_w = IMAX(w/24, 8);
-	pnt_h = IMAX(h/24, 8);
 	iw = w; ih = h;
 	samp = IMIN(IMAX(iw,ih)/2, 1023);
 	printf("maxsrc using %i points\n", samp);
 
-	point_src = setup_point(pnt_w, pnt_h);
+	point_init(pnt_src, IMAX(w/24, 8), IMAX(h/24, 8));
 
 #ifdef HAVE_MMAP
 	// use mmap here since it'll give us a nice page aligned chunk (malloc will probably be using it anyway...)
-	prev_src = mmap(NULL, 2 * w * h * sizeof(uint16_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, 0, 0);
+	prev_src = buf = mmap(NULL, 2 * w * h * sizeof(uint16_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, 0, 0);
 #else
-	prev_src = _mm_malloc(2 * w * h * sizeof(uint16_t), 32);
+	prev_src = buf = _mm_malloc(2 * w * h * sizeof(uint16_t), 32);
 #endif
 	memset(prev_src, 0, 2*w*h*sizeof(uint16_t));
 	next_src = prev_src + w*h;
+}
+
+void maxsrc_shutdown(void)
+{
+#ifdef HAVE_MMAP
+	munmap(buf, 2 * iw * ih * sizeof(uint16_t));
+#else
+	_mm_free(buf);
+#endif
+	free((void*)pnt_src->data); free(pnt_src); pnt_src = NULL;
+	next_src = prev_src = buf = NULL;
+	iw = ih = samp = 0;
 }
 
 #define COORD_S (8)
 #define COORD_R (256)
 #define COORD_M (COORD_R-1)
 
-static void draw_point(void *restrict dest, float px, float py)
+static void draw_point(void *restrict dest, const MxSurf *pnt_src, float px, float py)
 {
-	int ipx = lrintf(px*256), ipy = lrintf(py*256);
+	const int ipx = lrintf(px*256), ipy = lrintf(py*256);
 	uint yf = ipy&0xff, xf = ipx&0xff;
 	uint a00 = (yf*xf);
 	uint a01 = (yf*(255-xf));
@@ -62,10 +82,12 @@ static void draw_point(void *restrict dest, float px, float py)
 	unsigned int off = (ipy/256)*iw + ipx/256;
 
 	uint16_t *restrict dst = dest;
-	for(int y=0; y < pnt_h; y++) {
+	const uint16_t *restrict src = pnt_src->data;
+	const int pnt_w = pnt_src->w;
+	for(int y=0; y < pnt_src->h; y++) {
 		for(int x=0; x < pnt_w; x++) {
-			uint16_t res = (point_src[(pnt_w+1)*y+x]*a00 + point_src[(pnt_w+1)*y+x+1]*a01
-					+ point_src[(pnt_w+1)*(y+1)+x]*a10   + point_src[(pnt_w+1)*(y+1)+x+1]*a11)>>16;
+			uint16_t res = (src[(pnt_w+1)*y+x]*a00 + src[(pnt_w+1)*y+x+1]*a01
+					+ src[(pnt_w+1)*(y+1)+x]*a10   + src[(pnt_w+1)*(y+1)+x+1]*a11)>>16;
 			dst[off+iw*y+x] = IMAX(res, dst[off+iw*y+x]);
 		}
 	}
@@ -214,9 +236,9 @@ void maxsrc_update(void)
 		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
 		float zvd = 0.75f/(z+2);
 
-		float xi = x*zvd*iw+iw/2 - pnt_w/2;
-		float yi = y*zvd*ih+ih/2 - pnt_h/2;
-		draw_point(dst, xi, yi);
+		float xi = x*zvd*iw+iw/2 - pnt_src->w/2;
+		float yi = y*zvd*ih+ih/2 - pnt_src->h/2;
+		draw_point(dst, pnt_src, xi, yi);
 	}
 	audio_finish_samples();
 	next_src = prev_src;

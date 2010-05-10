@@ -12,6 +12,7 @@ void maxblend(void *dest, void *src, int w, int h);
 
 uint16_t *maxsrc_get(void);
 void maxsrc_setup(int w, int h);
+void maxsrc_shutdown(void);
 void maxsrc_update(void);
 
 void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h);
