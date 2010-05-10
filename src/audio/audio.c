@@ -48,9 +48,9 @@ static float *do_fft(float *in)
 
 	//const float scl = 1.0f/nr_samp;
 	fft[0] = fabsf(fft_tmp[0])/nr_samp;
-	fft[nr_samp/2] = fabsf(fft_tmp[nr_samp/2])/nr_samp;
 	for(int i=1; i < nr_samp/2; i++)
 		fft[i] = sqrtf(fft_tmp[i]*fft_tmp[i] + fft_tmp[nr_samp-i]*fft_tmp[nr_samp-i])/nr_samp;
+	fft[nr_samp/2] = fabsf(fft_tmp[nr_samp/2])/nr_samp;
 
 #ifdef FFT_TRIBUF
 	tribuf_finish_write(fft_tb);
