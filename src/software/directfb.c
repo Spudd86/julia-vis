@@ -107,7 +107,7 @@ int main(int argc, char **argv)
 	else if(opts.w < 0) opts.w = opts.h;
 	else if(opts.h < 0) opts.h = opts.w;
 	im_w = IMIN(opts.w, im_w); im_h = IMIN(opts.h, im_h);
-	im_w = im_w - im_w%8; im_h = im_h - im_h%8;
+	im_w = im_w - im_w%16; im_h = im_h - im_h%16;
 
 	printf("running with %dx%d bufs\n", im_w, im_h);
 

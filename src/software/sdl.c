@@ -28,7 +28,7 @@ int main(int argc, char **argv)
 	else if(opts.quality >= 1)  map_func = soft_map;
 	if(audio_init(&opts) < 0) exit(1);
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
-	int im_w = screen->w - screen->w%16, im_h = screen->h - screen->h%8;
+	int im_w = screen->w - screen->w%16, im_h = screen->h - screen->h%16;
 	printf("running with %dx%d bufs\n", im_w, im_h);
 
 	maxsrc_setup(im_w, im_h);

@@ -74,7 +74,7 @@ int main(int argc, char **argv)
 {
 	optproc(argc, argv, &opts); if(audio_init(&opts) < 0) exit(1);
 	SDL_Surface *screen = sdl_setup(&opts, IM_SIZE);
-	im_w = screen->w - screen->w%16; im_h = screen->h - screen->h%8;
+	im_w = screen->w - screen->w%16; im_h = screen->h - screen->h%16;
 	printf("running with %dx%d bufs\n", im_w, im_h);
 
 	if(strcmp(opts.map_name, "rational") == 0) {
