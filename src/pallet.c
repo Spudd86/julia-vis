@@ -6,13 +6,21 @@
 #include "pallet.h"
 
 struct pallet_colour {
-	unsigned char r, g, b;
-	unsigned char pos;
+	uint8_t r, g, b;
+	uint8_t pos;
 };
 
 #define NUM_PALLETS 5
 static const int num_pallets = NUM_PALLETS;
 static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
+
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0},
+		{   0,   0,  64,  60},
+		{ 255, 128,  64, 137},
+		{ 255, 255, 255, 240},
+		{ 255, 255, 255, 255}
+	},
 
 	{	//  r    g    b  pos
 		{   0,  11, 138,   0},
@@ -21,14 +29,6 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 		{ 111, 230, 255, 152},
 		{ 255, 216, 111, 185},
 		{ 255, 111, 111, 240},
-		{ 255, 255, 255, 255}
-	},
-
-	{	//  r    g    b  pos
-		{   0,   0,   0,   0},
-		{   0,   0,  64,  60},
-		{ 255, 128,  64, 137},
-		{ 255, 255, 255, 240},
 		{ 255, 255, 255, 255}
 	},
 
@@ -65,12 +65,6 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 
 static uint32_t pallets32[NUM_PALLETS][256] __attribute__((aligned(16)));
 
-static uint32_t active_pal[257] __attribute__((aligned(16)));
-
-const uint32_t *get_active_pal(void) {
-	return active_pal;
-}
-
 static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, int bswap)
 {
 	int j = 0;
@@ -87,10 +81,15 @@ static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, in
 	} while(curpal[j].pos < 255);
 }
 
+static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_t *restrict next, const uint8_t *restrict prev);
+
 static int pallet_changing = 0;
 static int palpos = 0;
 static int nextpal = 0;
-static int curpal = 1;
+static int curpal = 0;
+
+static uint32_t active_pal[257] __attribute__((aligned(16)));
+
 
 void pallet_init(int bswap) {
 	for(int p=0; p < num_pallets; p++)
@@ -98,6 +97,9 @@ void pallet_init(int bswap) {
 	memcpy(active_pal, pallets32[curpal], sizeof(uint32_t)*256);
 	active_pal[256] = active_pal[255];
 }
+
+const uint32_t *get_active_pal(void) { return active_pal; }
+int get_pallet_changing(void) { return pallet_changing; }
 
 void pallet_start_switch(int next) {
 	next = next % num_pallets;
@@ -110,10 +112,24 @@ void pallet_start_switch(int next) {
 	pallet_changing = 1;
 }
 
-#ifdef HAVE_ORC
+int pallet_step(int step) {
+	if(!pallet_changing) return 0;
+	palpos += step;
+	if(palpos >=256) {
+		pallet_changing = palpos = 0;
+		curpal = nextpal;
+		memcpy(active_pal, pallets32[nextpal], 256);
+	} else
+		do_pallet_step(palpos, active_pal, (uint8_t *restrict)pallets32[nextpal], (uint8_t *restrict)pallets32[curpal]);
+
+	active_pal[256] = active_pal[255];
+	return 1;
+}
+
+#if HAVE_ORC
 //#if 0
 #include <orc/orc.h>
-static void do_pallet_step(uint32_t * restrict active_pal) { //TODO: make this take the dest buffer as a param
+static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_t *restrict next, const uint8_t *restrict prev) {
 	static OrcProgram *p = NULL;
 	OrcExecutor _ex;
 	OrcExecutor *ex = &_ex;
@@ -149,35 +165,19 @@ static void do_pallet_step(uint32_t * restrict active_pal) { //TODO: make this t
 	}
 	orc_executor_set_program (ex, p);
 	orc_executor_set_n (ex, 256*4);
-	orc_executor_set_array (ex, ORC_VAR_S1, pallets32[nextpal]);
-	orc_executor_set_array (ex, ORC_VAR_S2, pallets32[curpal]);
+	orc_executor_set_array (ex, ORC_VAR_S1, next);
+	orc_executor_set_array (ex, ORC_VAR_S2, prev);
 	orc_executor_set_array (ex, ORC_VAR_D1, active_pal);
-	orc_executor_set_param (ex, palp, palpos);
-	orc_executor_set_param (ex, vt, 255-palpos);
+	orc_executor_set_param (ex, palp, pos);
+	orc_executor_set_param (ex, vt, 255-pos);
 
 	orc_executor_run (ex);
 }
 #else
-static void do_pallet_step(uint32_t * restrict active_pal) {
-	const uint8_t *restrict next = (uint8_t *restrict)pallets32[nextpal], *restrict prev = (uint8_t *restrict)pallets32[curpal];
+static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_t *restrict next, const uint8_t *restrict prev) {
 	uint8_t *restrict d = (uint8_t *restrict)active_pal;
 	for(int i=0; i<256*4; i++)
-		d[i] = (uint8_t)((next[i]*palpos + prev[i]*(255-palpos))>>8);
+		d[i] = (uint8_t)((next[i]*pos + prev[i]*(255-pos))>>8);
 }
 #endif
-
-int get_pallet_changing(void) { return pallet_changing; }
-int pallet_step(int step) {
-	if(!pallet_changing) return 0;
-	palpos += step;
-	if(palpos >=256) {
-		pallet_changing = palpos = 0;
-		curpal = nextpal;
-		memcpy(active_pal, pallets32[nextpal], 256);
-	} else
-		do_pallet_step(active_pal);
-
-	active_pal[256] = active_pal[255];
-	return 1;
-}
 
