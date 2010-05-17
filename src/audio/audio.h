@@ -17,6 +17,8 @@ typedef struct {
 	float *hist;
 } beat_data;
 
+typedef struct beat_ctx beat_ctx;
+
 static inline float beat_gethist(beat_data *b, int band, int i) {
 	if(i < 0 || i > b->histlen || band < 0 || band >= b->bands) return 0.0f;
 	return b->hist[band*b->histlen*2 + (b->hi + b->histlen + i)%(b->histlen*2)];
@@ -28,7 +30,7 @@ static inline float beat_gethist(beat_data *b, int band, int i) {
 void beat_setup();
 int beat_get_count(void);
 void beat_get_data(beat_data *);
-void beat_update(float *fft, int fft_len);
+void beat_update(const float *restrict fft, int fft_len);
 
 int audio_init(const opt_data *);
 void audio_shutdown();
