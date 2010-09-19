@@ -24,7 +24,6 @@ static void point_init(MxSurf *res, int w, int h)
 	}
 
 	res->data = buf;
-	return res;
 }
 
 static void *buf = NULL;
@@ -105,7 +104,7 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 		float x, y;
 
 		{	const float u = -1.0f, v = v0;
-			const float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
+			const float d = 0.95f + 0.05f*hypotf(u,v);//sqrtf(u*u + v*v);
 			const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 				(u*R[0][0] + v*R[0][1]),
 				(u*R[1][0] + v*R[1][1])*d,
@@ -118,7 +117,7 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 		int y0 = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
 
 		{	const float u = -1.0f, v = v1;
-			const float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
+			const float d = 0.95f + 0.05f*hypotf(u,v);//sqrtf(u*u + v*v);
 			const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 				(u*R[0][0] + v*R[0][1]),
 				(u*R[1][0] + v*R[1][1])*d,
@@ -135,7 +134,7 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 			u1 = u1+ustep;
 
 			{	const float u = u1, v = v0;
-				const float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
+				const float d = 0.95f + 0.05f*hypotf(u,v);//sqrtf(u*u + v*v);
 				const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 					(u*R[0][0] + v*R[0][1]),
 					(u*R[1][0] + v*R[1][1])*d,
@@ -148,7 +147,7 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 			const int y1 = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
 
 			{	const float u = u1, v = v1;
-				const float d = 0.95f + 0.05f*sqrtf(u*u + v*v);
+				const float d = 0.95f + 0.05f*hypotf(u,v);//sqrtf(u*u + v*v);
 				const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 					(u*R[0][0] + v*R[0][1]),
 					(u*R[1][0] + v*R[1][1])*d,

@@ -386,7 +386,7 @@ void gl_maxsrc_update(void)
 		x=x*zvd*4/3; y=y*zvd*4/3;
 
 		const float dx=x-px, dy=y-py;
-		const float d = 1/sqrt(dx*dx + dy*dy);
+		const float d = 1/hypotf(dx, dy);
 		const float tx=dx*d*pw, ty=dy*d*pw;
 		const float nx=-dy*d*pw, ny=dx*d*ph;
 

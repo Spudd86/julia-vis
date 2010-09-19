@@ -23,7 +23,7 @@ void init_mandel()
 
 	for(int y=0; y < mandel_surf->h; y++) { // TODO: speed this up (marching squares?)
 		for(int x=0; x < mandel_surf->w; x++) {
-			double complex z0 = x*2.0f/mandel_surf->w - 1.5 + (y*2.0f/mandel_surf->h - 1)*I;
+			double complex z0 = x*2.0f/mandel_surf->w - 1.5f + (y*2.0f/mandel_surf->h - 1.0f)*I;
 			double complex z = z0;
 //			int i=0; while(cabs(z) < 2 && i < 1024) {
 			int i=0; while(sqrd(cimag(z))+sqrd(creal(z)) < 4 && i < 128) {
