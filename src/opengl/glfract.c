@@ -28,7 +28,7 @@ static const char *map_defs_list[2][5] =
 static const char *vtx_shader =
 		"void main() {\n"
 		"	gl_TexCoord[0] = gl_MultiTexCoord0;\n"
-		"	gl_TexCoord[1] = gl_MultiTexCoord0*2-1;\n"
+		"	gl_TexCoord[1] = gl_MultiTexCoord0*2.0-1.0;\n"
 		"	gl_Position = gl_Vertex;\n"
 		"}";
 
@@ -44,7 +44,7 @@ static const char *map_frag_shader =
 
 	"uniform sampler2D prev;\n"
 	"uniform sampler2D maxsrc;\n"
-	"invariant uniform vec2 c;\n"
+	"uniform vec2 c;\n"
 
 	"#ifdef MAP_SAMP\n"
 	"float smap(const in vec2 s) {\n"
@@ -112,7 +112,7 @@ static const char *map_frag_shader =
 static const char *rat_map_frag_shader = 
 	"const sampler2D prev;\n"
 	"const sampler2D maxsrc;\n"
-	"invariant uniform vec4 c;\n"
+	"uniform vec4 c;\n"
 	"#ifdef FLOAT_PACK_PIX\n"
 	FLOAT_PACK_FUNCS
 	"#else\n"

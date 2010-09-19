@@ -65,7 +65,7 @@ static void draw_palleted_NV(GLuint draw_tex)
 //TODO: write code to do this using these extensions:
 //		ATI_fragment_shader (http://www.opengl.org/registry/specs/ATI/fragment_shader.txt)
 static const char *pal_frag_mix =
-	"#version 120\n"
+	"#version 110\n"
 	FLOAT_PACK_FUNCS
 	"uniform sampler2D src;\n"
 	"uniform sampler1D pal;\n"
@@ -85,7 +85,7 @@ static const char *vtx_shader =
 	"#version 110\n"
 	"void main() {\n"
 	"	gl_TexCoord[0] = gl_MultiTexCoord0;\n"
-	"	gl_TexCoord[1] = gl_MultiTexCoord0*2-1;\n"
+	"	gl_TexCoord[1] = gl_MultiTexCoord0*2.0-1.0;\n"
 	"	gl_Position = gl_Vertex;\n"
 	"}";
 

@@ -82,7 +82,7 @@ static const char *vtx_shader =
 
 static const char *frag_src =
 	"uniform sampler2D prev;\n"
-	"invariant uniform mat2x3 R;\n"
+	"uniform mat2x3 R;\n"
 	"#ifdef FLOAT_PACK_PIX\n"
 	FLOAT_PACK_FUNCS
 	"#endif\n"
