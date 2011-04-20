@@ -28,6 +28,7 @@ ENABLE_JACK=@enable_jack@
 ENABLE_PULSE=@enable_pulseaudio@
 ENABLE_DIRECTFB=@enable_directfb@
 ENABLE_GL=@enable_opengl@
+ENABLE_EGL=@enable_egl@
 
 -include config.mk
 
@@ -59,7 +60,7 @@ else
 	CFLAGS += -fsched-stalled-insns=2 -fsched-stalled-insns-dep=2 -fvect-cost-model -ftracer
 	CFLAGS += -ffast-math  -fassociative-math -freciprocal-math -fno-signed-zeros
 	
-	CFLAGS += -Wl,-O1 -Wl,--sort-common -Wl,--as-needed
+	CFLAGS += -Wl,-O1,--sort-common
 endif
 
 CFLAGS += -Wl,--as-needed
@@ -74,6 +75,8 @@ SDL_FLAGS = @SDL_CFLAGS@ @SDL_LIBS@
 DFB_FLAGS = @DIRECTFB_CFLAGS@ @DIRECTFB_LIBS@
 GL_CFLAGS = @GL_CFLAGS@
 GL_LIBS = @GL_LIBS@
+EGL_CFLAGS = @EGL_CFLAGS@
+EGL_LIBS = @EGL_LIBS@
 
 ifeq (@enable_systemglee@,yes)
 GLEE = -lGLEE
@@ -84,6 +87,9 @@ endif
 ALL_BINS := bin/sdl-test$(EXEEXT) bin/sdlthread-test$(EXEEXT) bin/audio-test$(EXEEXT)
 ifeq ($(ENABLE_GL),yes) 
 	ALL_BINS += bin/gl-test$(EXEEXT)
+endif
+ifeq ($(ENABLE_EGL),yes) 
+	ALL_BINS += bin/egl-test$(EXEEXT)
 endif
 
 AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/portaudio.c 
@@ -141,6 +147,12 @@ bin/gl-test$(EXEEXT): $(GLEE) src/opengl/sdlmain.c src/opengl/glmain.c src/openg
 	src/opengl/sdlmain.c src/opengl/glmain.c src/opengl/glfract.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c \
 	src/sdl-misc.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) $(GL_CFLAGS) $(GL_LIBS) $(GLEE) -o $@
+
+bin/egl-test$(EXEEXT): $(GLEE) src/opengl/eglmain.c src/opengl/egl/xegl.c src/opengl/glmain.c src/opengl/glfract.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+	$(CC) $(CFLAGS) -DUSE_SDL -DUSE_GL \
+	src/opengl/eglmain.c src/opengl/egl/xegl.c src/opengl/glfract.c src/opengl/glmain.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glpallet.c src/opengl/mandelbrot.c src/opengl/glmap.c \
+	$(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
+	$(EGL_CFLAGS) $(EGL_LIBS) $(AUDIO_FLAGS) $(GL_CFLAGS) $(GL_LIBS) $(GLEE) -o $@
 
 src/opengl/GLee/GLee.o: src/opengl/GLee/GLee.c
 	$(CC) -g -O2 $(GL_CFLAGS) -c $< -o $@

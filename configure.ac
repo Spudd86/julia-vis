@@ -99,6 +99,22 @@ fi
 AC_SUBST(GL_CFLAGS)
 AC_SUBST(GL_LIBS)
 
+if test "x$enable_opengl" = xyes; then
+	AC_ARG_ENABLE([egl], AS_HELP_STRING([--disable-egl], [enable egl based versions (default: enabled)]))
+	if test "x$enable_egl" = xno; then
+		enable_egl=yes
+	fi
+	AC_SUBST(enable_egl)
+	
+	if test "x$enable_egl" = xyes; then
+		PKG_CHECK_MODULES([EGL], [egl],
+		    [AC_DEFINE([HAVE_EGL], [1], [Define if we have egl])],
+		    [AC_MSG_FAILURE([--enable-egl was given, but test for egl failed (old egl?)])])
+	fi
+	AC_SUBST(EGL_CFLAGS)
+	AC_SUBST(EGL_LIBS)
+fi
+
 AC_ARG_ENABLE([systemglee], AS_HELP_STRING([--enable-system-glee], [enable system copy of glee (default: disabled)]))
 if test "x$enable_systemglee" = xyes; then
 	AC_DEFINE([USE_SYSTEM_GLEE], [1], [Define if we should use system GLee])
