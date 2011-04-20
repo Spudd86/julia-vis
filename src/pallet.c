@@ -109,6 +109,7 @@ struct pal_ctx *pal_ctx_new(void)
 
 const uint32_t *pal_ctx_get_active(struct pal_ctx *self) { return self->active_pal; }
 int pal_ctx_changing(struct pal_ctx *self) { return self->pallet_changing; }
+float pal_ctx_get_pos(struct pal_ctx *self) { return self->palpos*(1.0f/256); }
 
 void pal_ctx_start_switch(struct pal_ctx *self, int next) {
 	if(next<0) return;
@@ -152,6 +153,12 @@ int get_pallet_changing(void) { return glbl_ctx.pallet_changing; }
 void pallet_start_switch(int next) { pal_ctx_start_switch(&glbl_ctx, next); }
 int pallet_step(int step) { return pal_ctx_step(&glbl_ctx, step); }
 
+int pallet_num_pal(void) { return num_pallets; }
+uint32_t *pallet_get_pal(int pal) { if(pal >= 0 && pal < num_pallets) return pallets32[pal]; else return NULL; }
+float pallet_get_pos(void) { return pal_ctx_get_pos(&glbl_ctx); } 
+int pallet_get_curpal(void) { return glbl_ctx.curpal; }
+int pallet_get_nextpal(void) { return glbl_ctx.nextpal; }
+
 
 #if HAVE_ORC
 //#if 0
@@ -164,7 +171,7 @@ static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_
 
 	if (p == NULL) {
 		p = orc_program_new_dss(1,1,1);
-#ifndef __MMX__ // some of the orc stuff used below doesn't work off x86
+#ifndef 1 // some of the orc stuff used below doesn't work on arm... (works on altivec/x86)
 		palp = orc_program_add_parameter(p, 1, "palpos");
 		vt = orc_program_add_parameter(p, 1, "vt");
 

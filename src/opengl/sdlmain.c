@@ -5,10 +5,14 @@
 
 #include "common.h"
 
+#include "sdl-misc.h"
+
 #include <SDL.h>
 
-#include "sdl-misc.h"
 #include "glmisc.h"
+#include <GL/glx.h>
+#include <GL/glxext.h>
+
 #include "audio/audio.h"
 
 int main(int argc, char **argv)

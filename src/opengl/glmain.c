@@ -5,12 +5,16 @@
 
 #include "common.h"
 #include "points.h"
-#include "sdl-misc.h"
 #include "glmisc.h"
 #include "glmaxsrc.h"
 #include "pallet.h"
 #include "audio/audio.h"
 #include "glpallet.h"
+
+/* TODO:
+ *  - rewrite pallet handling so that in GLSL mode we can just let it look
+ *     after switching/position and skip the mixing work and active pallet 
+ */
 
 void init_mandel();
 void render_mandel(struct point_data *pd);
@@ -102,12 +106,12 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	glEnable(GL_TEXTURE_2D); CHECK_GL_ERR;
 
 	init_mandel(); CHECK_GL_ERR;
-
+/*
 	draw_string("Done\n"); swap_buffers(); CHECK_GL_ERR;
 	if(GLEE_ARB_shading_language_100 && !force_fixed) {
 		draw_string("Compiling Shaders..."); swap_buffers();
 	}
-	CHECK_GL_ERR;
+	CHECK_GL_ERR; /* */
 	fractal_init(opts, im_w, im_h, force_fixed, packed_intesity_pixels); CHECK_GL_ERR;
 	gl_maxsrc_init(IMAX(im_w>>res_boost, 128), IMAX(im_h>>res_boost, 128), packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
 	pal_init(im_w, im_h, packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
@@ -147,7 +151,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	if(show_mandel) render_mandel(pd); //TODO: enable click to change c
 
 	//TODO: figure out what attrib to push to save color
-	if(debug_pal || debug_maxsrc) { glPushAttrib(GL_TEXTURE_BIT); if(packed_intesity_pixels) glColor3f(1.0f, 0.0f, 0.0f); }
+	if(debug_pal || debug_maxsrc) { glPushAttrib(GL_TEXTURE_BIT); if(packed_intesity_pixels) glColor3f(1.0f, 1.0f, 1.0f); }
 	if(debug_pal) {
 		glBindTexture(GL_TEXTURE_2D, fract_get_tex());
 		glBegin(GL_QUADS);

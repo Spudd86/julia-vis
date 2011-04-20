@@ -44,7 +44,7 @@ static const char *pnt_vtx_shader =
 	"void main() {\n"
 	"#ifdef FLOAT_PACK_PIX\n"
 #ifdef USE_MIRRORED_REPEAT
-	"	gl_TexCoord[0] = gl_MultiTexCoord0-1;\n"
+	"	gl_TexCoord[0] = gl_MultiTexCoord0 - 1;\n"
 #else
 	"	gl_TexCoord[0] = gl_MultiTexCoord0*2-1;\n"
 #endif
@@ -57,9 +57,11 @@ static const char *pnt_vtx_shader =
 static const char *pnt_shader_src =
 	"#ifdef FLOAT_PACK_PIX\n"
 	"#define uv2flt(uv) 0.5f*(log2(dot((uv),(uv))+1))\n"
+	//FLOAT_PACK_FUNCS
 	"void main() {\n"
 	"	vec2 uv = gl_TexCoord[0].st;\n"
 	"	gl_FragColor = vec4(clamp(exp(-4.5f*uv2flt(uv)), 0.0, 1.0-1.0/255.0), 0.0,0.0,0.0);\n"
+	//"	gl_FragColor = encode(clamp(exp(-4.5f*uv2flt(uv)), 0.0, 1.0-1.0/255.0));\n"
 	"}\n"
 	"#else\n"
 	"uniform sampler2D tex;\n"
@@ -85,6 +87,8 @@ static const char *frag_src =
 	"uniform mat2x3 R;\n"
 	"#ifdef FLOAT_PACK_PIX\n"
 	FLOAT_PACK_FUNCS
+	"#else\n"
+	"#define encode(X) vec4(X)\n#define decode(X) (X)\n"
 	"#endif\n"
 	"void main() {\n"
 	"	vec3 p;\n"
@@ -94,9 +98,10 @@ static const char *frag_src =
 	"		t.yz = vec2(0.95f*0.5f + (0.05f*0.5f)*length(uv));\n"
 	"		p = (uv.x*R[0] + uv.y*R[1])*t;\n"
 	"	}\n"
-	"#ifdef FLOAT_PACK_PIX\n"
+	"#ifdef FLOAT_PACK_PIX\n" //TODO: use this formula whenver we have extra prescision in the FBO
 	"	gl_FragColor = encode(decode(texture2D(prev, p*R + 0.5f))*0.978f);\n"
 	"#else\n"
+	//"	gl_FragColor.r = texture2D(prev, p*R + 0.5f).r*0.978f;\n"
 	"	vec4 c = texture2D(prev, p*R + 0.5f);\n"
 	"	gl_FragColor = vec4(c.x - max(2/256.0f, c.x*(1.0f/100)));\n"
 //	"	const vec4 c = texture2D(prev, p*R + 0.5f);\n"
@@ -154,6 +159,7 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 	iw=width, ih=height;
 	pw = 0.5f*fmaxf(1.0f/24, 8.0f/iw), ph = 0.5f*fmaxf(1.0f/24, 8.0f/ih);
 	samp = (int)fminf(fminf(iw/2,ih/2), 128);
+	//samp = 16;
 
 	printf("maxsrc using %i points\n", samp);
 	if(!force_fixed) {
@@ -173,13 +179,22 @@ void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLb
 	if(!use_glsl)
 		fixed_map = map_new(24, fixed_map_cb);
 
+	if(GLEE_ARB_texture_rg) {
+		printf("glmaxsrc: using R textures\n");
+	}
+
+
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 
 	glGenFramebuffersEXT(1, &max_fbo);
 	glGenTextures(2, fbo_tex);
 	for(int i=0; i<2; i++) {
 		glBindTexture(GL_TEXTURE_2D, fbo_tex[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		if(GLEE_ARB_texture_rg) { //TODO: use RG8 if we're doing float pack stuff
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		} else {
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		}
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

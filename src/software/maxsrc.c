@@ -38,7 +38,7 @@ static MxSurf *pnt_src = &_pnt_src_;
 void maxsrc_setup(int w, int h)
 {
 	iw = w; ih = h;
-	samp = IMIN(IMAX(iw,ih)/2, 1023);
+	samp = IMIN(IMAX(iw,ih), 1023);
 	printf("maxsrc using %i points\n", samp);
 
 	point_init(pnt_src, IMAX(w/24, 8), IMAX(h/24, 8));
@@ -72,11 +72,12 @@ void maxsrc_shutdown(void)
 static void draw_point(void *restrict dest, const MxSurf *pnt_src, float px, float py)
 {
 	const int ipx = lrintf(px*256), ipy = lrintf(py*256);
+	//const int ipx = (int)truncf(px*256), ipy = (int)truncf(py*256); // want to round towards zero
 	uint yf = ipy&0xff, xf = ipx&0xff;
 	uint a00 = (yf*xf);
-	uint a01 = (yf*(255-xf));
-	uint a10 = ((255-yf)*xf);
-	uint a11 = ((255-yf)*(255-xf));
+	uint a01 = (yf*(256-xf));
+	uint a10 = ((256-yf)*xf);
+	uint a11 = ((256-yf)*(256-xf));
 
 	unsigned int off = (ipy/256)*iw + ipx/256;
 
@@ -92,7 +93,7 @@ static void draw_point(void *restrict dest, const MxSurf *pnt_src, float px, flo
 	}
 }
 
-#define BLOCK_SIZE 16
+#define BLOCK_SIZE 8
 
 static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, float R[3][3])
 {

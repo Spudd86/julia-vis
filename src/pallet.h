@@ -12,4 +12,7 @@ int pallet_step(int step);
 void pallet_start_switch(int nextpal);
 int get_pallet_changing(void);
 
+int pallet_num_pal(void);
+uint32_t *pallet_get_pal(int pal);
+
 #endif /* include guard */

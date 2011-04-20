@@ -31,6 +31,51 @@ static const char *vtx_shader =
 		"	gl_TexCoord[1] = gl_MultiTexCoord0*2.0-1.0;\n"
 		"	gl_Position = gl_Vertex;\n"
 		"}";
+/*
+// mandelbox http://sites.google.com/site/mandelbox/what-is-a-mandelbox
+static const char *map_frag_shader =
+	"uniform sampler2D prev;\n"
+	"uniform sampler2D maxsrc;\n"
+	"uniform vec2 c;\n"
+	
+	"vec2 boxFold(in vec2 v) {\n"
+	"	if(v.x > 1) v.x = 2-v.x;\n"
+	"	else if(v.x < -1) v.x = -2-v.x;\n"
+	"	if(v.y > 1) v.y = 2-v.y;\n"
+	"	else if(v.y < -1) v.y = -2-v.y;\n"
+	"	return v;\n"
+	"}\n"
+	
+	"vec2 ballFold(in float r, in vec2 v) {\n"
+	"	float m = length(v);\n"
+	"	if(m < r) v = v/(r*r);\n"
+	"	else if(m<1) v = v/(m*m);\n"
+	"	return v;\n"
+	"}\n"
+	
+//	"#define encode(X) vec4(X)\n#define decode(X) (X).x\n"
+	"#define encode(X) (X)\n#define decode(X) (X)\n"
+	
+	"void main() {\n"
+	"	vec2 t = (gl_TexCoord[0].st-0.5)*10;\n" //(pd->p[0]-0.5f)*0.25f + 0.5f, pd->p[1]*0.25f + 0.5f
+//	"	vec2 v = 1*ballFold(0.5, 2*boxFold(t)) + (c*4+vec2(-1.5, -2.0))*2;\n"
+	"	vec2 v = 2.0*ballFold(0.5, 0.5*boxFold(t)) + (c*4+vec2(-1.5, -2.0))*2;\n"
+	"	gl_FragData[0] = encode(max(\n"
+	"			decode( texture2D(prev, v/10 + 0.5)*(253/256.0f) ),\n"
+	"			decode( texture2D(maxsrc, gl_TexCoord[0].st) )\n"
+	"	));\n"
+	"}\n";
+	
+/*
+  v = s*ballFold(r, f*boxFold(v)) + c
+where boxFold(v) means for each axis a:
+  if v[a]>1          v[a] =  2-v[a]
+  else if v[a]<-1 v[a] =-2-v[a]
+and ballFold(r, v) means for v's magnitude m:
+  if m<r         m = m/r^2
+  else if m<1 m = 1/m^2
+*/
+
 
 static const char *map_frag_shader =
 	"#ifdef FLOAT_PACK_PIX\n"
@@ -77,16 +122,6 @@ static const char *map_frag_shader =
 	"			smap(gl_TexCoord[1].st-0.288f*dx-0.500f*dy) +\n"
 	"			smap(gl_TexCoord[1].st-0.429f*dx-0.288f*dy) +\n"
 	"			smap(gl_TexCoord[1].st+0.143f*dx-0.429f*dy) );\n"
-//	"	const float dx = dFdx(gl_TexCoord[1].s);\n"
-//	"	const float r = (253.0f/(8*256.0f))*(\n"
-//	"			smap(gl_TexCoord[1].st+vec2(-0.500f,+0.143f)*dx) +\n"
-//	"			smap(gl_TexCoord[1].st+vec2(+0.288f,+0.500f)*dx) +\n"
-//	"			smap(gl_TexCoord[1].st+vec2(+0.429f,+0.288f)*dx) +\n"
-//	"			smap(gl_TexCoord[1].st+vec2(-0.143f,+0.429f)*dx) +\n"
-//	"			smap(gl_TexCoord[1].st+vec2(+0.500f,-0.143f)*dx) +\n"
-//	"			smap(gl_TexCoord[1].st+vec2(-0.288f,-0.500f)*dx) +\n"
-//	"			smap(gl_TexCoord[1].st+vec2(-0.429f,-0.288f)*dx) +\n"
-//	"			smap(gl_TexCoord[1].st+vec2(+0.143f,-0.429f)*dx) );\n"
 	"#elif MAP_SAMP == 9\n"
 	"	vec2 dx = dFdx(gl_TexCoord[1].st)*0.5f; vec2 dy = dFdy(gl_TexCoord[1].st)*0.5f;\n"
 	"	float r = (253.0f/(9*256.0f))*(smap(gl_TexCoord[1].st) + \n"
@@ -95,7 +130,6 @@ static const char *map_frag_shader =
 	"			smap(gl_TexCoord[1].st+dy+dx) + smap(gl_TexCoord[1].st+dy-dx) +\n"
 	"			smap(gl_TexCoord[1].st-dx-dy) + smap(gl_TexCoord[1].st-dy+dx) );\n"
 	"#endif\n"
-//	"	gl_FragData[0] = r;\n"
 	"	gl_FragData[0] = encode(r);\n"
 //	"	gl_FragData[0] = encode(max(decode(r), decode(texture2D(maxsrc, gl_TexCoord[0].st))));\n"
 	"}\n"
@@ -108,10 +142,10 @@ static const char *map_frag_shader =
 	"	));\n"
 	"}\n"
 	"#endif\n";
-	
+/**/
 static const char *rat_map_frag_shader = 
-	"const sampler2D prev;\n"
-	"const sampler2D maxsrc;\n"
+	"uniform sampler2D prev;\n"
+	"uniform sampler2D maxsrc;\n"
 	"uniform vec4 c;\n"
 	"#ifdef FLOAT_PACK_PIX\n"
 	FLOAT_PACK_FUNCS
@@ -285,25 +319,6 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 
 //	glHint(GL_FRAGMENT_SHADER_DERIVATIVE_HINT_ARB, GL_NICEST);
 
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
-	glGenFramebuffersEXT(1, &fbo);
-	glGenTextures(NUM_FBO_TEX, fbo_tex);
-	for(int i=0; i<NUM_FBO_TEX; i++) {
-		glBindTexture(GL_TEXTURE_2D, fbo_tex[i]);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, im_w, im_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-		static float foo[] = {0.0f, 0.0f, 0.0f };
-		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, foo);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	}
-	glPopClientAttrib();
-	glPopAttrib();
-	CHECK_GL_ERR;
-
 	if(!force_fixed) {
 		printf("Compiling map shader:\n");
 		int quality = MIN(opts->quality, 4);
@@ -334,5 +349,38 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 		else
 			fixed_map = map_new(127, rat_map_cb);
 	}
+	CHECK_GL_ERR;
+	
+	if(GLEE_ARB_texture_rg) {
+		printf("glfract: using R textures\n");
+	}
+	
+	glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+	glGenFramebuffersEXT(1, &fbo);
+	glGenTextures(NUM_FBO_TEX, fbo_tex);
+	for(int i=0; i<NUM_FBO_TEX; i++) {
+		glBindTexture(GL_TEXTURE_2D, fbo_tex[i]);
+		
+		if(GLEE_ARB_texture_rg) { //TODO: use RG8 if we're doing float pack stuff
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, im_w, im_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		} else {
+		//if(map_prog && !packed_intesity_pixels && GLEE_ARB_half_float_pixel)
+		//	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, im_w, im_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		//else	
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, im_w, im_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+		}
+
+		CHECK_GL_ERR;
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		static float foo[] = {0.0f, 0.0f, 0.0f };
+		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, foo);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	}
+	glPopClientAttrib();
+	glPopAttrib();
 	CHECK_GL_ERR;
 }

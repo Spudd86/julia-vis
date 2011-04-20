@@ -76,14 +76,21 @@ void draw_string(const char *str);
 		"// TODO: figure out fastest way to make this do what we want on non ati...\n"\
 		"//	vec3 enc = vec3(1.0, 255.0, 65025.0) * clamp(v, 0.0, 1.0);\n"\
 		"//	vec3 enc = vec3(1.0, 255.0, 65025.0) * v;\n"\
-		"//	enc = fract(enc);\n"\
-		"	vec3 enc = fract(vec3(1.0, 255.0, 65025.0) * v);\n"\
-		"	enc -= enc.yzz * vec3(1.0/255.0,1.0/255.0,1.0/255);\n"\
-		"	return vec4(enc, 0.0);\n"\
+		"//	enc = enc - floor(enc);\n"\
+		\
+		"//	vec3 enc = fract(vec3(1.0, 255.0, 65025.0) * v);\n"\
+		"//	enc -= enc.yzz * vec3(1.0/255.0,1.0/255.0,1.0/255.0);\n"\
+		"//	return vec4(enc, 0.0);\n"\
+		\
+		"	vec2 enc = fract(vec2(1.0, 255.0) * v);\n"\
+		"	enc -= enc.yy * vec2(1.0/255.0,1.0/255.0);\n"\
+		"	return vec4(enc, 0.0, 1.0);\n"\
 		"}\n"\
 		"float decode(vec4 rgba ) {\n"\
 		"//	return clamp(dot(rgba.xyz, vec3(1.0, 1/255.0, 1/65025.0) ), 0.0, 1.0);\n"\
-		"	return dot(rgba.xyz, vec3(1.0, 1/255.0, 1/65025.0) );\n"\
+		"	return dot(rgba.xyz, vec3(1.0, 1.0/255.0, 1.0/65025.0) );\n"\
+		"//	return dot(rgba.xy, vec2(1.0, 1.0/255.0) );\n"\
+		"//	return rgba.x;\n"\
 		"}\n"
 
 #endif /* include guard */
