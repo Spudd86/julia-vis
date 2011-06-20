@@ -32,9 +32,11 @@
 #define USEC 1
 
 #if USEC
-#define BASE_SLACK 1500
+#define BASE_SLACK 500
+#define MIN_SLACK 2000
 #else
-#define BASE_SLACK 2
+#define BASE_SLACK 1
+#define MIN_SLACK 2
 #endif
 
 struct fps_data {
@@ -104,7 +106,7 @@ static void init(struct fps_data *self, struct fps_period freq, uint64_t init_ms
 
 struct fps_data *fps_data_new(struct fps_period rate, uint64_t init_msc, uint64_t now)
 {
-	struct fps_data *self = malloc(sizeof(*self));
+	struct fps_data *self = calloc(1,sizeof(*self));//malloc(sizeof(*self));
 	printf("1 fps_data %p\n", self);
 	if(!self) return NULL;
 	init(self, rate, init_msc, now);
@@ -147,7 +149,13 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	int varience = (self->work_powsumavg_n - self->totworktime*(int64_t)(self->totworktime/WORK_HIST_LEN))/WORK_HIST_LEN;
 	int wktime_stdev = (int)isqrt(varience);
 	
-	self->slack = wktime_stdev + BASE_SLACK;
+	//TODO: need to have some way to profile what value slack and delay have!
+	// ideally with a graph we can overly on top of whatever
+	// also would like to track when we miss a swap deadline, again profile, 
+	// possibly something like the audio-test does with beats
+	// maybe even show on a worktime graph a line where we think we'll end up 
+	// missing a deadline if we go over it
+	self->slack = MAX(wktime_stdev + BASE_SLACK, MIN_SLACK);
 	//printf("powsum %d varience %d stdev %d\n", self->work_powsumavg_n/WORK_HIST_LEN, varience, wktime_stdev);
 #endif
 	// compute our target value of 'now'

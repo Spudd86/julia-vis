@@ -35,6 +35,9 @@ static struct point_data *pd = NULL;
 static const opt_data *opts = NULL;
 static int totframetime = 0;
 static int frametimes[FPS_HIST_LEN];
+static int totworktime = 0;
+static int worktimes[FPS_HIST_LEN];
+
 static uint64_t tick0 = 0;
 
 void fractal_init(const opt_data *opts, int width, int height, GLboolean force_fixed, GLboolean packed_intesity_pixels);
@@ -68,6 +71,7 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	setup_viewport(scr_w, scr_h); CHECK_GL_ERR;
 	glHint(GL_CLIP_VOLUME_CLIPPING_HINT_EXT, GL_FASTEST); CHECK_GL_ERR;
 	glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST); CHECK_GL_ERR;
+	glEnable(GL_LINE_SMOOTH); CHECK_GL_ERR;
 
 	glClear(GL_COLOR_BUFFER_BIT); CHECK_GL_ERR;
 	glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));
@@ -119,6 +123,8 @@ void init_gl(const opt_data *opt_data, int width, int height)
 
 	memset(frametimes, 0, sizeof(frametimes));
 	totframetime = frametimes[0] = MIN(10000000/opts->draw_rate, 1);
+	memset(worktimes, 0, sizeof(worktimes));
+	totworktime = worktimes[0] = MIN(10000000/opts->draw_rate, 1);
 	tick0 = uget_ticks();
 }
 
@@ -128,10 +134,10 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	static uint32_t maxfrms = 0;
 	static uint32_t last_beat_time = 0, lastpalstep = 0, fps_oldtime = 0;
 	static int beats = 0;
-	static uint64_t now = 0;
+	static uint64_t now = 0, workstart = 0;
 	
 	//TODO: move this up to top
-	now = uget_ticks();
+	workstart = now = uget_ticks();
 	int delay =  (tick0 + (uint64_t)cnt*1000000/opts->draw_rate) - now;
 	if(delay > 0) udodelay(delay);
 
@@ -179,16 +185,27 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 
 	if(show_fps_hist) { DEBUG_CHECK_GL_ERR;
 		glPushMatrix();
-		glScalef(0.25, 0.25, 1);
-		glTranslatef(-4, 3, 0);
+		glScalef(0.5, 0.25, 1);
+		glTranslatef(-2, 3, 0);
 		draw_hist_array(cnt, totframetime, frametimes, FPS_HIST_LEN);
-		glColor3f(1.0f, 1.0f, 1.0f);
 		glPopMatrix();
-		char buf[64];
+		glPushMatrix();
+		glScalef(0.5, 0.25, 1);
+		glTranslatef(0, 3, 0);
+		draw_hist_array(cnt, totworktime, worktimes, FPS_HIST_LEN);
+		glPopMatrix();
+		glColor3f(1.0f, 1.0f, 1.0f);
+		char buf[128];
 		sprintf(buf,"%6.1f FPS %6.1f\n", FPS_HIST_LEN*1000000.0f/totframetime, maxfrms*1000000.0f/(now-tick0));
-		glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));
+		//glRasterPos2f(-1,1 - 50.0f/(scr_h*0.5f));
+		glRasterPos2f(-1,0.75-20.0f/(scr_h*0.5f));
+		//glRasterPos2f(0,0);
+		draw_string(buf); DEBUG_CHECK_GL_ERR;
+		sprintf(buf,"%7.1fns frametime\n%7.1fns worktime\n", totframetime/((float)FPS_HIST_LEN), totworktime/((float)FPS_HIST_LEN));
 		draw_string(buf); DEBUG_CHECK_GL_ERR;
 	}
+	// TODO: figure out if needing this here is a bug, without it some of the debug stuff doesn't show
+	glFlush();
 	swap_buffers(); CHECK_GL_ERR;
 
 	now = uget_ticks();
@@ -212,6 +229,9 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	totframetime -= frametimes[cnt%FPS_HIST_LEN];
 	totframetime += (frametimes[cnt%FPS_HIST_LEN] = now - fps_oldtime);
 	fps_oldtime = now;
+	
+	totworktime -= worktimes[cnt%FPS_HIST_LEN];
+	totworktime += (worktimes[cnt%FPS_HIST_LEN] = now - workstart);
 
 	cnt++;
 }

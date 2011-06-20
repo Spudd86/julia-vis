@@ -146,11 +146,11 @@ void draw_hist_array(int off, int total, int *array, int len)
 
 	glColor3f(0.0f, 1.0f, 0.0f);
 	glBegin(GL_LINES);
-	for(int i=0; i<len-1;) {
+	for(int i=0; i<len-1; i++) {
 		int idx = (i + off)%len;
-		glVertex2f(((float)i)/(len-1),  4*array[idx]/(float)total);
-		i++; idx = (i + off)%len;
-		glVertex2f(((float)i)/(len-1),  4*array[idx]/(float)total);
+		glVertex2f(((float)i)/(len-1), (len/8.0f)*array[idx]/(float)total);
+		idx = (i + 1 + off)%len;
+		glVertex2f(((float)(i+1))/(len-1), (len/8.0f)*array[idx]/(float)total);
 	}
 	glEnd();
 }

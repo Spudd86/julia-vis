@@ -74,6 +74,8 @@ static Bool WaitForNotify(Display *d, XEvent *e, char *arg) {
 	return (e->type == MapNotify) && (e->xmap.window == (Window)arg);
 }
 
+static int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
+
 int main(int argc, char **argv)
 {
 	opt_data opts; optproc(argc, argv, &opts);
@@ -147,11 +149,9 @@ int main(int argc, char **argv)
     glxWin = glXCreateWindow(dpy, fbConfigs[0], xwin, NULL );
     
     XMapWindow(dpy, xwin);
-    XIfEvent(dpy, &event, WaitForNotify, (XPointer) xwin);
+    //XIfEvent(dpy, &event, WaitForNotify, (XPointer) xwin);
     
     glXMakeContextCurrent(dpy, glxWin, glxWin, context);
-	
-	init_gl(&opts, w, h);
 	
 	const GLubyte *glx_ext_str = glXQueryExtensionsString(dpy, 0);
 	
@@ -165,41 +165,41 @@ int main(int argc, char **argv)
     	glXSelectEvent(dpy, glxWin, GLX_BUFFER_SWAP_COMPLETE_INTEL_MASK);
     }
     
-    // start off buffer swapping 
-	glXSwapBuffers(dpy, glxWin);
+    init_gl(&opts, w, h);
 	
 	{ // init fps servo
 		int64_t ust, msc, sbc;
 		struct fps_period swap_period;
 		glXGetMscRateOML(dpy, glxWin, &swap_period.n, &swap_period.d);
-		glXGetSyncValuesOML(dpy, glxWin, &ust, &msc, &sbc);
 		
 		int tmp = gcd(swap_period.n, swap_period.d);
 		swap_period.n /= tmp; swap_period.d /= tmp;
+		glXGetSyncValuesOML(dpy, glxWin, &ust, &msc, &sbc);
+		glXWaitForMscOML(dpy, glxWin, msc + 1, 1, 0, &ust, &msc, &sbc);
 		fps_data = fps_data_new(swap_period, msc, uget_ticks());
 	}
 	
 	int xfd = ConnectionNumber(dpy);
 	int tfd = timerfd_create(CLOCK_MONOTONIC, 0);
-	
+
 	struct pollfd pfds[] = {
-		{xfd, POLLIN, 0 },
 		{tfd, POLLIN, 0 },
+		{xfd, POLLIN | POLLPRI, 0 },
 	};
 	
-	int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
+	arm_timer(tfd, 0);
 	
 	while(1) {
 		if(poll(pfds, 2, -1) < 0) continue;
 		
-		if(pfds[1].revents) {
+		if(pfds[0].revents) {
 			uint64_t timeouts;
 			read(tfd, &timeouts, sizeof(timeouts));			
 			//printf("Render (timeouts = %" PRId64 ")\n", timeouts);
 			render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
 		}
 		
-		if(!pfds[0].revents) continue;
+		//if(!pfds[1].revents) continue;
 	
 		int clear_key = 1;
 		while (XPending(dpy) > 0) 
@@ -216,8 +216,9 @@ int main(int argc, char **argv)
 				int delay = swap_complete(fps_data, now, swap_event->msc, swap_event->sbc);
 				
 				//printf("swap_complete: delay = %d\n", delay);
-				if(delay <= 0) render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
-				else arm_timer(tfd, now+delay); // schedual next frame
+				//if(delay <= 0) render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
+				//else 
+					arm_timer(tfd, now+delay); // schedual next frame
 				
 				continue;
 			}
