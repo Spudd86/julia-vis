@@ -137,8 +137,60 @@ void setup_viewport(int width, int height) {
 	glLoadIdentity();
 }
 
+void draw_hist_array(int off, int total, int *array, int len)
+{	
+	glColor3f(1.0f, 1.0f, 1.0f);
+	glBegin(GL_LINES);
+	glVertex2f(0, 0); glVertex2f(1, 0);
+	glEnd();
+
+	glColor3f(0.0f, 1.0f, 0.0f);
+	glBegin(GL_LINES);
+	for(int i=0; i<len-1;) {
+		int idx = (i + off)%len;
+		glVertex2f(((float)i)/(len-1),  4*array[idx]/(float)total);
+		i++; idx = (i + off)%len;
+		glVertex2f(((float)i)/(len-1),  4*array[idx]/(float)total);
+	}
+	glEnd();
+}
+
 #include "terminusIBM.h"
 
+#if TEXTURE_TEXT
+
+void draw_string(const char *str)
+{
+	static int txt_texture = 0;	
+		
+	if(!txt_texture) {
+		glPushClientAttrib( GL_CLIENT_PIXEL_STORE_BIT );
+		glPixelStorei( GL_UNPACK_SWAP_BYTES,  GL_FALSE );
+		glPixelStorei( GL_UNPACK_LSB_FIRST,   GL_FALSE );
+		glPixelStorei( GL_UNPACK_ROW_LENGTH,  0        );
+		glPixelStorei( GL_UNPACK_SKIP_ROWS,   0        );
+		glPixelStorei( GL_UNPACK_SKIP_PIXELS, 0        );
+		glPixelStorei( GL_UNPACK_ALIGNMENT,   1        );
+		
+		glPopClientAttrib();
+		CHECK_GL_ERR;
+		
+		
+		glGenTextures(1, &txt_texture);
+		uint8_t *data = malloc(sizeof(*data)*8*(16*128)); // no extended ASCII
+		
+		// unpack font into data
+		
+		free(data);
+		
+		GL_UNSIGNED_BYTE
+	}
+	
+	float pos[4];
+	glGetFloatv(GL_CURRENT_RASTER_POSITION, pos);
+}
+
+#else
 void draw_string(const char *str)
 {
 	glPushClientAttrib( GL_CLIENT_PIXEL_STORE_BIT );
@@ -179,3 +231,5 @@ void draw_string(const char *str)
 	glPopClientAttrib();
 	DEBUG_CHECK_GL_ERR;
 }
+#endif
+

@@ -43,14 +43,6 @@ PKG_CHECK_MODULES([FFTW], [fftw3f])
 AC_SUBST(FFTW_CFLAGS)
 AC_SUBST(FFTW_LIBS)
 
-PKG_CHECK_MODULES([PORTAUDIO], [portaudio-2.0])
-AC_SUBST(PORTAUDIO_CFLAGS)
-AC_SUBST(PORTAUDIO_LIBS)
-
-#PKG_CHECK_MODULES([GL], [gl])
-#AC_SUBST(GL_CFLAGS)
-#AC_SUBST(GL_LIBS)
-
 AC_ARG_ENABLE([directfb], AS_HELP_STRING([--enable-directfb], [build test-directfb (default: disabled)]))
 if test "x$enable_directfb" = xyes; then
 	PKG_CHECK_MODULES([DIRECTFB], [directfb],
@@ -61,6 +53,18 @@ fi
 AC_SUBST(DIRECTFB_CFLAGS)
 AC_SUBST(DIRECTFB_LIBS)
 AC_SUBST(enable_directfb)
+
+#TODO: default to enabled on windows
+AC_ARG_ENABLE([portaudio], AS_HELP_STRING([--enable-portaudio], [enable using portaudio for audio input (default: disabled)]))
+if test "x$enable_portaudio" = xyes; then
+PKG_CHECK_MODULES([PORTAUDIO], [portaudio-2.0],
+		[AC_DEFINE([HAVE_PORTAUDIO], [1], [Define if portaudio is enabled])],
+		[AC_MSG_FAILURE([--enable-portaudio was given, but test for portaudio failed])]
+	)
+fi
+AC_SUBST(PORTAUDIO_CFLAGS)
+AC_SUBST(PORTAUDIO_LIBS)
+AC_SUBST(enable_portaudio)
 
 AC_ARG_ENABLE([jack], AS_HELP_STRING([--enable-jack], [enable using jack for audio input (default: disabled)]))
 if test "x$enable_jack" = xyes; then
@@ -74,11 +78,28 @@ AC_SUBST(JACK_LIBS)
 AC_SUBST(enable_jack)
 
 AC_ARG_ENABLE([pulseaudio], AS_HELP_STRING([--enable-pulseaudio], [enable using pulseaudio for audio input (default: disabled)]))
-if test "x$enable_pulseaudio" = xyes; then
-	PKG_CHECK_MODULES([PULSE], [libpulse],
-		[AC_DEFINE([HAVE_PULSE], [1], [Define if pulseaudio is enabled])],
-		[AC_MSG_FAILURE([--enable-pulseaudio was given, but test for pulseaudio failed])]
-	)
+if test "x$enable_pulseaudio" != xno; then
+	PKG_CHECK_MODULES([PULSE], [libpulse],[have_pulse=yes], [have_pulse=no])
+#		[AC_DEFINE([HAVE_PULSE], [1], [Define if pulseaudio is enabled])
+#		enable_pulseaudio=yes
+#		],
+#		[
+#		if test "x$enable_pulseaudio" = xyes; then
+#			AC_MSG_FAILURE([--enable-pulseaudio was given, but test for pulseaudio failed])
+#		fi
+#		enable_pulseaudio=no
+#		]
+#	)
+fi
+
+if test "x$have_pulse" = xyes; then
+	AC_DEFINE([HAVE_PULSE], [1], [Define if pulseaudio is enabled])
+	enable_pulseaudio=yes
+else
+	if test "x$enable_pulseaudio" = xyes; then
+		AC_MSG_FAILURE([--enable-pulseaudio was given, but test for pulseaudio failed])
+	fi
+	enable_pulseaudio=no
 fi
 AC_SUBST(PULSE_CFLAGS)
 AC_SUBST(PULSE_LIBS)

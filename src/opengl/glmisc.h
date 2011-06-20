@@ -17,6 +17,10 @@
 void swap_buffers(void);
 uint32_t get_ticks(void);
 void dodelay(uint32_t ms);
+uint64_t uget_ticks(void);
+void udodelay(uint64_t us);
+
+void draw_hist_array(int off, int total, int *array, int len);
 
 void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_mandel, GLboolean show_fps_hist);
 void init_gl(const opt_data *opt_data, int width, int height);

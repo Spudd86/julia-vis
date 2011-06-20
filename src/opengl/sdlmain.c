@@ -6,13 +6,11 @@
 #include "common.h"
 
 #include "sdl-misc.h"
+#include "glmisc.h"
 
 #include <SDL.h>
 
 #include "glmisc.h"
-#include <GL/glx.h>
-#include <GL/glxext.h>
-
 #include "audio/audio.h"
 
 int main(int argc, char **argv)
@@ -50,3 +48,12 @@ uint32_t get_ticks(void) {
 void dodelay(uint32_t ms) {
 	SDL_Delay(ms);
 }
+
+uint64_t uget_ticks(void) {
+	return (uint64_t)SDL_GetTicks() * 1000;
+}
+
+void udodelay(uint64_t us) {
+	SDL_Delay(us/1000);
+}
+

@@ -26,16 +26,16 @@ static int make_pow2(int x) {
 	else return 1<<(n+1);
 }
 
-#define FPS_HIST_LEN 32
+#define FPS_HIST_LEN 64
 
 static GLboolean packed_intesity_pixels = GL_FALSE;
 static int im_w = 0, im_h = 0;
 static int scr_w = 0, scr_h = 0;
 static struct point_data *pd = NULL;
 static const opt_data *opts = NULL;
-static uint32_t totframetime = 0;
-static uint32_t frametimes[FPS_HIST_LEN];
-static uint32_t tick0 = 0;
+static int totframetime = 0;
+static int frametimes[FPS_HIST_LEN];
+static uint64_t tick0 = 0;
 
 void fractal_init(const opt_data *opts, int width, int height, GLboolean force_fixed, GLboolean packed_intesity_pixels);
 void render_fractal(struct point_data *pd);
@@ -71,7 +71,7 @@ void init_gl(const opt_data *opt_data, int width, int height)
 
 	glClear(GL_COLOR_BUFFER_BIT); CHECK_GL_ERR;
 	glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));
-	draw_string("Loading... "); swap_buffers(); CHECK_GL_ERR;
+	//draw_string("Loading... "); swap_buffers(); CHECK_GL_ERR;
 
 	printf("GL_VENDOR: %s\n", glGetString(GL_VENDOR));
 	printf("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
@@ -106,8 +106,8 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	glEnable(GL_TEXTURE_2D); CHECK_GL_ERR;
 
 	init_mandel(); CHECK_GL_ERR;
-/*
-	draw_string("Done\n"); swap_buffers(); CHECK_GL_ERR;
+
+/*	draw_string("Done\n"); swap_buffers(); CHECK_GL_ERR;
 	if(GLEE_ARB_shading_language_100 && !force_fixed) {
 		draw_string("Compiling Shaders..."); swap_buffers();
 	}
@@ -118,8 +118,8 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	pd = new_point_data(opts->rational_julia?4:2);
 
 	memset(frametimes, 0, sizeof(frametimes));
-	totframetime = frametimes[0] = MIN(1000/opts->draw_rate, 1);
-	tick0 = get_ticks();
+	totframetime = frametimes[0] = MIN(10000000/opts->draw_rate, 1);
+	tick0 = uget_ticks();
 }
 
 void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_mandel, GLboolean show_fps_hist)
@@ -128,10 +128,15 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	static uint32_t maxfrms = 0;
 	static uint32_t last_beat_time = 0, lastpalstep = 0, fps_oldtime = 0;
 	static int beats = 0;
-	static uint32_t now = 0;
+	static uint64_t now = 0;
+	
+	//TODO: move this up to top
+	now = uget_ticks();
+	int delay =  (tick0 + (uint64_t)cnt*1000000/opts->draw_rate) - now;
+	if(delay > 0) udodelay(delay);
 
 	// rate limit our maxsrc updates, but run at full frame rate if we're close the opts.maxsrc_rate to avoid choppyness
-	if((tick0-now)*opts->maxsrc_rate + (maxfrms*1000) > 1000 ) {
+	if((tick0-now)*opts->maxsrc_rate + (maxfrms*1000000) > 1000000 ) {
 //			|| (totframetime + 10*FPS_HIST_LEN > FPS_HIST_LEN*1000/opts->maxsrc_rate ) ) {
 		gl_maxsrc_update();
 		maxfrms++;
@@ -175,31 +180,20 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	if(show_fps_hist) { DEBUG_CHECK_GL_ERR;
 		glPushMatrix();
 		glScalef(0.25, 0.25, 1);
-		glTranslatef(-3, 3, 0);
-		glBegin(GL_LINES);
-		glVertex2f(-1, 0); glVertex2f(0, 0);
-		glEnd();
-		glColor3f(0.0f, 1.0f, 0.0f);
-		glBegin(GL_LINES);
-		for(int i=0; i<FPS_HIST_LEN-1; ) {
-			int idx = (i + cnt)%FPS_HIST_LEN;
-			glVertex2f(-1 + ((float)i)/(FPS_HIST_LEN-1),  4*frametimes[idx]/(float)totframetime);
-			i++;idx = (i + cnt)%FPS_HIST_LEN;
-			glVertex2f(-1 + ((float)i)/(FPS_HIST_LEN-1),  4*frametimes[idx]/(float)totframetime);
-		}
-		glEnd();
+		glTranslatef(-4, 3, 0);
+		draw_hist_array(cnt, totframetime, frametimes, FPS_HIST_LEN);
 		glColor3f(1.0f, 1.0f, 1.0f);
 		glPopMatrix();
 		char buf[64];
-		sprintf(buf,"%6.1f FPS %6.1f\n", FPS_HIST_LEN*1000.0f/totframetime, maxfrms*1000.0f/(now-tick0));
+		sprintf(buf,"%6.1f FPS %6.1f\n", FPS_HIST_LEN*1000000.0f/totframetime, maxfrms*1000000.0f/(now-tick0));
 		glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));
 		draw_string(buf); DEBUG_CHECK_GL_ERR;
 	}
 	swap_buffers(); CHECK_GL_ERR;
 
-	now = get_ticks();
-	if(now - lastpalstep >= 2048/256 && get_pallet_changing()) { // want pallet switch to take ~2 seconds
-		if(pallet_step(IMIN((now - lastpalstep)*256/2048, 32)))
+	now = uget_ticks();
+	if(now - lastpalstep >= 1000*2048/256 && get_pallet_changing()) { // want pallet switch to take ~2 seconds
+		if(pallet_step(IMIN((now - lastpalstep)*256/(2048*1000), 32)))
 			pal_pallet_changed();
 		lastpalstep = now;
 	}
@@ -207,16 +201,14 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	if(newbeat != beats) {
 		pallet_start_switch(newbeat);
 	}
-	if(newbeat != beats && now - last_beat_time > 1000) {
+	if(newbeat != beats && now - last_beat_time > 1000000) {
 		last_beat_time = now;
-		update_points(pd, (now - tick0), 1);
-	} else update_points(pd, (now - tick0), 0);
+		update_points(pd, (now - tick0)/1000, 1);
+	} else update_points(pd, (now - tick0)/1000, 0);
 	beats = newbeat;
 
-	now = get_ticks();
-	int delay =  (tick0 + cnt*1000/opts->draw_rate) - now;
-	if(delay > 0) dodelay(delay);
-	now = get_ticks();
+	
+	now = uget_ticks();
 	totframetime -= frametimes[cnt%FPS_HIST_LEN];
 	totframetime += (frametimes[cnt%FPS_HIST_LEN] = now - fps_oldtime);
 	fps_oldtime = now;

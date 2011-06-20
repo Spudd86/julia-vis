@@ -153,16 +153,20 @@ int audio_init(const opt_data *od)
 	#endif
 	#ifdef HAVE_PULSE
 		case AUDIO_PULSE:
-			rc = pulse_setup(od);
 			audio_drv_shutdown = pulse_shutdown;
+			rc = pulse_setup(od);
 			break;
 	#endif
+	#ifdef HAVE_PORTAUDIO
 		case AUDIO_PORTAUDIO:
 			rc = audio_setup_pa(od);
 			audio_drv_shutdown = audio_stop_pa;
 			break;
+	#endif
 		default:
-			rc = -1;
+			printf("No Audio driver!\n");
+			rc = audio_setup(48000);
+			//rc = -1;
 	}
 
 	if(rc < 0) printf("Audio setup failed!\n");

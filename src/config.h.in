@@ -30,6 +30,9 @@
 /* Define if we have orc */
 #undef HAVE_ORC
 
+/* Define if portaudio is enabled */
+#undef HAVE_PORTAUDIO
+
 /* Define if pulseaudio is enabled */
 #undef HAVE_PULSE
 

@@ -68,6 +68,7 @@ static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl)
 			SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1);
 		SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 		SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
+		SDL_GL_SetAttribute(SDL_GL_SWAP_CONTROL, 0);
 	} else {
 
 	}
