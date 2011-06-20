@@ -140,7 +140,7 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 {
 	// if we've run in to our slack time we need to shorten delay
 #if 1
-	int worktime = now - (self->last_swap_time + self->delay);
+	int worktime = now - (self->last_swap_time + self->delay + self->slack);
 	int oldwt = self->worktimes[self->count % WORK_HIST_LEN];
 	self->totworktime += worktime - oldwt;
 	self->work_powsumavg_n += worktime*worktime - oldwt*oldwt;
@@ -155,7 +155,7 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	// possibly something like the audio-test does with beats
 	// maybe even show on a worktime graph a line where we think we'll end up 
 	// missing a deadline if we go over it
-	self->slack = MAX(wktime_stdev*15/10 + BASE_SLACK, MIN_SLACK);
+	self->slack = MAX(wktime_stdev*2 + BASE_SLACK, MIN_SLACK);
 	//printf("powsum %d varience %d stdev %d\n", self->work_powsumavg_n/WORK_HIST_LEN, varience, wktime_stdev);
 #endif
 	// compute our target value of 'now'
