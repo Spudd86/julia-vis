@@ -33,7 +33,7 @@
 
 #if USEC
 #define BASE_SLACK 500
-#define MIN_SLACK 2000
+#define MIN_SLACK 1000
 #else
 #define BASE_SLACK 1
 #define MIN_SLACK 2
@@ -155,7 +155,7 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	// possibly something like the audio-test does with beats
 	// maybe even show on a worktime graph a line where we think we'll end up 
 	// missing a deadline if we go over it
-	self->slack = MAX(wktime_stdev + BASE_SLACK, MIN_SLACK);
+	self->slack = MAX(wktime_stdev*15/10 + BASE_SLACK, MIN_SLACK);
 	//printf("powsum %d varience %d stdev %d\n", self->work_powsumavg_n/WORK_HIST_LEN, varience, wktime_stdev);
 #endif
 	// compute our target value of 'now'
@@ -187,17 +187,10 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 {
 
 	//TODO: figure out why this seems to be insane
-#if 0
+#if 1
 	self->msc += self->interval;
 	if(self->msc < msc) {
-		// we missed a swap here
-		// if self->slack_diff > 0 we need to increase slack a little
-		// possibly by the amount we were early on the swap
-		if(self->slack_diff > 0) {
-			//self->slack += -self->slack_diff/2;
-			//printf("slack %d\n", self->slack);
-		}
-		printf("missed %d swaps by %d\n", msc - self->msc, self->slack_diff);
+		printf("missed %d swaps by %d slack = %d\n", msc - self->msc, self->slack_diff, self->slack);
 		self->msc = msc;
 	}
 #endif

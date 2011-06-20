@@ -209,11 +209,10 @@ int main(int argc, char **argv)
 			if(event.type == glxEventBase + GLX_BufferSwapComplete) {
 				int64_t now = uget_ticks();
 				
-				//int64_t ust, msc, sbc;
-				//glXGetSyncValuesOML(dpy, glxWin, &ust, &msc, &sbc);
-				//int delay = swap_complete(fps_data, now, msc, sbc);
-				GLXBufferSwapEventINTEL *swap_event = &event;
-				int delay = swap_complete(fps_data, now, swap_event->msc, swap_event->sbc);
+				int64_t ust, msc, sbc; glXGetSyncValuesOML(dpy, glxWin, &ust, &msc, &sbc);
+				int delay = swap_complete(fps_data, now, msc, sbc);
+				//GLXBufferSwapEventINTEL *swap_event = &event;
+				//int delay = swap_complete(fps_data, now, swap_event->msc, swap_event->sbc);
 				
 				//printf("swap_complete: delay = %d\n", delay);
 				//if(delay <= 0) render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);

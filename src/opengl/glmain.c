@@ -138,11 +138,12 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	
 	//TODO: move this up to top
 	workstart = now = uget_ticks();
-	int delay =  (tick0 + (uint64_t)cnt*1000000/opts->draw_rate) - now;
-	if(delay > 0) udodelay(delay);
+	int delay =  (tick0 + cnt*INT64_C(1000000)/opts->draw_rate) - now;
+	if(delay > 0) { udodelay(delay); now = uget_ticks(); }
+	
 
 	// rate limit our maxsrc updates, but run at full frame rate if we're close the opts.maxsrc_rate to avoid choppyness
-	if((tick0-now)*opts->maxsrc_rate + (maxfrms*1000000) > 1000000 ) {
+	if((tick0-now)*opts->maxsrc_rate + (maxfrms*INT64_C(1000000)) > INT64_C(1000000) ) {
 //			|| (totframetime + 10*FPS_HIST_LEN > FPS_HIST_LEN*1000/opts->maxsrc_rate ) ) {
 		gl_maxsrc_update();
 		maxfrms++;
@@ -191,7 +192,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 		glPopMatrix();
 		glPushMatrix();
 		glScalef(0.5, 0.25, 1);
-		glTranslatef(0, 3, 0);
+		glTranslatef(1, 3, 0);
 		draw_hist_array(cnt, totworktime, worktimes, FPS_HIST_LEN);
 		glPopMatrix();
 		glColor3f(1.0f, 1.0f, 1.0f);
