@@ -183,30 +183,30 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 		glEnd();
 	}
 	if(debug_pal || debug_maxsrc) { glPopAttrib(); if(packed_intesity_pixels) glColor3f(1.0f, 1.0f, 1.0f); }
-
-
-	//glRasterPos2f(-1,1 - 50.0f/(scr_h*0.5f));
-	glRasterPos2f(-1,0.75-20.0f/(scr_h*0.5f));
-	//glRasterPos2f(0,0);
+	
 	if(show_fps_hist) { DEBUG_CHECK_GL_ERR;
 		glPushMatrix();
 		glScalef(0.5, 0.25, 1);
 		glTranslatef(-2, 3, 0);
-		draw_hist_array(cnt, totframetime, frametimes, FPS_HIST_LEN);
+		draw_hist_array(cnt, FPS_HIST_LEN/(8.0f*totframetime), frametimes, FPS_HIST_LEN);
 		glPopMatrix();
 		glPushMatrix();
 		glScalef(0.5, 0.25, 1);
 		glTranslatef(1, 3, 0);
-		draw_hist_array(cnt, totworktime, worktimes, FPS_HIST_LEN);
+		draw_hist_array(cnt, FPS_HIST_LEN/(8.0f*totworktime), worktimes, FPS_HIST_LEN);
 		glPopMatrix();
 		glColor3f(1.0f, 1.0f, 1.0f);
 		char buf[128];
+		glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));
 		sprintf(buf,"%6.1f FPS %6.1f\n", FPS_HIST_LEN*1000000.0f/totframetime, maxfrms*1000000.0f/(now-tick0));
 		draw_string(buf); DEBUG_CHECK_GL_ERR;
+		glRasterPos2f(-1,0.75-20.0f/(scr_h*0.5f));
 		sprintf(buf,"%7.1fns frametime\n%7.1fns worktime\n", totframetime/((float)FPS_HIST_LEN), totworktime/((float)FPS_HIST_LEN));
 		draw_string(buf); DEBUG_CHECK_GL_ERR;
+	} else {
+		glRasterPos2f(-1,0.75-20.0f/(scr_h*0.5f));
 	}
-	
+
 	render_debug_overlay();
 	// TODO: figure out if needing this here is a bug, without it some of the debug stuff doesn't show
 	glFlush();

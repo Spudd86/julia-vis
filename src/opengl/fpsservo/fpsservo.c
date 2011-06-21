@@ -28,7 +28,7 @@
  */
 
 
-#define WORK_HIST_LEN 16
+#define WORK_HIST_LEN 32
 #define USEC 1
 
 #if USEC
@@ -63,6 +63,10 @@ void fps_get_worktimes(struct fps_data *self, int *total, int *len, const int **
 	if(total) *total = self->totworktime;
 	if(len) *len = WORK_HIST_LEN;
 	if(worktimes) *worktimes = self->worktimes;
+}
+
+int fps_get_cur_slack(struct fps_data *self) {
+	return self->slack;
 }
 
 /**

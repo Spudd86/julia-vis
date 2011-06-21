@@ -137,7 +137,7 @@ void setup_viewport(int width, int height) {
 	glLoadIdentity();
 }
 
-void draw_hist_array(int off, int total, const int *array, int len)
+void draw_hist_array(int off, float scl, const int *array, int len)
 {	
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glBegin(GL_LINES);
@@ -148,9 +148,9 @@ void draw_hist_array(int off, int total, const int *array, int len)
 	glBegin(GL_LINES);
 	for(int i=0; i<len-1; i++) {
 		int idx = (i + off)%len;
-		glVertex2f(((float)i)/(len-1), (len/8.0f)*array[idx]/(float)total);
+		glVertex2f(((float)i)/(len-1), scl*array[idx]);
 		idx = (i + 1 + off)%len;
-		glVertex2f(((float)(i+1))/(len-1), (len/8.0f)*array[idx]/(float)total);
+		glVertex2f(((float)(i+1))/(len-1), scl*array[idx]);
 	}
 	glEnd();
 }

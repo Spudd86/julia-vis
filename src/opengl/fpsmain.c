@@ -79,6 +79,8 @@ static int delayhist_total = 0;
 static int delayhist[HIST_LEN];
 static int framecnt = 0;
 
+static int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
+
 int main(int argc, char **argv)
 {
 	opt_data opts; optproc(argc, argv, &opts);
@@ -193,8 +195,7 @@ int main(int argc, char **argv)
 	};
 	
 	arm_timer(tfd, 0);
-	
-	static int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
+
 	while(1) {
 		if(poll(pfds, 2, -1) < 0) continue;
 		
@@ -274,22 +275,19 @@ glx_main_loop_quit:
 	return 0;
 }
 
-void render_debug_overlay(void)
+//TODO: add hotkey to turn this on and off
+void render_fps_hist(void)
 {
 	glPushMatrix();
 	glScalef(0.5, 0.25, 1);
 	glTranslatef(1, -4, 0);
-	//draw_hist_array(framecnt, MIN(delayhist_total, 1), delayhist, HIST_LEN);
-	glColor3f(0.0f, 1.0f, 0.0f);
-	float avgdelay = (float)delayhist_total/HIST_LEN;
+	//draw_hist_array(framecnt, (avgdelay*4), delayhist, HIST_LEN);
+	
+	glColor3f(1.0f, 0.0f, 0.0f);
 	glBegin(GL_LINES);
-	for(int i=0; i<HIST_LEN-1; i++) {
-		int idx = (i + framecnt)%HIST_LEN;
-		glVertex2f(((float)i)/(HIST_LEN-1), delayhist[idx]/(avgdelay*4));
-		idx = (i + 1 + framecnt)%HIST_LEN;
-		glVertex2f(((float)(i+1))/(HIST_LEN-1), delayhist[idx]/(avgdelay*4));
-	}
+	glVertex2f(0, 0.5f); glVertex2f(1, 0.5f);
 	glEnd();
+	draw_hist_array(framecnt, HIST_LEN/(2.0f*MAX(delayhist_total,1)), delayhist, HIST_LEN);
 	glPopMatrix();
 	
 	int fpstotal, fpslen;
@@ -297,14 +295,19 @@ void render_debug_overlay(void)
 	//void fps_get_worktimes(struct fps_data *self, int *total, int *len, const int **worktimes);
 	glPushMatrix();
 	glScalef(0.5, 0.25, 1);
-	glTranslatef(-2, -3, 0);
+	glTranslatef(-2, -4, 0);
 	fps_get_worktimes(fps_data, &fpstotal, &fpslen, &fpsworktimes);
-	draw_hist_array(framecnt, fpstotal, fpsworktimes, fpslen);
+	draw_hist_array(framecnt, HIST_LEN/(8.0f*fpstotal), fpsworktimes, fpslen);
 	glPopMatrix();
 	glColor3f(1.0f, 1.0f, 1.0f);
 	char buf[128];
 	sprintf(buf,"AVG delay %6.1f\n worktime %6.1f\n", (float)delayhist_total/HIST_LEN, (float)fpstotal/fpslen);
 	draw_string(buf); DEBUG_CHECK_GL_ERR;
+}
+
+void render_debug_overlay(void)
+{
+	if(show_fps_hist) render_fps_hist();
 }
 
 void swap_buffers(void)
