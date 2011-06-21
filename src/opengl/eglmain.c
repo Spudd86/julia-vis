@@ -100,6 +100,10 @@ egl_main_quit:
 	return 0;
 }
 
+void render_debug_overlay(void) {
+
+}
+
 void swap_buffers(void) {
 	eglSwapBuffers(display, surface);
 }

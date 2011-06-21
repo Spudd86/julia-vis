@@ -12,7 +12,7 @@ struct fps_data;
 
 struct fps_data *fps_data_new(struct fps_period rate, uint64_t init_msc, uint64_t now);
 
-void fps_get_worktimes(struct fps_data *self, int *total, int *len, int **worktimes);
+void fps_get_worktimes(struct fps_data *self, int *total, int *len, const int **worktimes);
 
 /**
  * Call this just before XXXSwapBuffers()

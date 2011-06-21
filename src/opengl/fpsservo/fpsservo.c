@@ -57,10 +57,9 @@ struct fps_data {
 	int totworktime;
 	int64_t work_powsumavg_n;
 	int worktimes[WORK_HIST_LEN];
-	
 };
 
-void fps_get_worktimes(struct fps_data *self, int *total, int *len, int **worktimes) {
+void fps_get_worktimes(struct fps_data *self, int *total, int *len, const int **worktimes) {
 	if(total) *total = self->totworktime;
 	if(len) *len = WORK_HIST_LEN;
 	if(worktimes) *worktimes = self->worktimes;
@@ -84,7 +83,7 @@ static void init(struct fps_data *self, struct fps_period freq, uint64_t init_ms
 #endif
 
 	// try about 15% of period for initial slack value
-	self->slack = self->period.n*15/(100*self->period.d);
+	self->slack = MAX(self->period.n*15/(100*self->period.d), MIN_SLACK);
 	
 	printf("freq %d (%d/%d) period %" PRId64 "/%" PRId64 "\n", 
 	       freq.n/freq.d, freq.n, freq.d, self->period.n, self->period.d);
@@ -140,9 +139,10 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 {
 	// if we've run in to our slack time we need to shorten delay
 #if 1
-	int worktime = now - (self->last_swap_time + self->delay + self->slack);
+	int worktime = now - (self->last_swap_time + self->delay);
 	int oldwt = self->worktimes[self->count % WORK_HIST_LEN];
-	self->totworktime += worktime - oldwt;
+	self->totworktime -= oldwt;
+	self->totworktime += worktime;
 	self->work_powsumavg_n += worktime*worktime - oldwt*oldwt;
 	self->worktimes[self->count % WORK_HIST_LEN] = worktime;
 	
@@ -161,14 +161,14 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	// compute our target value of 'now'
 	int64_t expected = (self->last_swap_time*self->period.d + self->period.n)/self->period.d - self->slack;
 	self->slack_diff = expected - now;
-	self->delay += self->slack_diff/2;
+	self->delay += self->slack_diff/4;
 	
 	//printf("now %" PRId64 " expected %" PRId64 "\n", now, expected);
 	//printf("slackdiff %" PRId64 "\n", self->slack_diff);
 	
 	int avgworktime = self->totworktime/WORK_HIST_LEN;
 	int64_t period = self->period.n/self->period.d;
-	if(self->delay + avgworktime + self->slack > period) {
+	if(self->delay + avgworktime + MIN_SLACK > period) {
 		int newdelay = period - (self->slack + avgworktime);
 		//printf("DELAY CAPPED! reduced by %d\n", self->delay - newdelay);
 		self->delay = newdelay;
@@ -190,7 +190,7 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 #if 1
 	self->msc += self->interval;
 	if(self->msc < msc) {
-		printf("missed %d swaps by %d slack = %d\n", msc - self->msc, self->slack_diff, self->slack);
+		//printf("missed %d swaps by %d slack = %d\n", msc - self->msc, self->slack_diff, self->slack);
 		self->msc = msc;
 	}
 #endif

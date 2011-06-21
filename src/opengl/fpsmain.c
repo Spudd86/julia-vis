@@ -74,7 +74,10 @@ static Bool WaitForNotify(Display *d, XEvent *e, char *arg) {
 	return (e->type == MapNotify) && (e->xmap.window == (Window)arg);
 }
 
-static int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
+#define HIST_LEN 32
+static int delayhist_total = 0;
+static int delayhist[HIST_LEN];
+static int framecnt = 0;
 
 int main(int argc, char **argv)
 {
@@ -85,6 +88,8 @@ int main(int argc, char **argv)
 	else if(opts.w < 0) opts.w = opts.h;
 	else if(opts.h < 0) opts.h = opts.w;
 	w = opts.w; h = opts.h;
+	
+	memset(delayhist, 0, sizeof(delayhist));
 	
 	XEvent event;
 	
@@ -189,6 +194,7 @@ int main(int argc, char **argv)
 	
 	arm_timer(tfd, 0);
 	
+	static int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
 	while(1) {
 		if(poll(pfds, 2, -1) < 0) continue;
 		
@@ -218,6 +224,10 @@ int main(int argc, char **argv)
 				//if(delay <= 0) render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
 				//else 
 					arm_timer(tfd, now+delay); // schedual next frame
+				
+				delayhist_total -= delayhist[framecnt%HIST_LEN];
+				delayhist_total += (delayhist[framecnt%HIST_LEN] = delay);
+				framecnt++;
 				
 				continue;
 			}
@@ -262,6 +272,39 @@ glx_main_loop_quit:
 	XCloseDisplay(dpy);
 	
 	return 0;
+}
+
+void render_debug_overlay(void)
+{
+	glPushMatrix();
+	glScalef(0.5, 0.25, 1);
+	glTranslatef(1, -4, 0);
+	//draw_hist_array(framecnt, MIN(delayhist_total, 1), delayhist, HIST_LEN);
+	glColor3f(0.0f, 1.0f, 0.0f);
+	float avgdelay = (float)delayhist_total/HIST_LEN;
+	glBegin(GL_LINES);
+	for(int i=0; i<HIST_LEN-1; i++) {
+		int idx = (i + framecnt)%HIST_LEN;
+		glVertex2f(((float)i)/(HIST_LEN-1), delayhist[idx]/(avgdelay*4));
+		idx = (i + 1 + framecnt)%HIST_LEN;
+		glVertex2f(((float)(i+1))/(HIST_LEN-1), delayhist[idx]/(avgdelay*4));
+	}
+	glEnd();
+	glPopMatrix();
+	
+	int fpstotal, fpslen;
+	const int *fpsworktimes = NULL;
+	//void fps_get_worktimes(struct fps_data *self, int *total, int *len, const int **worktimes);
+	glPushMatrix();
+	glScalef(0.5, 0.25, 1);
+	glTranslatef(-2, -3, 0);
+	fps_get_worktimes(fps_data, &fpstotal, &fpslen, &fpsworktimes);
+	draw_hist_array(framecnt, fpstotal, fpsworktimes, fpslen);
+	glPopMatrix();
+	glColor3f(1.0f, 1.0f, 1.0f);
+	char buf[128];
+	sprintf(buf,"AVG delay %6.1f\n worktime %6.1f\n", (float)delayhist_total/HIST_LEN, (float)fpstotal/fpslen);
+	draw_string(buf); DEBUG_CHECK_GL_ERR;
 }
 
 void swap_buffers(void)

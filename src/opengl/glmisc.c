@@ -137,7 +137,7 @@ void setup_viewport(int width, int height) {
 	glLoadIdentity();
 }
 
-void draw_hist_array(int off, int total, int *array, int len)
+void draw_hist_array(int off, int total, const int *array, int len)
 {	
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glBegin(GL_LINES);

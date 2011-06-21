@@ -37,6 +37,10 @@ int main(int argc, char **argv)
 	return 0;
 }
 
+void render_debug_overlay(void) {
+
+}
+
 void swap_buffers(void) {
 	SDL_GL_SwapBuffers();
 }
