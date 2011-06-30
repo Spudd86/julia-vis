@@ -32,8 +32,8 @@
 #define USEC 1
 
 #if USEC
-#define BASE_SLACK 500
-#define MIN_SLACK 1000
+#define BASE_SLACK 750
+#define MIN_SLACK 1500
 #else
 #define BASE_SLACK 1
 #define MIN_SLACK 2
@@ -165,7 +165,7 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	// compute our target value of 'now'
 	int64_t expected = (self->last_swap_time*self->period.d + self->period.n)/self->period.d - self->slack;
 	self->slack_diff = expected - now;
-	self->delay += self->slack_diff/4;
+	self->delay += self->slack_diff/2;
 	
 	//printf("now %" PRId64 " expected %" PRId64 "\n", now, expected);
 	//printf("slackdiff %" PRId64 "\n", self->slack_diff);
@@ -179,7 +179,8 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	}
 	
 	if(self->delay < 0) self->delay = 0;
-	if((self->delay+self->slack+1)*self->period.d > self->period.n) self->delay = 0;
+	
+	self->count++;
 	
 	return self->msc + self->interval;
 }
@@ -191,7 +192,7 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 {
 
 	//TODO: figure out why this seems to be insane
-#if 1
+#if 0
 	self->msc += self->interval;
 	if(self->msc < msc) {
 		//printf("missed %d swaps by %d slack = %d\n", msc - self->msc, self->slack_diff, self->slack);
@@ -202,10 +203,20 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 	//TODO: we need to do stuff to estimate work time, then use the esitimate
 	// to keep delay + work + slack < period*interval
 	
+	int64_t expected = (self->last_swap_time*self->period.d + self->period.n)/self->period.d;
+	int timediff = now - expected;
+	
 	self->last_swap_time = now;
 	
 	// compute our delay, update counters and stuff
-	self->count++;
+	
+	if(timediff > self->period.n/self->period.d)
+		printf("after expected swap by %d (we must have missed it!)\n", timediff);
+
+	//TODO: be more useful about this	
+	if(timediff > self->period.n/self->period.d) self->delay = 0;
+	else if(timediff > 0) self->delay = MAX(self->delay - timediff, 0);
+
 	return self->delay;
 }
 

@@ -74,16 +74,19 @@ static Bool WaitForNotify(Display *d, XEvent *e, char *arg) {
 	return (e->type == MapNotify) && (e->xmap.window == (Window)arg);
 }
 
-#define HIST_LEN 32
+#define HIST_LEN 64
 static int delayhist_total = 0;
 static int delayhist[HIST_LEN];
 static int framecnt = 0;
 
 static int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
 
+static opt_data opts;
+
+
 int main(int argc, char **argv)
 {
-	opt_data opts; optproc(argc, argv, &opts);
+	optproc(argc, argv, &opts);
 	if(audio_init(&opts) < 0) exit(1);
 	int x = 0, y = 0, w, h;
 	if(opts.w < 0 && opts.h < 0) opts.w = opts.h = 512;
@@ -216,20 +219,19 @@ int main(int argc, char **argv)
 			if(event.type == glxEventBase + GLX_BufferSwapComplete) {
 				int64_t now = uget_ticks();
 				
-				int64_t ust, msc, sbc; glXGetSyncValuesOML(dpy, glxWin, &ust, &msc, &sbc);
-				int delay = swap_complete(fps_data, now, msc, sbc);
-				//GLXBufferSwapEventINTEL *swap_event = &event;
-				//int delay = swap_complete(fps_data, now, swap_event->msc, swap_event->sbc);
+				//int64_t ust, msc, sbc; glXGetSyncValuesOML(dpy, glxWin, &ust, &msc, &sbc);
+				//int delay = swap_complete(fps_data, now, msc, sbc);
+				GLXBufferSwapEventINTEL *swap_event = &event;
+				int delay = swap_complete(fps_data, now, swap_event->msc, swap_event->sbc);
 				
 				//printf("swap_complete: delay = %d\n", delay);
-				//if(delay <= 0) render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
-				//else 
-					arm_timer(tfd, now+delay); // schedual next frame
 				
 				delayhist_total -= delayhist[framecnt%HIST_LEN];
 				delayhist_total += (delayhist[framecnt%HIST_LEN] = delay);
 				framecnt++;
 				
+				if(delay <= 0) render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
+				else arm_timer(tfd, now+delay); // schedual next frame
 				continue;
 			}
 			
@@ -281,7 +283,6 @@ void render_fps_hist(void)
 	glPushMatrix();
 	glScalef(0.5, 0.25, 1);
 	glTranslatef(1, -4, 0);
-	//draw_hist_array(framecnt, (avgdelay*4), delayhist, HIST_LEN);
 	
 	glColor3f(1.0f, 0.0f, 0.0f);
 	glBegin(GL_LINES);
@@ -297,12 +298,18 @@ void render_fps_hist(void)
 	glScalef(0.5, 0.25, 1);
 	glTranslatef(-2, -4, 0);
 	fps_get_worktimes(fps_data, &fpstotal, &fpslen, &fpsworktimes);
-	draw_hist_array(framecnt, HIST_LEN/(8.0f*fpstotal), fpsworktimes, fpslen);
+	draw_hist_array(framecnt, fpslen/(4.0f*fpstotal), fpsworktimes, fpslen);
 	glPopMatrix();
 	glColor3f(1.0f, 1.0f, 1.0f);
 	char buf[128];
 	sprintf(buf,"AVG delay %6.1f\n worktime %6.1f\n", (float)delayhist_total/HIST_LEN, (float)fpstotal/fpslen);
 	draw_string(buf); DEBUG_CHECK_GL_ERR;
+	
+	glRasterPos2f(0.5, -0.75);// - 20.0f/(opts.h*0.5f));
+	draw_string("delay hist"); DEBUG_CHECK_GL_ERR;
+	
+	glRasterPos2f(-1, -0.75);// - 20.0f/(opts.h*0.5f));
+	draw_string("worktimes"); DEBUG_CHECK_GL_ERR;
 }
 
 void render_debug_overlay(void)
