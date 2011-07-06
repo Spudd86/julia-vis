@@ -21,6 +21,7 @@ uint64_t uget_ticks(void);
 void udodelay(uint64_t us);
 
 void draw_hist_array(int off, float scl, const int *array, int len);
+void draw_hist_array_col(int off, float scl, const int *array, int len, float r, float g, float b);
 
 void render_debug_overlay(void);
 void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_mandel, GLboolean show_fps_hist);

@@ -21,18 +21,18 @@
 */
 
 /*
-	if we don't have INTEL_swap_event can use glXWaitForSbcOML() to wait for 
+	if we don't have INTEL_swap_event can use glXWaitForSbcOML() to wait for
 	the swap to actually happen, since glXSwapBuffersMscOML() returns the sbc we
 	would have to wait for. The only problem is we can't do something else in
 	the mean time with that...
  */
 
 
-#define WORK_HIST_LEN 32
+#define WORK_HIST_LEN 64
 #define USEC 1
 
 #if USEC
-#define BASE_SLACK 750
+#define BASE_SLACK 1000
 #define MIN_SLACK 1500
 #else
 #define BASE_SLACK 1
@@ -89,7 +89,7 @@ static void init(struct fps_data *self, struct fps_period freq, uint64_t init_ms
 	// try about 15% of period for initial slack value
 	self->slack = MAX(self->period.n*15/(100*self->period.d), MIN_SLACK);
 	
-	printf("freq %d (%d/%d) period %" PRId64 "/%" PRId64 "\n", 
+	printf("freq %d (%d/%d) period %" PRId64 "/%" PRId64 "\n",
 	       freq.n/freq.d, freq.n, freq.d, self->period.n, self->period.d);
 	printf("slack = %d\n", self->slack);
 	
@@ -110,10 +110,8 @@ static void init(struct fps_data *self, struct fps_period freq, uint64_t init_ms
 struct fps_data *fps_data_new(struct fps_period rate, uint64_t init_msc, uint64_t now)
 {
 	struct fps_data *self = calloc(1,sizeof(*self));//malloc(sizeof(*self));
-	printf("1 fps_data %p\n", self);
 	if(!self) return NULL;
 	init(self, rate, init_msc, now);
-	printf("2 fps_data %p\n", self);
 	return self;
 }
 
@@ -138,11 +136,11 @@ static int32_t isqrt(uint32_t n)
  * Call this just before XXXSwapBuffers()
  * 
  * @return target msc (for use with glXSwapBuffersMscOML()
- */ 
+ */
 int64_t swap_begin(struct fps_data *self, int64_t now)
 {
 	// if we've run in to our slack time we need to shorten delay
-#if 1
+
 	int worktime = now - (self->last_swap_time + self->delay);
 	int oldwt = self->worktimes[self->count % WORK_HIST_LEN];
 	self->totworktime -= oldwt;
@@ -159,26 +157,35 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	// possibly something like the audio-test does with beats
 	// maybe even show on a worktime graph a line where we think we'll end up 
 	// missing a deadline if we go over it
-	self->slack = MAX(wktime_stdev*2 + BASE_SLACK, MIN_SLACK);
+	
+	int period = self->period.n/self->period.d;
+	int avgworktime = self->totworktime/WORK_HIST_LEN;
+	
+	// need to cap the slack
+	self->slack = MIN(self->period.n*2/(self->period.d*3), MAX(wktime_stdev*25/10 + BASE_SLACK, MIN_SLACK));
 	//printf("powsum %d varience %d stdev %d\n", self->work_powsumavg_n/WORK_HIST_LEN, varience, wktime_stdev);
-#endif
+
 	// compute our target value of 'now'
 	int64_t expected = (self->last_swap_time*self->period.d + self->period.n)/self->period.d - self->slack;
 	self->slack_diff = expected - now;
-	self->delay += self->slack_diff/2;
+	//self->delay += self->slack_diff/2;
+	if(self->slack_diff < 0) self->delay += MIN(self->slack_diff/2, -1);
+	//else self->delay += MAX(period/32, 1);
+	else self->delay += MAX(self->slack_diff/4, 1);
 	
 	//printf("now %" PRId64 " expected %" PRId64 "\n", now, expected);
 	//printf("slackdiff %" PRId64 "\n", self->slack_diff);
 	
-	int avgworktime = self->totworktime/WORK_HIST_LEN;
-	int64_t period = self->period.n/self->period.d;
-	if(self->delay + avgworktime + MIN_SLACK > period) {
+	if(self->delay + avgworktime + self->slack > period) {
 		int newdelay = period - (self->slack + avgworktime);
 		//printf("DELAY CAPPED! reduced by %d\n", self->delay - newdelay);
 		self->delay = newdelay;
 	}
 	
-	if(self->delay < 0) self->delay = 0;
+	if(self->delay < 0) {
+		//printf("DELAY NEGATIVE\n");
+		self->delay = 0;
+	} 
 	
 	self->count++;
 	
@@ -197,6 +204,8 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 	if(self->msc < msc) {
 		//printf("missed %d swaps by %d slack = %d\n", msc - self->msc, self->slack_diff, self->slack);
 		self->msc = msc;
+		
+		
 	}
 #endif
 	
@@ -212,10 +221,12 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 	
 	if(timediff > self->period.n/self->period.d)
 		printf("after expected swap by %d (we must have missed it!)\n", timediff);
+		
+	//TODO: mabey track stddev of timediff%period and use that in slack calculation?
 
 	//TODO: be more useful about this	
-	if(timediff > self->period.n/self->period.d) self->delay = 0;
-	else if(timediff > 0) self->delay = MAX(self->delay - timediff, 0);
+	if(timediff*self->period.d > self->period.n) self->delay = 0;
+	else if(timediff > 0) self->delay = MAX(self->delay - timediff/2, 0);
 
 	return self->delay;
 }

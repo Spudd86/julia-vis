@@ -137,14 +137,36 @@ void setup_viewport(int width, int height) {
 	glLoadIdentity();
 }
 
-void draw_hist_array(int off, float scl, const int *array, int len)
+void draw_hist_array_col(int off, float scl, const int *array, int len, float r, float g, float b)
 {	
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glBegin(GL_LINES);
+	glVertex2f(0, 1); glVertex2f(1, 1);
 	glVertex2f(0, 0); glVertex2f(1, 0);
 	glEnd();
 
-	glColor3f(0.0f, 1.0f, 0.0f);
+	glColor3f(r, g, b);
+
+#if 1
+	float pnts[(len - 1)*2][2];
+	for(int i=0; i<len-1; i++) {
+		int idx = (i + off)%len;
+		pnts[i*2][0] = ((float)i)/(len-1);
+		pnts[i*2][1] = scl*array[idx];
+		idx = (i + 1 + off)%len;
+		pnts[i*2+1][0] = ((float)(i+1))/(len-1);
+		pnts[i*2+1][1] = scl*array[idx];
+	}
+	//glPushAttrib(GL_ALL_ATTRIB_BITS);
+	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+	//glEnable(GL_BLEND);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glVertexPointer(2, GL_FLOAT, 0, pnts);
+	glDrawArrays(GL_LINES, 0, (len - 1)*2);
+	glPopClientAttrib();
+	//glPopAttrib();
+	CHECK_GL_ERR;
+#else	
 	glBegin(GL_LINES);
 	for(int i=0; i<len-1; i++) {
 		int idx = (i + off)%len;
@@ -153,6 +175,11 @@ void draw_hist_array(int off, float scl, const int *array, int len)
 		glVertex2f(((float)(i+1))/(len-1), scl*array[idx]);
 	}
 	glEnd();
+#endif
+}
+
+void draw_hist_array(int off, float scl, const int *array, int len) {
+	draw_hist_array_col(off, scl, array, len, 0.0f, 1.0f, 0.0f);
 }
 
 #include "terminusIBM.h"
