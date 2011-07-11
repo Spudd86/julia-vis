@@ -59,25 +59,34 @@ static float *do_fft(float *in)
 }
 
 static int bufp = 0;
+static float *cur_buf = NULL; ///< need to preserve the result of tb_get_write across calls
 
 // TODO: double check correctness
 void audio_update(const float * __attribute__ ((aligned (16))) in, int n)
 {
-	float *samps = tribuf_get_write(samp_tb);
+	float *samps = NULL;
 	int remain = 0;
 
 	if(bufp == 0 && n == nr_samp) {
+		samps  = tribuf_get_write(samp_tb);
 		memcpy(samps, in, sizeof(float)*nr_samp);
+		tribuf_finish_write(samp_tb);
 	} else {
+		if(bufp == 0) cur_buf = tribuf_get_write(samp_tb);
+
+		samps = cur_buf;
+	
 		int cpy = IMIN(n, nr_samp-bufp);
 		memcpy(samps+bufp, in, sizeof(float)*cpy);
 		remain = n - cpy;
 		in += cpy;
 		bufp = (bufp + cpy)%nr_samp;
 	}
-	if(bufp != 0) return;
-
-	tribuf_finish_write(samp_tb);
+	if(bufp == 0) {
+		cur_buf = NULL;
+		tribuf_finish_write(samp_tb);
+	} else return;
+	
 	buf_count++;
 	beat_update(do_fft(samps), nr_samp/2);
 
