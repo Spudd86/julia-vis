@@ -340,6 +340,7 @@ void render_fps_hist(void)
 	glColor3f(1.0f, 0.0f, 0.0f);
 	//draw_string(" slack"); DEBUG_CHECK_GL_ERR;
 	draw_string("      slack"); DEBUG_CHECK_GL_ERR;
+	glColor3f(1.0f, 1.0f, 1.0f);
 }
 
 void render_debug_overlay(void)
