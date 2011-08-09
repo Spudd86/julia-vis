@@ -50,6 +50,7 @@ struct fps_data {
 	} period; ///< how often swaps happen (hardware) as a fraction in ms
 	
 	int64_t slack_diff; ///< difference between when we swapped and when we would have liked to
+	int64_t last_swap_begin;
 	int64_t last_swap_time;
 	uint64_t msc;
 	
@@ -57,14 +58,22 @@ struct fps_data {
 	
 	int count;
 	
-	struct runstat *workstat;
+	struct runstat *workstat, *swapstat;
 };
 
+#if 1
 void fps_get_worktimes(struct fps_data *self, int *total, int *len, const int **worktimes) {
 	if(total) *total = self->workstat->sum;
 	if(len) *len = self->workstat->n;
 	if(worktimes) *worktimes = self->workstat->data;
 }
+#else
+void fps_get_worktimes(struct fps_data *self, int *total, int *len, const int **worktimes) {
+	if(total) *total = self->swapstat->sum;
+	if(len) *len = self->swapstat->n;
+	if(worktimes) *worktimes = self->swapstat->data;
+}
+#endif
 
 int fps_get_cur_slack(struct fps_data *self) {
 	return self->slack;
@@ -100,6 +109,7 @@ static void init(struct fps_data *self, struct fps_period freq, uint64_t init_ms
 
 	int worktime = (self->period.n - self->slack*self->period.d)/self->period.d;
 	self->workstat = runstat_new(worktime, FPS_HIST_LEN);
+	self->swapstat = runstat_new(MIN_SLACK/3, FPS_HIST_LEN);
 }
 
 struct fps_data *fps_data_new(struct fps_period rate, uint64_t init_msc, uint64_t now)
@@ -158,14 +168,20 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	//int slack_target = MIN(self->period.n*2/(self->period.d*3), MAX(wktime_stdev*63/10 + min_wkt + BASE_SLACK, MIN_SLACK));
 	
 	// if we assume normal distribution then we want this instead
-	int slack_target = MIN(self->period.n*2/(self->period.d*3), MAX(wktime_stdev*6 + avgworktime + BASE_SLACK, MIN_SLACK));
+	int slack_target = MAX(wktime_stdev*6 + avgworktime + BASE_SLACK, MIN_SLACK);
 	// however neither is right, but normal is probably more wrong, however we 
 	// don't need to do a pass over the worktimes to get an average
 	// also trying to use same probability as above is not big enough...
 	
+	slack_target += isqrt(runstat_varience(self->swapstat))*15/10;
+	
+	slack_target = MIN(self->period.n*2/(self->period.d*3), slack_target);
+	
 	//TODO: maybe make slack decrease in an interpolated way...
 	if(self->slack > slack_target) self->slack = (self->slack*3 + slack_target)/4;
 	else self->slack = slack_target;
+	
+	
 
 	// compute our target value of 'now'
 	int64_t expected = (self->last_swap_time*self->period.d + self->period.n)/self->period.d - self->slack;
@@ -187,9 +203,9 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	if(self->delay < 0) {
 		//printf("DELAY NEGATIVE\n");
 		self->delay = 0;
-	} 
+	}
 	
-	self->count++;
+	self->last_swap_begin = now;
 	
 	return self->msc + self->interval;
 }
@@ -199,6 +215,9 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
  */
 int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc)
 {
+	runstat_insert(self->swapstat, self->count, now - self->last_swap_begin);
+
+	self->count++;
 
 	//TODO: figure out why this seems to be insane
 #if 0
