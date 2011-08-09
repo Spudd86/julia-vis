@@ -5,6 +5,7 @@
 #include <math.h>
 
 #include "fpsservo.h"
+#include "runstat.h"
 
 /* From GLX_OML_sync_control
 
@@ -28,16 +29,18 @@
  */
 
 
-#define WORK_HIST_LEN 64
+#define FPS_HIST_LEN 128
 #define USEC 1
 
 #if USEC
-#define BASE_SLACK 1000
-#define MIN_SLACK 1500
+#define BASE_SLACK 1500
+#define MIN_SLACK 2000
 #else
 #define BASE_SLACK 1
 #define MIN_SLACK 2
 #endif
+
+
 
 struct fps_data {
 	int delay, slack;
@@ -47,6 +50,7 @@ struct fps_data {
 	} period; ///< how often swaps happen (hardware) as a fraction in ms
 	
 	int64_t slack_diff; ///< difference between when we swapped and when we would have liked to
+	int64_t last_swap_begin;
 	int64_t last_swap_time;
 	uint64_t msc;
 	
@@ -54,16 +58,22 @@ struct fps_data {
 	
 	int count;
 	
-	int totworktime;
-	int64_t work_powsumavg_n;
-	int worktimes[WORK_HIST_LEN];
+	struct runstat *workstat, *swapstat;
 };
 
+#if 1
 void fps_get_worktimes(struct fps_data *self, int *total, int *len, const int **worktimes) {
-	if(total) *total = self->totworktime;
-	if(len) *len = WORK_HIST_LEN;
-	if(worktimes) *worktimes = self->worktimes;
+	if(total) *total = self->workstat->sum;
+	if(len) *len = self->workstat->n;
+	if(worktimes) *worktimes = self->workstat->data;
 }
+#else
+void fps_get_worktimes(struct fps_data *self, int *total, int *len, const int **worktimes) {
+	if(total) *total = self->swapstat->sum;
+	if(len) *len = self->swapstat->n;
+	if(worktimes) *worktimes = self->swapstat->data;
+}
+#endif
 
 int fps_get_cur_slack(struct fps_data *self) {
 	return self->slack;
@@ -96,15 +106,10 @@ static void init(struct fps_data *self, struct fps_period freq, uint64_t init_ms
 	self->last_swap_time = now;
 	self->msc = init_msc;
 	self->interval = 1;
-	
+
 	int worktime = (self->period.n - self->slack*self->period.d)/self->period.d;
-	self->totworktime = WORK_HIST_LEN*worktime;
-	self->work_powsumavg_n = WORK_HIST_LEN*(int64_t)worktime*worktime;
-	for(int i=0; i < WORK_HIST_LEN; i++) {
-		self->worktimes[i] = worktime;
-	}
-	
-	printf("powsum %" PRId64 "\n", self->work_powsumavg_n/WORK_HIST_LEN);
+	self->workstat = runstat_new(worktime, FPS_HIST_LEN);
+	self->swapstat = runstat_new(MIN_SLACK/3, FPS_HIST_LEN);
 }
 
 struct fps_data *fps_data_new(struct fps_period rate, uint64_t init_msc, uint64_t now)
@@ -132,6 +137,13 @@ static int32_t isqrt(uint32_t n)
     return root >> 1;
 }
 
+//TODO: need to have some way to profile what value slack and delay have!
+// ideally with a graph we can overly on top of whatever
+// also would like to track when we miss a swap deadline, again profile, 
+// possibly something like the audio-test does with beats
+// maybe even show on a worktime graph a line where we think we'll end up 
+// missing a deadline if we go over it
+
 /**
  * Call this just before XXXSwapBuffers()
  * 
@@ -139,37 +151,43 @@ static int32_t isqrt(uint32_t n)
  */
 int64_t swap_begin(struct fps_data *self, int64_t now)
 {
-	// if we've run in to our slack time we need to shorten delay
+	int period = self->period.n/self->period.d;
 
-	int worktime = now - (self->last_swap_time + self->delay);
-	int oldwt = self->worktimes[self->count % WORK_HIST_LEN];
-	self->totworktime -= oldwt;
-	self->totworktime += worktime;
-	self->work_powsumavg_n += worktime*worktime - oldwt*oldwt;
-	self->worktimes[self->count % WORK_HIST_LEN] = worktime;
-	
-	int varience = (self->work_powsumavg_n - self->totworktime*(int64_t)(self->totworktime/WORK_HIST_LEN))/WORK_HIST_LEN;
+	runstat_insert(self->workstat, self->count, now - (self->last_swap_time + self->delay));
+
+	int avgworktime = runstat_average(self->workstat);
+	int varience = runstat_varience(self->workstat);
 	int wktime_stdev = (int)isqrt(varience);
 	
-	//TODO: need to have some way to profile what value slack and delay have!
-	// ideally with a graph we can overly on top of whatever
-	// also would like to track when we miss a swap deadline, again profile, 
-	// possibly something like the audio-test does with beats
-	// maybe even show on a worktime graph a line where we think we'll end up 
-	// missing a deadline if we go over it
+	// if we assume worktime is expontially distributed then:
+	//       want x s.t. p[t_wk > x] <= 0.002
+	// x = -ln(0.002)/lambda = -ln(0.002)*wktime_stdev ~= 6.2*wktime_stdev
+	// need to add the smallest worktime seen to compensate for the fact that 
+	// the distribution is shifted
+	//int min_wkt = self->worktimes[0]; for(int i=1; i<WORK_HIST_LEN; i++) min_wkt = MIN(min_wkt, self->worktimes[i]);
+	//int slack_target = MIN(self->period.n*2/(self->period.d*3), MAX(wktime_stdev*63/10 + min_wkt + BASE_SLACK, MIN_SLACK));
 	
-	int period = self->period.n/self->period.d;
-	int avgworktime = self->totworktime/WORK_HIST_LEN;
+	// if we assume normal distribution then we want this instead
+	int slack_target = MAX(wktime_stdev*6 + avgworktime + BASE_SLACK, MIN_SLACK);
+	// however neither is right, but normal is probably more wrong, however we 
+	// don't need to do a pass over the worktimes to get an average
+	// also trying to use same probability as above is not big enough...
 	
-	// need to cap the slack
-	self->slack = MIN(self->period.n*2/(self->period.d*3), MAX(wktime_stdev*25/10 + BASE_SLACK, MIN_SLACK));
-	//printf("powsum %d varience %d stdev %d\n", self->work_powsumavg_n/WORK_HIST_LEN, varience, wktime_stdev);
+	slack_target += isqrt(runstat_varience(self->swapstat))*15/10;
+	
+	slack_target = MIN(self->period.n*2/(self->period.d*3), slack_target);
+	
+	//TODO: maybe make slack decrease in an interpolated way...
+	if(self->slack > slack_target) self->slack = (self->slack*3 + slack_target)/4;
+	else self->slack = slack_target;
+	
+	
 
 	// compute our target value of 'now'
 	int64_t expected = (self->last_swap_time*self->period.d + self->period.n)/self->period.d - self->slack;
 	self->slack_diff = expected - now;
 	//self->delay += self->slack_diff/2;
-	if(self->slack_diff < 0) self->delay += MIN(self->slack_diff/2, -1);
+	if(self->slack_diff < 0) self->delay += MIN(self->slack_diff/2, -MIN_SLACK);
 	//else self->delay += MAX(period/32, 1);
 	else self->delay += MAX(self->slack_diff/4, 1);
 	
@@ -185,9 +203,9 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	if(self->delay < 0) {
 		//printf("DELAY NEGATIVE\n");
 		self->delay = 0;
-	} 
+	}
 	
-	self->count++;
+	self->last_swap_begin = now;
 	
 	return self->msc + self->interval;
 }
@@ -197,6 +215,9 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
  */
 int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc)
 {
+	runstat_insert(self->swapstat, self->count, now - self->last_swap_begin);
+
+	self->count++;
 
 	//TODO: figure out why this seems to be insane
 #if 0
@@ -226,7 +247,12 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 
 	//TODO: be more useful about this	
 	if(timediff*self->period.d > self->period.n) self->delay = 0;
-	else if(timediff > 0) self->delay = MAX(self->delay - timediff/2, 0);
+	else if(timediff > 0) self->delay = MAX(self->delay - timediff, 0);
+	
+	//self->delay = MAX(self->delay - self->slack/500, 0);
+	
+	//TODO: maybe include an estimator for winsys delay and jitter, like we have
+	// for worktime
 
 	return self->delay;
 }

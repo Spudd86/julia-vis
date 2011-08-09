@@ -287,6 +287,10 @@ glx_main_loop_quit:
 	return 0;
 }
 
+static void gl_hline(float y, float x1, float x2) {
+	glVertex2f(x1, y); glVertex2f(x2, y);
+}
+
 //TODO: add hotkey to turn this on and off
 void render_fps_hist(void)
 {
@@ -295,6 +299,10 @@ void render_fps_hist(void)
 	fps_get_worktimes(fps_data, &fpstotal, &fpslen, &fpsworktimes);
 
 	float scl = swap_period.n/(swap_period.d*1000000.0f);
+	int frame_int = (int)(swap_period.d*INT64_C(1000000)/swap_period.n);
+	
+	int totslen = MIN(fpslen, HIST_LEN);
+	int tots[totslen];
 
 	glPushMatrix();
 	glScalef(1.0, 0.25, 1);
@@ -302,27 +310,38 @@ void render_fps_hist(void)
 	
 	float px = 1.0f/(opts.h*0.5f);
 	glBegin(GL_LINES);
-	glColor3f(1.0f, 0.0f, 0.0f);
-	glVertex2f(-px, slackhist_total*scl/HIST_LEN); glVertex2f(-8*px, slackhist_total*scl/HIST_LEN);
-	glColor3f(0.0f, 1.0f, 0.0f);
-	glVertex2f(-px, delayhist_total*scl/HIST_LEN); glVertex2f(-7*px, delayhist_total*scl/HIST_LEN);
-	glColor3f(1.0f, 1.0f, 0.0f);
-	glVertex2f(-px, fpstotal*scl/fpslen); glVertex2f(-5*px, fpstotal*scl/fpslen);
+	glColor3f(1.0f, 0.0f, 0.0f); gl_hline(scl*(frame_int - slackhist_total/HIST_LEN), -px, -9*px);
+	//glColor3f(0.0f, 0.0f, 1.0f); gl_hline(slackhist_total*scl/HIST_LEN, -px, -8*px);
+	glColor3f(0.0f, 1.0f, 0.0f); gl_hline(delayhist_total*scl/HIST_LEN, -px, -7*px);
+	glColor3f(1.0f, 1.0f, 0.0f); gl_hline(fpstotal*scl/fpslen, -px, -5*px);
 	glEnd();
 	
-	draw_hist_array_col(framecnt, scl, slackhist, HIST_LEN, 1.0f, 0.0f, 0.0f);
-	draw_hist_array(framecnt, scl, delayhist, HIST_LEN);
+	//draw_hist_array_col(framecnt, scl, slackhist, HIST_LEN, 0.0f, 0.0f, 1.0f);
+	draw_hist_array_col(framecnt, scl, delayhist, HIST_LEN, 0.0f, 1.0f, 0.0f);
 	draw_hist_array_col(framecnt, scl, fpsworktimes, fpslen, 1.0f, 1.0f, 0.0f);
+
+	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = frame_int - slackhist[HIST_LEN-i-1];
+	draw_hist_array_col(framecnt, scl, tots, totslen, 1.0f, 0.0f, 0.0f);
+	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = delayhist[HIST_LEN-i-1] + fpsworktimes[fpslen-i-1];
+	draw_hist_array_col(framecnt, scl, tots, totslen, 0.0f, 1.0f, 1.0f);
 	glPopMatrix();
 	
-
 	glPushMatrix();
 	glScalef(0.5, 0.25, 1); glTranslatef(-2, -4, 0);
+	//glScalef(0.5, 0.5, 1); glTranslatef(-1, -2, 0);
+	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = delayhist[HIST_LEN-i-1] + fpsworktimes[fpslen-i-1];
+	draw_hist_array_col(framecnt, scl, tots, totslen, 0.0f, 1.0f, 1.0f);
+	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = frame_int - slackhist[HIST_LEN-i-1];
+	draw_hist_array_col(framecnt, scl, tots, totslen, 1.0f, 0.0f, 0.0f);
+	glPopMatrix();
+
+	glPushMatrix();
+	glScalef(0.5, 0.25, 1); glTranslatef(-2, -3, 0);
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glBegin(GL_LINES); glVertex2f(1.0f, 0.5f); glVertex2f(1.05f, 0.5f); glEnd();
 	draw_hist_array(framecnt, fpslen/(2.0f*fpstotal), fpsworktimes, fpslen);
-	//draw_hist_array(framecnt, HIST_LEN/(2.0f*MAX(delayhist_total,1)), delayhist, HIST_LEN);
 	glPopMatrix();
+	
 	glColor3f(1.0f, 1.0f, 1.0f);
 	char buf[128];
 	sprintf(buf,"AVG delay %6.1f\n   slack %6.1f\n   worktime %6.1f\n", 
@@ -331,15 +350,32 @@ void render_fps_hist(void)
 	        (float)fpstotal/fpslen);
 	draw_string(buf); DEBUG_CHECK_GL_ERR;
 	
-	glRasterPos2f(-1, -0.75);// - 20.0f/(opts.h*0.5f));
+	glColor3f(0.0f, 1.0f, 0.0f);
+	glRasterPos2f(-1, -0.5);
 	draw_string("worktimes"); DEBUG_CHECK_GL_ERR;
 	
-	glRasterPos2f(0.5, -0.75);// - 20.0f/(opts.h*0.5f));
-	draw_string("delay"); DEBUG_CHECK_GL_ERR;
-	glRasterPos2f(0.5, -0.75);// - 20.0f/(opts.h*0.5f));
+	glColor3f(0.0f, 1.0f, 1.0f);
+	glRasterPos2f(-1, -0.75);
+	draw_string("wkt+delay"); DEBUG_CHECK_GL_ERR;
 	glColor3f(1.0f, 0.0f, 0.0f);
+	glRasterPos2f(-1, -0.75);
+	draw_string("          -slack"); DEBUG_CHECK_GL_ERR;
+	
+	glColor3f(0.0f, 1.0f, 0.0f);
+	glRasterPos2f(0.25, -0.75);// - 20.0f/(opts.h*0.5f));
+	draw_string("delay"); DEBUG_CHECK_GL_ERR;
+	
+	glColor3f(1.0f, 0.0f, 0.0f);
+	glRasterPos2f(0.25, -0.75);// - 20.0f/(opts.h*0.5f));
 	//draw_string(" slack"); DEBUG_CHECK_GL_ERR;
-	draw_string("      slack"); DEBUG_CHECK_GL_ERR;
+	draw_string("      -slack"); DEBUG_CHECK_GL_ERR;
+	
+	glColor3f(1.0f, 1.0f, 0.0f);
+	glRasterPos2f(0.25, -0.75);// - 20.0f/(opts.h*0.5f));
+	//draw_string(" worktimes"); DEBUG_CHECK_GL_ERR;
+	draw_string("             worktimes"); DEBUG_CHECK_GL_ERR;
+	
+	glColor3f(1.0f, 1.0f, 1.0f);
 }
 
 void render_debug_overlay(void)
