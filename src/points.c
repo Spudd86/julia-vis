@@ -37,7 +37,7 @@ void update_points(struct point_data *pd, unsigned int passed_time, int retarget
 	}
 	
 	const float tsped = 0.002f;
-	const int steps_ps = 150;
+	const unsigned int steps_ps = 150;
 	
 	// go through this mess here to make sure we're running the loop some integer multiple of the framerate times
 	// (assuming constant framerate that is)
@@ -49,7 +49,8 @@ void update_points(struct point_data *pd, unsigned int passed_time, int retarget
 	unsigned int dt = del;
 	int steps = 1;
 	if(del > 0) {
-		while(dt > 1000/steps_ps) dt = dt/2;
+		//while(dt > (1000/steps_ps)) dt = dt/2;
+		while(dt*steps_ps > 1000) dt = dt/2;
 		steps = del/dt;
 	} else dt=1;
 	

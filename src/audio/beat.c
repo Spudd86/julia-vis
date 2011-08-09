@@ -52,17 +52,14 @@ void beat_ctx_update(beat_ctx *self, const float *restrict fft, int fft_len)
 		// since log2(samp+1)/2 should give us a nice linear relation to percived volume
 		//float tmp = log2f(getsamp(fft, fft_len, b*fft_len/(BANDS*2) , fft_len/(BANDS*4)) + 1.0f)/2;
 		float tmp = getsamp(fft, fft_len, b*fft_len/(BANDS*2) , fft_len/(BANDS*4));
-		float v = 0;
+		
 		float *const restrict Ehb = self->Eh[b];
 
-		for(int i=0; i<HIST; i++) v += sqr(Ehb[(hi + HIST + i)%(HIST*2)]) - sqr(E[b]);
-		self->V[b] = sqrtf(v);
-		self->E[b] += (tmp - Ehb[(hi+HIST)%(HIST*2)])/HIST;
-
-		Ehb[hi] = tmp;
+		
 
 		//float C = -0.0025714*V[b]+1.5142857;
-		float C = -0.00025714*V[b]+1.5142857*2.5;
+		float C = -0.0025714*V[b]+1.5142857*2;
+		//float C = -0.00025714*V[b]+1.5142857*2.5;
 		if(tmp > C*E[b] && E[b]>0.002f) {
 			if(self->count - self->lastbeat > 10) {
 				__sync_add_and_fetch(&self->beat_count, 1);
@@ -70,6 +67,13 @@ void beat_ctx_update(beat_ctx *self, const float *restrict fft, int fft_len)
 			}
 			//__sync_add_and_fetch(beat_bands + b, 1);
 		}
+		
+		float v = 0;
+		for(int i=0; i<HIST; i++) v += sqr(Ehb[(hi + HIST + i)%(HIST*2)]) - sqr(E[b]);
+		self->V[b] = sqrtf(v);
+		self->E[b] += (tmp - Ehb[(hi+HIST)%(HIST*2)])/HIST;
+
+		Ehb[hi] = tmp;
 	}
 
 	self->hi = (hi + 1)%(HIST*2);

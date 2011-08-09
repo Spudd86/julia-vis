@@ -37,9 +37,24 @@ void audio_shutdown()
  * take nr_samp frames of audio and do update beat detection
  * http://www.gamedev.net/reference/programming/features/beatdetection/
  */
-static float *do_fft(float *in)
+static float *do_fft(float *in1, float *in2)
 {
-	memcpy(fft_tmp, in, sizeof(float)*nr_samp);
+	//memcpy(fft_tmp, in, sizeof(float)*nr_samp);
+	for(int i=0; i<nr_samp;i++) { // window samples
+		// Hanning window
+		float w = 0.5f*(1.0f - cosf((2*(float)M_PI*i)/(nr_samp-1)));
+		
+		// Blackman
+		//float w = (1.0f - 0.16f)/2 - 0.5f*cosf((2*(float)M_PI*i)/(nr_samp-1)) + 0.16f*0.5f*cosf((4*(float)M_PI*i)/(nr_samp-1));
+		
+		//Lanczos
+		//float t = (2.0f*i/(nr_samp-1) - 1)*(float)M_PI;
+		//float w = sin(t)/t;
+		
+		fft_tmp[i] = ((i < nr_samp/2)?in1[i]:in2[i-nr_samp/2])*w;
+		
+	}
+	
 	fftwf_execute(p);
 	float *fft = fft_tmp;
 #ifdef FFT_TRIBUF
@@ -81,14 +96,16 @@ void audio_update(const float * __attribute__ ((aligned (16))) in, int n)
 		remain = n - cpy;
 		in += cpy;
 		bufp = (bufp + cpy)%nr_samp;
+		if(bufp == 0) {
+			cur_buf = NULL;
+			tribuf_finish_write(samp_tb);
+		} else return;
 	}
-	if(bufp == 0) {
-		cur_buf = NULL;
-		tribuf_finish_write(samp_tb);
-	} else return;
 	
+	
+	//TODO: lapped transform?
 	buf_count++;
-	beat_update(do_fft(samps), nr_samp/2);
+	beat_update(do_fft(samps, samps+nr_samp/2), nr_samp/2);
 
 	if(remain > 0) audio_update(in, remain);
 }
