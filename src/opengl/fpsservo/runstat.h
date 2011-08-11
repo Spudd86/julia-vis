@@ -31,11 +31,11 @@ static void runstat_insert(struct runstat *self, int i, int v) {
 	self->data[i] = v;
 }
 
-static int runstat_varience(struct runstat *self) {
+static int runstat_varience(const struct runstat *self) {
 	return (self->sqrsum - self->sum*(int64_t)self->sum/self->n)/self->n;
 }
 
-static int runstat_average(struct runstat *self) {
+static int runstat_average(const struct runstat *self) {
 	return self->sum/self->n;
 }
 

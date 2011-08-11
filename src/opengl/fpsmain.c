@@ -294,15 +294,22 @@ static void gl_hline(float y, float x1, float x2) {
 //TODO: add hotkey to turn this on and off
 void render_fps_hist(void)
 {
-	int fpstotal, fpslen;
+	int fpstotal, swaptotal, slacktotal, fpsdelaytotal, fpslen;
 	const int *fpsworktimes = NULL;
-	fps_get_worktimes(fps_data, &fpstotal, &fpslen, &fpsworktimes);
+	const int *fpsframetimes = NULL;
+	const int *fpsdelays = NULL;
+	const int *fpsslacks = NULL;
+	fpslen = fps_get_hist_len(fps_data);
+	fps_get_worktimes(fps_data, &fpstotal, &fpsworktimes);
+	fps_get_frametimes(fps_data, &swaptotal, &fpsframetimes);
+	fps_get_delays(fps_data, &fpsdelaytotal, &fpsdelays);
+	fps_get_slacks(fps_data, &slacktotal, &fpsslacks);
 
 	float scl = swap_period.n/(swap_period.d*1000000.0f);
 	int frame_int = (int)(swap_period.d*INT64_C(1000000)/swap_period.n);
 	
 	int totslen = MIN(fpslen, HIST_LEN);
-	int tots[totslen];
+	int tots[MAX(fpslen, HIST_LEN)];
 
 	glPushMatrix();
 	glScalef(1.0, 0.25, 1);
@@ -320,8 +327,8 @@ void render_fps_hist(void)
 	draw_hist_array_col(framecnt, scl, delayhist, HIST_LEN, 0.0f, 1.0f, 0.0f);
 	draw_hist_array_col(framecnt, scl, fpsworktimes, fpslen, 1.0f, 1.0f, 0.0f);
 
-	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = frame_int - slackhist[HIST_LEN-i-1];
-	draw_hist_array_col(framecnt, scl, tots, totslen, 1.0f, 0.0f, 0.0f);
+	for(int i=0; i < fpslen; i++) tots[i] = frame_int - fpsslacks[i];
+	draw_hist_array_col(framecnt, scl, tots, fpslen, 1.0f, 0.0f, 0.0f);
 	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = delayhist[HIST_LEN-i-1] + fpsworktimes[fpslen-i-1];
 	draw_hist_array_col(framecnt, scl, tots, totslen, 0.0f, 1.0f, 1.0f);
 	glPopMatrix();
@@ -329,10 +336,11 @@ void render_fps_hist(void)
 	glPushMatrix();
 	glScalef(0.5, 0.25, 1); glTranslatef(-2, -4, 0);
 	//glScalef(0.5, 0.5, 1); glTranslatef(-1, -2, 0);
-	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = delayhist[HIST_LEN-i-1] + fpsworktimes[fpslen-i-1];
-	draw_hist_array_col(framecnt, scl, tots, totslen, 0.0f, 1.0f, 1.0f);
-	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = frame_int - slackhist[HIST_LEN-i-1];
-	draw_hist_array_col(framecnt, scl, tots, totslen, 1.0f, 0.0f, 0.0f);
+	draw_hist_array_col(framecnt, scl, fpsdelays, fpslen, 0.0f, 1.0f, 0.0f);
+	for(int i=0; i < fpslen; i++) tots[i] = fpsdelays[i] + fpsworktimes[i];
+	draw_hist_array_col(framecnt, scl, tots, fpslen, 0.0f, 1.0f, 1.0f);
+	for(int i=0; i < fpslen; i++) tots[i] = frame_int - fpsslacks[i];
+	draw_hist_array_col(framecnt, scl, tots, fpslen, 1.0f, 0.0f, 0.0f);
 	glPopMatrix();
 
 	glPushMatrix();
@@ -340,13 +348,21 @@ void render_fps_hist(void)
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glBegin(GL_LINES); glVertex2f(1.0f, 0.5f); glVertex2f(1.05f, 0.5f); glEnd();
 	draw_hist_array(framecnt, fpslen/(2.0f*fpstotal), fpsworktimes, fpslen);
+	draw_hist_array_col(framecnt, scl, fpsframetimes, fpslen, 1.0f,0.0f,1.0f);
 	glPopMatrix();
 	
 	glColor3f(1.0f, 1.0f, 1.0f);
-	char buf[128];
-	sprintf(buf,"AVG delay %6.1f\n   slack %6.1f\n   worktime %6.1f\n", 
-	        (float)delayhist_total/HIST_LEN, 
-	        (float)slackhist_total/HIST_LEN, 
+	char buf[256];
+	sprintf(buf,
+	        "AVG delay %7.1f\n"
+	        "    delay %7.1f\n"
+	        "    slack %7.1f\n"
+	        "    swap  %7.1f\n"
+	        " worktime %7.1f\n",
+	        (float)delayhist_total/HIST_LEN,
+	        (float)fpsdelaytotal/fpslen,
+	        (float)slacktotal/fpslen,
+	        (float)swaptotal/fpslen,
 	        (float)fpstotal/fpslen);
 	draw_string(buf); DEBUG_CHECK_GL_ERR;
 	
