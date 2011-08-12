@@ -77,8 +77,6 @@ static Bool WaitForNotify(Display *d, XEvent *e, char *arg) {
 #define HIST_LEN 128
 static int delayhist_total = 0;
 static int delayhist[HIST_LEN];
-static int slackhist_total = 0;
-static int slackhist[HIST_LEN];
 static int framecnt = 0;
 
 static struct fps_period swap_period;
@@ -231,9 +229,6 @@ int main(int argc, char **argv)
 				int delay = swap_complete(fps_data, now, swap_event->msc, swap_event->sbc);
 				
 				//printf("swap_complete: delay = %d\n", delay);
-				
-				slackhist_total -= slackhist[framecnt%HIST_LEN];
-				slackhist_total += (slackhist[framecnt%HIST_LEN] = fps_get_cur_slack(fps_data));
 							
 				delayhist_total -= delayhist[framecnt%HIST_LEN];
 				delayhist_total += (delayhist[framecnt%HIST_LEN] = delay);
@@ -317,18 +312,15 @@ void render_fps_hist(void)
 	
 	float px = 1.0f/(opts.h*0.5f);
 	glBegin(GL_LINES);
-	glColor3f(1.0f, 0.0f, 0.0f); gl_hline(scl*(frame_int - slackhist_total/HIST_LEN), -px, -9*px);
-	//glColor3f(0.0f, 0.0f, 1.0f); gl_hline(slackhist_total*scl/HIST_LEN, -px, -8*px);
+	glColor3f(1.0f, 0.0f, 0.0f); gl_hline(scl*(frame_int - slacktotal/fpslen), -px, -9*px);
 	glColor3f(0.0f, 1.0f, 0.0f); gl_hline(delayhist_total*scl/HIST_LEN, -px, -7*px);
 	glColor3f(1.0f, 1.0f, 0.0f); gl_hline(fpstotal*scl/fpslen, -px, -5*px);
 	glEnd();
 	
-	//draw_hist_array_col(framecnt, scl, slackhist, HIST_LEN, 0.0f, 0.0f, 1.0f);
 	draw_hist_array_col(framecnt, scl, delayhist, HIST_LEN, 0.0f, 1.0f, 0.0f);
 	draw_hist_array_col(framecnt, scl, fpsworktimes, fpslen, 1.0f, 1.0f, 0.0f);
-
-	for(int i=0; i < fpslen; i++) tots[i] = frame_int - fpsslacks[i];
-	draw_hist_array_col(framecnt, scl, tots, fpslen, 1.0f, 0.0f, 0.0f);
+	draw_hist_array_xlate(framecnt, -scl, frame_int*scl, fpsslacks, fpslen, 1.0f, 0.0f, 0.0f);
+	
 	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = delayhist[HIST_LEN-i-1] + fpsworktimes[fpslen-i-1];
 	draw_hist_array_col(framecnt, scl, tots, totslen, 0.0f, 1.0f, 1.0f);
 	glPopMatrix();
@@ -336,19 +328,23 @@ void render_fps_hist(void)
 	glPushMatrix();
 	glScalef(0.5, 0.25, 1); glTranslatef(-2, -4, 0);
 	//glScalef(0.5, 0.5, 1); glTranslatef(-1, -2, 0);
+	draw_hist_array_xlate(framecnt, -scl, frame_int*scl, fpsslacks, fpslen, 1.0f, 0.0f, 0.0f);
 	draw_hist_array_col(framecnt, scl, fpsdelays, fpslen, 0.0f, 1.0f, 0.0f);
-	for(int i=0; i < fpslen; i++) tots[i] = fpsdelays[i] + fpsworktimes[i];
+	//for(int i=0; i < fpslen; i++) tots[i] = fpsdelays[i] + fpsworktimes[i];
 	draw_hist_array_col(framecnt, scl, tots, fpslen, 0.0f, 1.0f, 1.0f);
-	for(int i=0; i < fpslen; i++) tots[i] = frame_int - fpsslacks[i];
-	draw_hist_array_col(framecnt, scl, tots, fpslen, 1.0f, 0.0f, 0.0f);
+	glPopMatrix();
+	
+	glPushMatrix();
+	glScalef(0.5, 0.25, 1); glTranslatef(-2, -3, 0);
+	glColor3f(0.6f, 0.6f, 0.6f); glBegin(GL_LINES); gl_hline(0.5f, 0.0f, 1.05f); glEnd();
+	draw_hist_array_xlate(framecnt, scl/2, 0.5f, fpsframetimes, fpslen, 1.0f,0.0f,1.0f);
 	glPopMatrix();
 
 	glPushMatrix();
-	glScalef(0.5, 0.25, 1); glTranslatef(-2, -3, 0);
-	glColor3f(1.0f, 1.0f, 1.0f);
-	glBegin(GL_LINES); glVertex2f(1.0f, 0.5f); glVertex2f(1.05f, 0.5f); glEnd();
-	draw_hist_array(framecnt, fpslen/(2.0f*fpstotal), fpsworktimes, fpslen);
-	draw_hist_array_col(framecnt, scl, fpsframetimes, fpslen, 1.0f,0.0f,1.0f);
+	glScalef(0.5, 0.25, 1); glTranslatef(-2, -2, 0);
+	glColor3f(0.6f, 0.6f, 0.6f); glBegin(GL_LINES); gl_hline(0.5f, 0.0f, 1.05f); glEnd();
+	float fps_scl_avg = fpslen*0.5f/MAX(fpstotal, fpslen);
+	draw_hist_array_col(framecnt, fps_scl_avg, fpsworktimes, fpslen, 0.0f,1.0f,0.0f);
 	glPopMatrix();
 	
 	glColor3f(1.0f, 1.0f, 1.0f);

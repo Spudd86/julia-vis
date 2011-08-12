@@ -137,8 +137,8 @@ void setup_viewport(int width, int height) {
 	glLoadIdentity();
 }
 
-void draw_hist_array_col(int off, float scl, const int *array, int len, float r, float g, float b)
-{	
+void draw_hist_array_xlate(int off, float scl, float xlate, const int *array, int len, float r, float g, float b)
+{
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glBegin(GL_LINES);
 	glVertex2f(0, 1); glVertex2f(1, 1);
@@ -152,10 +152,10 @@ void draw_hist_array_col(int off, float scl, const int *array, int len, float r,
 	for(int i=0; i<len-1; i++) {
 		int idx = (i + off)%len;
 		pnts[i*2][0] = ((float)i)/(len-1);
-		pnts[i*2][1] = scl*array[idx];
+		pnts[i*2][1] = scl*array[idx]+xlate;
 		idx = (i + 1 + off)%len;
 		pnts[i*2+1][0] = ((float)(i+1))/(len-1);
-		pnts[i*2+1][1] = scl*array[idx];
+		pnts[i*2+1][1] = scl*array[idx]+xlate;
 	}
 	//glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
@@ -170,12 +170,18 @@ void draw_hist_array_col(int off, float scl, const int *array, int len, float r,
 	glBegin(GL_LINES);
 	for(int i=0; i<len-1; i++) {
 		int idx = (i + off)%len;
-		glVertex2f(((float)i)/(len-1), scl*array[idx]);
+		glVertex2f(((float)i)/(len-1), scl*array[idx]+xlate);
 		idx = (i + 1 + off)%len;
-		glVertex2f(((float)(i+1))/(len-1), scl*array[idx]);
+		glVertex2f(((float)(i+1))/(len-1), scl*array[idx]+xlate);
 	}
 	glEnd();
 #endif
+}
+
+
+void draw_hist_array_col(int off, float scl, const int *array, int len, float r, float g, float b)
+{	
+	draw_hist_array_xlate(off, scl, 0.0f, array, len, r, g, b);
 }
 
 void draw_hist_array(int off, float scl, const int *array, int len) {

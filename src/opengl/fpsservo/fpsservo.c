@@ -132,23 +132,6 @@ struct fps_data *fps_data_new(struct fps_period rate, uint64_t init_msc, uint64_
 	return self;
 }
 
-#define iter1(N) \
-    try = root + (1 << (N)); \
-    if (n >= try << (N))   \
-    {   n -= try << (N);   \
-        root |= 2 << (N); \
-    }
-
-static int32_t isqrt(uint32_t n)
-{
-    uint32_t root = 0, try;
-    iter1 (15);    iter1 (14);    iter1 (13);    iter1 (12);
-    iter1 (11);    iter1 (10);    iter1 ( 9);    iter1 ( 8);
-    iter1 ( 7);    iter1 ( 6);    iter1 ( 5);    iter1 ( 4);
-    iter1 ( 3);    iter1 ( 2);    iter1 ( 1);    iter1 ( 0);
-    return root >> 1;
-}
-
 //TODO: need to have some way to profile what value slack and delay have!
 // ideally with a graph we can overly on top of whatever
 // also would like to track when we miss a swap deadline, again profile, 
@@ -167,8 +150,9 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	runstat_insert(self->workstat, self->count, now - (self->frame_start + self->delay));
 
 	int avgworktime = runstat_average(self->workstat);
-	int varience = runstat_varience(self->workstat);
-	int wktime_stdev = (int)isqrt(varience);
+	//int varience = runstat_varience(self->workstat);
+	//int wktime_stdev = (int)isqrt(varience);
+	int wktime_stdev = runstat_stddev(self->workstat);
 	
 	// if we assume worktime is expontially distributed with a shift then:
 	//       want x s.t. p[t_wk > x] <= 0.002
@@ -201,7 +185,6 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 		self->delay = MAX(newdelay, 0);
 	}
 	
-	runstat_insert(self->delaystat, self->count, self->delay);
 	runstat_insert(self->slackstat, self->count, self->slack);
 	
 	self->count++;
@@ -244,20 +227,17 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 
 	//TODO: be more useful about this	
 	if(timediff*self->period.d > self->period.n) self->delay = 0;
-	else if(timediff > 0) {	//self->delay = MAX(self->delay - timediff/2, 0);
+	else if(timediff > 0) {	
+		self->delay = MAX(self->delay - timediff/2, 0);
 	
-		int delay_off = MIN(self->delay, timediff);
-		self->delay = self->delay - delay_off/4;
-		
-		self->frame_start += delay_off*3/4;
-		return self->delay - delay_off*3/4;
+		//int delay_off = MIN(self->delay, timediff);
+		//self->delay = self->delay - delay_off/4;
+		//self->frame_start += delay_off*3/4;
+		//return self->delay - delay_off*3/4;
 	}
 	
-	//self->delay = MAX(self->delay - self->slack/500, 0);
+	runstat_insert(self->delaystat, self->count, self->delay);
 	
-	//TODO: maybe include an estimator for winsys delay and jitter, like we have
-	// for worktime
-
 	return self->delay;
 }
 
