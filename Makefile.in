@@ -116,10 +116,10 @@ ALL_BINS += bin/dfb-test$(EXEEXT)
 endif
 
 ifeq ($(USE_OLD_TRIBUF),yes)
-TRIBUF_SRCS = tribuf.c
+TRIBUF_SRCS = old_tribuf.c
 CFLAGS += -DTRIBUF_LOCKING
 else
-TRIBUF_SRCS = src/atomic_tribuf3.c
+TRIBUF_SRCS = src/tribuf.c
 endif
 
 ifeq (@disable_atomics@,yes)
