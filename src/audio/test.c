@@ -1,6 +1,7 @@
 #include "common.h"
 #include "sdl-misc.h"
 #include "audio.h"
+#include "beat.h"
 
 #define IM_SIZE (768)
 
@@ -105,6 +106,9 @@ int main(int argc, char **argv)
 
 	int beath[16][im_w];
 	memset(beath, 0, sizeof(beath));
+	
+	beat_ctx *beat_ctx = beat_new();
+	int beat_nbands = beat_ctx_bands(beat_ctx);
 
 	while(SDL_PollEvent(&event) >= 0)
 	{
@@ -112,26 +116,36 @@ int main(int argc, char **argv)
 			|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE))
 			break;
 
-		const int vpx = audio_get_buf_count() % im_w;
-		if(ovpx == vpx) SDL_Delay(2000/982);
+		int avpx = audio_get_buf_count() % im_w;
+		//if(ovpx == vpx) SDL_Delay(2000/982);
+		while(ovpx == avpx) { //SDL_Delay(0);
+			avpx = audio_get_buf_count() % im_w;
+		}
+		int vpx = (ovpx+1) % im_w;
 
 		SDL_Rect r = {0,0, im_w, im_h/2+1};
 		SDL_FillRect(screen, &r, 0);
 
 		audio_data d;
-		beat_data bd;
-		int beat_count = beat_get_count();
-		beat_get_data(&bd);
 		audio_get_fft(&d);
-		//TODO: make copy of fft so we can finish read sooner
+		
+		beat_ctx_update(beat_ctx, d.data, d.len);
+		int beat_count = beat_ctx_count(beat_ctx);
+		
+		for(int b=0; b < 16; b++) {
+			float samp = getsamp(d.data, d.len, b*d.len/(beat_nbands*2), d.len/(beat_nbands*4));
+			float s = 1 - 0.2f*log2f(1+31*samp);
+			beath[b][ovpx] = MAX((b + s)*(im_h/32), b);
+		}
 
 		if(SDL_MUSTLOCK(voice_print) && SDL_LockSurface(voice_print) < 0) { printf("failed to lock voice_print\n"); break; }
 
-		for(int i=0; i < IMIN(d.len,im_h/2); i++) {
-			int bri = 255*log2f(d.data[i*d.len/IMIN(d.len,im_h/2)]*255+1.0f)/8;
+		for(int i=0; i < MIN(d.len,im_h/2); i++) {
+			int bri = 255*log2f(d.data[i*d.len/MIN(d.len,im_h/2)]*255+1.0f)/8;
 			putpixel_mono(voice_print, vpx, i, bri);
 		}
 		ovpx = vpx;
+
 		if(SDL_MUSTLOCK(voice_print)) SDL_UnlockSurface(voice_print);
 
 		if(oldbc != beat_count)
@@ -146,14 +160,16 @@ int main(int argc, char **argv)
 		if(SDL_MUSTLOCK(screen) && SDL_LockSurface(screen) < 0) { printf("failed to lock screen\n"); break; }
 
 		int ox, oy;
-		ox = 0.125f*im_w; oy = (1.0f-2*getsamp(d.data, d.len, 0, d.len/(bd.bands*4)))*(im_h-2);
-		for(int i=0; i<bd.bands; i++) {// draw a simple 'scope
-			int x = 0.125f*im_w+i*0.75f*im_w/(bd.bands);
-			int y = (1.0f - 2*getsamp(d.data, d.len, i*d.len/(bd.bands*2), d.len/(bd.bands*4)))*(im_h-2);
+		ox = 0.125f*im_w; oy = (1.0f-2*getsamp(d.data, d.len, 0, d.len/(beat_nbands*4)))*(im_h-2);
+		for(int i=0; i<beat_nbands; i++) {// draw a simple 'scope
+			int x = 0.125f*im_w+i*0.75f*im_w/(beat_nbands);
+			int y = (1.0f - 2*getsamp(d.data, d.len, i*d.len/(beat_nbands*2), d.len/(beat_nbands*4)))*(im_h-2);
 			draw_line(screen, ox, oy, x, y, blue);
 			ox=x; oy=y;
 		}
 
+		beat_data bd;
+		beat_ctx_get_data(beat_ctx, &bd);
 		ox = 0.125f*im_w;
 		oy = (1.0f-2*bd.means[0])*(im_h-2);
 		oy = abs(oy)%im_h;
@@ -174,8 +190,6 @@ int main(int argc, char **argv)
 		}
 
 		for(int b=0; b < 16; b++) {
-			const float s = 1 - 0.2f*log2f(1+31*beat_gethist(&bd, b, bd.histlen-1));
-			beath[b][vpx] = IMAX((b + s)*im_h/32, 0);
 			ox = 0; oy = beath[b][(vpx+1)%im_w];
 			for(int i=1; i < im_w; i++) {
 				int y = beath[b][(vpx+i+1)%im_w];

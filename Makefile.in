@@ -181,7 +181,7 @@ src/opengl/GLee/GLee.o: src/opengl/GLee/GLee.c
 	$(CC) -g -O2 $(GL_CFLAGS) -c $< -o $@
 
 bin/sdlthread-test$(EXEEXT): src/software/sdl-thread.c src/sdl-misc.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) src/points.h src/common.h Makefile config.mk
-	$(CC) $(CFLAGS) -DUSE_SDL -DTRIBUF_LOCKING \
+	$(CC) $(CFLAGS) -DUSE_SDL \
 	src/software/sdl-thread.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
@@ -190,9 +190,9 @@ bin/dfb-test$(EXEEXT): src/software/directfb.c $(SOFT_SRCS) src/optproc.c $(TRIB
 	src/software/directfb.c $(SOFT_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) \
 	$(DFB_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
-bin/audio-test$(EXEEXT): $(AUDIO_SRCS) src/audio/test.c src/sdl-misc.c src/terminusIBM.c src/optproc.c $(TRIBUF_SRCS) src/software/line.c
+bin/audio-test$(EXEEXT): $(AUDIO_SRCS) src/audio/test.c src/sdl-misc.c src/terminusIBM.c src/optproc.c $(TRIBUF_SRCS) src/audio/rb.c src/software/line.c
 	$(CC) $(CFLAGS) -DFFT_TRIBUF -DUSE_SDL \
-	$(AUDIO_SRCS) src/audio/test.c src/sdl-misc.c src/terminusIBM.c src/optproc.c $(TRIBUF_SRCS) src/software/line.c \
+	$(AUDIO_SRCS) src/audio/test.c src/sdl-misc.c src/terminusIBM.c src/optproc.c $(TRIBUF_SRCS) src/audio/rb.c src/software/line.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
 

@@ -1,10 +1,10 @@
 #include "common.h"
-#include "audio.h"
-#include "audio-private.h"
+#include "beat.h"
 
 #define BANDS (64)
 // about a seconds worth
-#define HIST 45
+//#define HIST 45
+#define HIST 90
 
 struct beat_ctx {
 	int hi; // index in circular history buffer
@@ -23,7 +23,17 @@ beat_ctx *beat_new() {
 	return self;
 }
 
-int beat_ctx_count(beat_ctx *self) { return __sync_add_and_fetch(&self->beat_count, 0); }
+int beat_ctx_count(beat_ctx *self) { return self->beat_count; }
+int beat_ctx_bands(beat_ctx *self) { return BANDS; }
+
+void beat_ctx_get_data(beat_ctx *ctx, beat_data *ad) {
+	ad->bands = BANDS;
+	ad->histlen = HIST;
+	ad->hi = (ctx->hi + HIST*2 - 1)%(HIST*2);
+	ad->counts = ctx->beat_bands;
+	ad->stddev = ctx->V;
+	ad->means  = ctx->E;
+}
 
 
 static inline float sqr(float x) { return x*x; }
@@ -50,16 +60,16 @@ void beat_ctx_update(beat_ctx *self, const float *restrict fft, int fft_len)
 	for(int b=0; b < BANDS; b++)
 	{ // TODO: try to make a good beat detector based on slope of log2(fft + 1)/2
 		// since log2(samp+1)/2 should give us a nice linear relation to percived volume
-		//float tmp = log2f(getsamp(fft, fft_len, b*fft_len/(BANDS*2) , fft_len/(BANDS*4)) + 1.0f)/2;
-		float tmp = getsamp(fft, fft_len, b*fft_len/(BANDS*2) , fft_len/(BANDS*4));
+		float tmp = log2f(getsamp(fft, fft_len, b*fft_len/(BANDS*2) , fft_len/(BANDS*4)) + 1.0f)/2;
+		//float tmp = getsamp(fft, fft_len, b*fft_len/(BANDS*2) , fft_len/(BANDS*4));
 		
 		float *const restrict Ehb = self->Eh[b];
 
 		
 
 		//float C = -0.0025714*V[b]+1.5142857;
-		float C = -0.0025714*V[b]+1.5142857*2;
-		//float C = -0.00025714*V[b]+1.5142857*2.5;
+		//float C = -0.0025714*V[b]+1.5142857*2;
+		float C = -0.00025714*V[b]+1.5142857*2.5;
 		if(tmp > C*E[b] && E[b]>0.002f) {
 			if(self->count - self->lastbeat > 10) {
 				__sync_add_and_fetch(&self->beat_count, 1);
@@ -78,32 +88,5 @@ void beat_ctx_update(beat_ctx *self, const float *restrict fft, int fft_len)
 
 	self->hi = (hi + 1)%(HIST*2);
 	self->count++;
-}
-
-
-static beat_ctx glbl_ctx;
-void beat_setup() {
-	memset(&glbl_ctx, 0, sizeof(beat_ctx));
-}
-
-int beat_get_count(void) { return __sync_add_and_fetch(&glbl_ctx.beat_count, 0); }
-void beat_get_data(beat_data *ad) {
-	ad->bands = BANDS;
-	ad->histlen = HIST;
-	ad->hi = glbl_ctx.hi;
-	ad->counts = glbl_ctx.beat_bands;
-	ad->stddev = glbl_ctx.V;
-	ad->means  = glbl_ctx.E;
-//	ad->df = dF;
-	ad->hist = (void *)glbl_ctx.Eh;
-}
-
-/**
- * take 1024 frames of audio and do update beat detection
- * http://www.gamedev.net/reference/programming/features/beatdetection/
- */
-void beat_update(const float *restrict fft, int fft_len)
-{
-	beat_ctx_update(&glbl_ctx, fft, fft_len);
 }
 
