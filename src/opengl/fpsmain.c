@@ -204,13 +204,23 @@ int main(int argc, char **argv)
 	while(1) {
 		int err;
 		//if(err = poll(pfds, 2, 5) < 0) continue;
-		if(err = poll(pfds, 2, -1) < 0) continue;
+		if((err = poll(pfds, 2, -1)) < 0) continue;
 		
 		if(pfds[0].revents) {
 			uint64_t timeouts;
 			read(tfd, &timeouts, sizeof(timeouts));			
 			//printf("Render (timeouts = %" PRId64 ")\n", timeouts);
 			render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
+#if 0			
+			int64_t ust, msc, sbc;
+			glXWaitForSbcOML(dpy, glxWin, 0, &ust, &msc, &sbc);
+			int64_t now = uget_ticks();
+			int delay = swap_complete(fps_data, now, msc, sbc);
+			delayhist_total -= delayhist[framecnt%HIST_LEN];
+			delayhist_total += (delayhist[framecnt%HIST_LEN] = delay);
+			framecnt++;
+			arm_timer(tfd, now+delay);
+#endif
 		}
 		
 		//if(!pfds[1].revents) continue;
@@ -219,7 +229,7 @@ int main(int argc, char **argv)
 		while (XPending(dpy) > 0) 
 		{
 			XNextEvent(dpy, &event);
-			
+#if 1			
 			if(event.type == glxEventBase + GLX_BufferSwapComplete) {
 				int64_t now = uget_ticks();
 				
@@ -239,6 +249,7 @@ int main(int argc, char **argv)
 				
 				continue;
 			}
+#endif
 			
 			switch (event.type) {
 				case Expose:
@@ -307,19 +318,27 @@ void render_fps_hist(void)
 	int tots[MAX(fpslen, HIST_LEN)];
 
 	glPushMatrix();
-	glScalef(1.0, 0.25, 1);
-	glTranslatef(0, -4, 0);
+	//glScalef(1.0, 0.25, 1); glTranslatef(0, -4, 0);
+	glScalef(1.0, 0.5, 1); glTranslatef(0, -2, 0);
 	
 	float px = 1.0f/(opts.h*0.5f);
+	glBegin(GL_QUADS);
+	glColor3f(1.0f, 0.4f, 0.4f);gl_hline(1.0, 1.0f, -10*px);
+	glColor3f(0.4f, 0.2f, 0.2f);gl_hline((frame_int-2000)*scl, -10*px, 1.0f);
+	glEnd();
 	glBegin(GL_LINES);
-	glColor3f(1.0f, 0.0f, 0.0f); gl_hline(scl*(frame_int - slacktotal/fpslen), -px, -9*px);
+	//glColor3f(1.0f, 0.6f, 0.6f); gl_hline((frame_int-2000)*scl, -10*px, 1.0f);
+	glColor3f(0.4f, 0.4f, 0.4f);
+	for(int lnpos = frame_int-4000; lnpos >= 0; lnpos -= 2000) 
+		gl_hline(lnpos*scl, -10*px, 1.0f);
+	glColor3f(1.0f, 0.0f, 1.0f); gl_hline(scl*(frame_int - slacktotal/fpslen), -px, -9*px);
 	glColor3f(0.0f, 1.0f, 0.0f); gl_hline(delayhist_total*scl/HIST_LEN, -px, -7*px);
 	glColor3f(1.0f, 1.0f, 0.0f); gl_hline(fpstotal*scl/fpslen, -px, -5*px);
 	glEnd();
 	
 	draw_hist_array_col(framecnt, scl, delayhist, HIST_LEN, 0.0f, 1.0f, 0.0f);
 	draw_hist_array_col(framecnt, scl, fpsworktimes, fpslen, 1.0f, 1.0f, 0.0f);
-	draw_hist_array_xlate(framecnt, -scl, frame_int*scl, fpsslacks, fpslen, 1.0f, 0.0f, 0.0f);
+	draw_hist_array_xlate(framecnt, -scl, frame_int*scl, fpsslacks, fpslen, 1.0f, 0.0f, 1.0f);
 	
 	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = delayhist[HIST_LEN-i-1] + fpsworktimes[fpslen-i-1];
 	draw_hist_array_col(framecnt, scl, tots, totslen, 0.0f, 1.0f, 1.0f);
@@ -374,16 +393,16 @@ void render_fps_hist(void)
 	draw_string("          -slack"); DEBUG_CHECK_GL_ERR;
 	
 	glColor3f(0.0f, 1.0f, 0.0f);
-	glRasterPos2f(0.25, -0.75);// - 20.0f/(opts.h*0.5f));
+	glRasterPos2f(0.25, -0.5);// - 20.0f/(opts.h*0.5f));
 	draw_string("delay"); DEBUG_CHECK_GL_ERR;
 	
-	glColor3f(1.0f, 0.0f, 0.0f);
-	glRasterPos2f(0.25, -0.75);// - 20.0f/(opts.h*0.5f));
+	glColor3f(1.0f, 0.0f, 1.0f);
+	glRasterPos2f(0.25, -0.5);// - 20.0f/(opts.h*0.5f));
 	//draw_string(" slack"); DEBUG_CHECK_GL_ERR;
 	draw_string("      -slack"); DEBUG_CHECK_GL_ERR;
 	
 	glColor3f(1.0f, 1.0f, 0.0f);
-	glRasterPos2f(0.25, -0.75);// - 20.0f/(opts.h*0.5f));
+	glRasterPos2f(0.25, -0.5);// - 20.0f/(opts.h*0.5f));
 	//draw_string(" worktimes"); DEBUG_CHECK_GL_ERR;
 	draw_string("             worktimes"); DEBUG_CHECK_GL_ERR;
 	
@@ -399,9 +418,10 @@ void swap_buffers(void)
 {
 	int msc = 0;
 	if(fps_data)
-		swap_begin(fps_data, uget_ticks());
+		msc = swap_begin(fps_data, uget_ticks());
 	//TODO: when intel swap buffer event isn't present wait for msc
 	// then call swap complete
+	//glFlush();
 	glXSwapBuffersMscOML(dpy, glxWin, 0, 0, 0);
 }
 

@@ -69,9 +69,9 @@ void init_gl(const opt_data *opt_data, int width, int height)
 
 	CHECK_GL_ERR;
 	setup_viewport(scr_w, scr_h); CHECK_GL_ERR;
-	glHint(GL_CLIP_VOLUME_CLIPPING_HINT_EXT, GL_FASTEST); CHECK_GL_ERR;
+	//glHint(GL_CLIP_VOLUME_CLIPPING_HINT_EXT, GL_FASTEST); CHECK_GL_ERR;
 	glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST); CHECK_GL_ERR;
-	glEnable(GL_LINE_SMOOTH); CHECK_GL_ERR;
+	//glEnable(GL_LINE_SMOOTH); CHECK_GL_ERR;
 
 	glClear(GL_COLOR_BUFFER_BIT); CHECK_GL_ERR;
 	glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));

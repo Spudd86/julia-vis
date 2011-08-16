@@ -33,8 +33,8 @@
 #define USEC 1
 
 #if USEC
-#define BASE_SLACK 1500
-#define MIN_SLACK 2000
+#define BASE_SLACK 500
+#define MIN_SLACK 1500
 #else
 #define BASE_SLACK 1
 #define MIN_SLACK 2
@@ -146,33 +146,36 @@ struct fps_data *fps_data_new(struct fps_period rate, uint64_t init_msc, uint64_
  */
 int64_t swap_begin(struct fps_data *self, int64_t now)
 {
-	int period = self->period.n/self->period.d;
+	// compute our target value of 'now'
+	int64_t expected = ((self->last_swap_time - self->slack)*self->period.d + self->period.n)/self->period.d;
+	self->slack_diff = expected - now;
+	
 	runstat_insert(self->workstat, self->count, now - (self->frame_start + self->delay));
-
+	
+	//printf("now %" PRId64 " expected %" PRId64 "\n", now, expected);
+	//printf("slackdiff %" PRId64 "\n", self->slack_diff);
+	
+	int period = self->period.n/self->period.d;
 	int avgworktime = runstat_average(self->workstat);
-	//int varience = runstat_varience(self->workstat);
-	//int wktime_stdev = (int)isqrt(varience);
 	int wktime_stdev = runstat_stddev(self->workstat);
+	
+	int slack_target = BASE_SLACK;
 	
 	// if we assume worktime is expontially distributed with a shift then:
 	//       want x s.t. p[t_wk > x] <= 0.002
 	// x = -ln(0.002)/lambda = -ln(0.002)*wktime_stdev ~= 6.2*wktime_stdev
 	// the distribution is shifted
-	int slack_target = MAX(wktime_stdev*55/10 + BASE_SLACK, MIN_SLACK);
+	slack_target += wktime_stdev*60/10;
 	
-	slack_target += isqrt(runstat_varience(self->swapstat))*25/10 + MAX(runstat_average(self->swapstat), 0);
+	slack_target += runstat_stddev(self->swapstat)*20/10 + MAX(runstat_average(self->swapstat), 0);
 	
-	slack_target = MIN(self->period.n*3/(self->period.d*4), slack_target);
+	slack_target = MIN((int)(self->period.n*3/(self->period.d*4)), MAX(slack_target, MIN_SLACK));
 	
 	if(self->slack > slack_target) self->slack = (self->slack*7 + slack_target)/8;
 	else self->slack = slack_target;
 	
-	// compute our target value of 'now'
-	int64_t expected = ((self->last_swap_time - self->slack)*self->period.d + self->period.n)/self->period.d;
-	self->slack_diff = expected - now;
-	
 	if(self->slack_diff < 0) 
-		//self->delay += MIN(self->slack_diff/2, -MIN_SLACK/2);
+		//self->delay += MIN(self->slack_diff, -MIN_SLACK/2);
 		//self->delay = self->delay*3/4;
 		self->delay = (self->delay/4 > -self->slack_diff/2) ? self->delay*3/4 : self->delay + self->slack_diff/2;
 	else 
@@ -185,12 +188,10 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 		self->delay = MAX(newdelay, 0);
 	}
 	
-	runstat_insert(self->slackstat, self->count, self->slack);
-	
 	self->count++;
-	//printf("now %" PRId64 " expected %" PRId64 "\n", now, expected);
-	//printf("slackdiff %" PRId64 "\n", self->slack_diff);
 	
+	runstat_insert(self->slackstat, self->count, self->slack);
+
 	return self->msc + self->interval;
 }
 
@@ -211,6 +212,15 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 	//TODO: we need to do stuff to estimate work time, then use the esitimate
 	// to keep delay + work + slack < period*interval
 	
+	//TODO: maybe track excpected swap_begin() here, so we can muck around with
+	// returned delay without messing up our estimates for that and getting
+	// worktime with jitter in it that isn't real
+	//TODO: try to lock on to an estimate of when we'd really like to get the
+	// swap event and if the actual timing isn't stable try to schedual relative
+	// to the estimate, then let the estimate try to track the real times so
+	// we don't drift off and end up thinking we are at frame start when we are
+	// really somewhere in the middle
+	
 	int64_t expected = (self->last_swap_time*self->period.d + self->period.n)/self->period.d;
 	int timediff = now - expected;
 	
@@ -222,8 +232,6 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 	
 	if(timediff > self->period.n/self->period.d)
 		printf("after expected swap by %d (we must have missed it!)\n", timediff);
-		
-	//TODO: mabey track stddev of timediff%period and use that in slack calculation?
 
 	//TODO: be more useful about this	
 	if(timediff*self->period.d > self->period.n) self->delay = 0;
