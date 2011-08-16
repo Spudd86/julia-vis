@@ -6,7 +6,7 @@
 #include <malloc.h>
 
 #ifdef TRIBUF_LOCKING
-#define TB_LOCK_PROFILE
+//#define TB_LOCK_PROFILE
 
 #include <sys/types.h>
 #include <pthread.h>
