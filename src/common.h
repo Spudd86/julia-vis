@@ -66,6 +66,14 @@ typedef bool _Bool
 #define MIN(a,b) IMIN(a,b)
 #endif
 
+#if __STDC_VERSION__ < 199901L
+# if __GNUC__ >= 2
+#  define __func__ __FUNCTION__
+# else
+#  define __func__ "<unknown>"
+# endif
+#endif
+
 typedef enum { AUDIO_PORTAUDIO, AUDIO_PULSE, AUDIO_JACK } opt_audio_drv;
 
 typedef struct {

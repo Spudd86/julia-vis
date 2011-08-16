@@ -250,8 +250,9 @@ static int im_w = -1, im_h = -1;
 static uint32_t frm  = 0;
 
 GLint fract_get_tex(void) {
+	return fbo_tex[(frm)%NUM_FBO_TEX];
 //	return fbo_tex[(frm+1)%NUM_FBO_TEX];
-	return fbo_tex[(frm+2)%NUM_FBO_TEX];
+//	return fbo_tex[(frm+2)%NUM_FBO_TEX];
 }
 
 void render_fractal(struct point_data *pd)

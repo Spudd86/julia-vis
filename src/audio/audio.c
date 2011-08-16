@@ -4,6 +4,12 @@
 #include "tribuf.h"
 #include "audio.h"
 #include "audio-private.h"
+#include "beat.h"
+
+#ifdef FFT_TRIBUF
+#undef FFT_TRIBUF
+#define FFT_RINGBUF 1
+#endif
 
 int buf_count = 0;
 static int nr_samp = 0;
@@ -11,15 +17,22 @@ static float *fft_tmp = NULL;
 static fftwf_plan p;
 
 static tribuf *samp_tb = NULL;
-#ifdef FFT_TRIBUF
-static tribuf *fft_tb = NULL;
+
+#ifdef FFT_RINGBUF
+#include "rb.h"
+static rb_t *fft_rb = NULL;
 #endif
+
+static beat_ctx *gbl_beat_ctx = NULL;
 
 typedef void (*audio_drv_shutdown_t)();
 audio_drv_shutdown_t audio_drv_shutdown = NULL;
 
 int audio_get_buf_count(void) {
 	return buf_count;
+}
+int beat_get_count(void) {
+	return beat_ctx_count(gbl_beat_ctx);
 }
 
 void audio_shutdown()
@@ -57,9 +70,6 @@ static float *do_fft(float *in1, float *in2)
 	
 	fftwf_execute(p);
 	float *fft = fft_tmp;
-#ifdef FFT_TRIBUF
-	fft = tribuf_get_write(fft_tb);
-#endif
 
 	//const float scl = 1.0f/nr_samp;
 	fft[0] = fabsf(fft_tmp[0])/nr_samp;
@@ -67,14 +77,18 @@ static float *do_fft(float *in1, float *in2)
 		fft[i] = sqrtf(fft_tmp[i]*fft_tmp[i] + fft_tmp[nr_samp-i]*fft_tmp[nr_samp-i])/nr_samp;
 	fft[nr_samp/2] = fabsf(fft_tmp[nr_samp/2])/nr_samp;
 
-#ifdef FFT_TRIBUF
-	tribuf_finish_write(fft_tb);
+#ifdef FFT_RINGBUF
+	size_t fft_len = sizeof(float)*(nr_samp/2 + 1);
+	if(rb_write_space(fft_rb) >=  fft_len)
+		rb_write(fft_rb, fft, fft_len);
 #endif
+
 	return fft;
 }
 
 static int bufp = 0;
 static float *cur_buf = NULL; ///< need to preserve the result of tb_get_write across calls
+static float *prev_buf = NULL; 
 
 // TODO: double check correctness
 void audio_update(const float * __attribute__ ((aligned (16))) in, int n)
@@ -82,6 +96,7 @@ void audio_update(const float * __attribute__ ((aligned (16))) in, int n)
 	float *samps = NULL;
 	int remain = 0;
 
+#if 0
 	if(bufp == 0 && n == nr_samp) {
 		samps  = tribuf_get_write(samp_tb);
 		memcpy(samps, in, sizeof(float)*nr_samp);
@@ -91,7 +106,7 @@ void audio_update(const float * __attribute__ ((aligned (16))) in, int n)
 
 		samps = cur_buf;
 	
-		int cpy = IMIN(n, nr_samp-bufp);
+		int cpy = MIN(n, nr_samp-bufp);
 		memcpy(samps+bufp, in, sizeof(float)*cpy);
 		remain = n - cpy;
 		in += cpy;
@@ -102,43 +117,74 @@ void audio_update(const float * __attribute__ ((aligned (16))) in, int n)
 		} else return;
 	}
 	
-	
 	//TODO: lapped transform?
 	buf_count++;
-	beat_update(do_fft(samps, samps+nr_samp/2), nr_samp/2);
+	beat_ctx_update(gbl_beat_ctx, do_fft(samps, samps+nr_samp/2), nr_samp/2);
+#else
+	if(bufp == 0 && n == nr_samp/2) {
+		samps  = tribuf_get_write(samp_tb);
+		memcpy(samps, in, sizeof(float)*nr_samp/2);
+		tribuf_finish_write(samp_tb);
+	} else {
+		if(bufp == 0) cur_buf = tribuf_get_write(samp_tb);
+
+		samps = cur_buf;
+	
+		int cpy = MIN(n, nr_samp/2-bufp);
+		memcpy(samps+bufp, in, sizeof(float)*cpy);
+		remain = n - cpy;
+		in += cpy;
+		bufp = (bufp + cpy)%(nr_samp/2);
+		if(bufp == 0) {
+			cur_buf = NULL;
+			tribuf_finish_write(samp_tb);
+		} else return;
+	}
+	
+	buf_count++;
+	beat_ctx_update(gbl_beat_ctx, do_fft(samps, prev_buf), nr_samp/2);
+	prev_buf = samps;
+	
+#endif
 
 	if(remain > 0) audio_update(in, remain);
 }
 
 int audio_get_samples(audio_data *d) {
-	d->len = nr_samp;
+	d->len = nr_samp/2;
 	d->data = tribuf_get_read(samp_tb);
 	return 0;
 }
 void audio_finish_samples(void) { tribuf_finish_read(samp_tb); }
 
-#ifdef FFT_TRIBUF
+#define MAX_SAMP 2048
+
+#ifdef FFT_RINGBUF
+static float fft_data[MAX_SAMP];
+
 int audio_get_fft(audio_data *d) {
 	d->len = nr_samp/2+1;
-	d->data = tribuf_get_read(fft_tb);
+	d->data = fft_data;
+	size_t fft_len = sizeof(float)*(nr_samp/2 + 1);
+	if(rb_read_space(fft_rb) >= fft_len) 
+		rb_read(fft_rb, (void *)fft_data, fft_len);
 	return 0;
 }
-void audio_fft_finsih_read(void) { tribuf_finish_read(fft_tb); }
 
-static void *fft_data[3];
+void audio_fft_finsih_read(void) { }
 #endif
 
 static void *samp_data[3];
 
 // never need more memory than we get here.
-static float samp_bufs[2048*3] __attribute__ ((aligned (16)));
+static float samp_bufs[MAX_SAMP*3] __attribute__ ((aligned (16)));
 
 // sr is sample rate
 int audio_setup(int sr)
 {
-	nr_samp = (sr<50000)?1024:2048;
+	nr_samp = (sr<50000)?MAX_SAMP/2:MAX_SAMP;
 
-	printf("Sample Rate %i\nUsing %i samples/buffer\n", sr, nr_samp);
+	printf("Sample Rate %i\nUsing %i samples/buffer\n", sr, nr_samp/2);
 
 	fft_tmp = fftwf_malloc(sizeof(float) * nr_samp); // do xform in place
 	if(!fft_tmp) abort();
@@ -146,21 +192,19 @@ int audio_setup(int sr)
 	p = fftwf_plan_r2r_1d(nr_samp, fft_tmp, fft_tmp, FFTW_R2HC, 0);
 
 	samp_data[0] = samp_bufs;
-	samp_data[1] = samp_data[0] + nr_samp;
-	samp_data[2] = samp_data[1] + nr_samp;
-	memset(samp_data[0], 0, sizeof(float) * nr_samp * 3);
+	samp_data[1] = samp_data[0] + MAX_SAMP;
+	samp_data[2] = samp_data[1] + MAX_SAMP;
+	memset(samp_data[0], 0, sizeof(float) * MAX_SAMP * 3);
 
-	#ifdef FFT_TRIBUF
-	for(int i=0;i<3;i++) {
-		fft_data[i] = fftwf_malloc(sizeof(float) * (nr_samp/2+1));
-		if(!fft_data[i]) abort();
-		memset(fft_data[i], 0, sizeof(float) * nr_samp/2+1);
-	}
-	fft_tb = tribuf_new(fft_data, 0);
-	#endif
+#ifdef FFT_RINGBUF
+	fft_rb = rb_create(8*MAX_SAMP*sizeof(float));
+#endif
+	
 	samp_tb = tribuf_new(samp_data, 0);
+	
+	prev_buf = tribuf_get_read_nolock(samp_tb);
 
-	beat_setup();
+	gbl_beat_ctx = beat_new();
 
 	return 0;
 }

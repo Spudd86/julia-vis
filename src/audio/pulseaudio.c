@@ -17,6 +17,9 @@ void pulse_shutdown(void) {
 	pa_threaded_mainloop_free(pulse_ml);
 }
 
+//TODO: listen for when the default sink changes and try to grab it's
+// monitor instead of the one we already have
+
 
 static void stream_read_callback(pa_stream *s, size_t length, void *userdata)
 { (void)userdata;
@@ -26,6 +29,7 @@ static void stream_read_callback(pa_stream *s, size_t length, void *userdata)
 //        pulse_shutdown();
         return;
     }
+    
 	audio_update(data, length/sizeof(float));
     pa_stream_drop(s);
 }
@@ -48,17 +52,24 @@ static void stream_state_callback(pa_stream *s, void *userdata)
 }
 
 static const pa_sample_spec sample_spec = { .format = PA_SAMPLE_FLOAT32NE, .rate = 44100, .channels = 1 };
-static const pa_buffer_attr buf_attr = { -1, -1, -1, -1, 1024*sizeof(float) };
+static const pa_buffer_attr buf_attr = { -1, -1, -1, -1, 512*sizeof(float) };
 
 static void connect_sink_info_callback(pa_context  *c, const pa_sink_info  *i, int eol, void *userdata)
 {(void)userdata;(void)eol;
 	stream = pa_stream_new(c, "foo", &sample_spec, NULL);
     pa_stream_set_state_callback(stream, stream_state_callback, NULL);
 //    pa_stream_set_read_callback(stream, stream_read_callback, NULL);
-	// TODO use PA_STREAM_FIX_RATE
+	// TODO use PA_STREAM_FIX_RATE, means we need to do this bit synchronous
+	// somehow and communicate back to main thread what the final rate is
 	if(i != NULL) {
 		printf("pulseaudio: Connecting to source '%s'\n", i->monitor_source_name);
-		pa_stream_connect_record(stream, i->monitor_source_name, &buf_attr, PA_STREAM_ADJUST_LATENCY);
+		//pa_stream_connect_record(stream, i->monitor_source_name, &buf_attr, PA_STREAM_ADJUST_LATENCY);
+		pa_stream_connect_record(stream, i->monitor_source_name, &buf_attr, PA_STREAM_NOFLAGS);
+		// pa docs say:
+		// "Set PA_STREAM_ADJUST_LATENCY if you want to control the overall 
+		//  playback latency for your stream. Unset it if you want to control 
+		//  only the latency induced by the server-side, rewritable playback
+		//  buffer."
 	} else {
 //		printf("Didn't get default sink, not using monitor, try default source instead!\n");
 //		pa_stream_connect_record(stream, NULL, &buf_attr, PA_STREAM_ADJUST_LATENCY);
