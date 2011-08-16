@@ -7,6 +7,9 @@
 
 #ifdef TRIBUF_LOCKING
 //#define TB_LOCK_PROFILE
+#ifdef TB_NO_ATOMIC
+#undef TB_LOCK_PROFILE
+#endif
 
 #include <sys/types.h>
 #include <pthread.h>

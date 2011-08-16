@@ -115,11 +115,16 @@ ifeq ($(ENABLE_DIRECTFB),yes)
 ALL_BINS += bin/dfb-test$(EXEEXT)
 endif
 
-ifneq (@enable_locking_tb@,yes)
-TRIBUF_SRCS = src/atomic_tribuf.c
+ifeq ($(USE_OLD_TRIBUF),yes)
+TRIBUF_SRCS = tribuf.c
+CFLAGS += -DTRIBUF_LOCKING
 else
-TRIBUF_SRCS = src/tribuf.c
-endif 
+TRIBUF_SRCS = src/atomic_tribuf3.c
+endif
+
+ifeq (@disable_atomics@,yes)
+CFLAGS += -DTB_NO_ATOMIC
+endif
 
 all: $(ALL_BINS)
 

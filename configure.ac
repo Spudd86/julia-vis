@@ -152,8 +152,11 @@ AC_SUBST(ORC_CFLAGS)
 AC_SUBST(ORC_LIBS)
 AC_SUBST(enable_orc)
 
-AC_ARG_ENABLE([locking-tb], AS_HELP_STRING([--enable-locking-tb], [enable using pthread locks to syncronize tribufs instead of atomic ops (default: disabled)]))
-AC_SUBST(enable_locking_tb)
+AC_ARG_ENABLE([atomics], AS_HELP_STRING([--disable-atomics], [enable using pthread locks to syncronize tribufs instead of atomic ops (default: disabled)]))
+if test "x$enable_atomics" = xno; then
+disable_atomics=yes
+fi 
+AC_SUBST(disable_atomics)
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_INLINE

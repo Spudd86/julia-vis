@@ -3,9 +3,9 @@
 #include "tribuf.h"
 
 #define TB_DEBUG 1
+#define TB_DEBUG_USER 1
 
-//#define TB_DEBUG_USER 1
-#ifdef TB_DEBUG_USER
+#if defined(TB_DEBUG_USER) || defined(TB_NO_ATOMIC)
 # include <sys/types.h>
 # include <pthread.h>
 # include <error.h>
@@ -116,7 +116,11 @@ struct tribuf_s {
 	void **data;
 
 #ifdef TB_DEBUG_USER
-	pthread_mutex_t debug_read_lock, debug_write_lock;
+	tb_mutex debug_read_lock, debug_write_lock;
+#endif
+
+#ifdef TB_NO_ATOMIC
+	tb_mutex lock;
 #endif
 
 	frms active;
@@ -141,6 +145,10 @@ tribuf* tribuf_new(void **data, int locking)
 	tb_mutex_init(&tb->debug_write_lock);
 #endif
 
+#ifdef TB_NO_ATOMIC
+	tb_mutex_init(&tb->lock);
+#endif
+
 	return tb;
 }
 
@@ -151,19 +159,89 @@ void tribuf_destroy(tribuf *tb)
 	tb_mutex_destroy(&tb->debug_write_lock);
 #endif
 
+#ifdef TB_NO_ATOMIC
+	tb_mutex_destroy(&tb->lock);
+#endif
+
 	free(tb);
 }
 
+static frms do_finish_write(frms active)
+{
+	tb_sanity_check(active.aw < 0, "tribuf state inconsistent!");
+	tb_sanity_check(active.nw < 0 && (active.nr < 0 || active.ar < 0), "tribuf state inconsistent!");
+	
+	frms f;
+	f.v = 0;	
+	f.nrf = 1;
+	f.nr = active.aw;
+	f.ar = active.ar;
+
+	if(active.nw < 0) { // only steal nr if we absolutly have to (ie we're running faster than read side can draw)
+		f.aw = active.nr;
+		f.nw = active.nw;
+	} else {
+		f.nw = active.nr;
+		f.aw = active.nw;
+	}
+	return f;
+}
+
+static frms do_get_read(frms active)
+{
+	tb_sanity_check(active.ar >= 0, "tribuf_get_read without finish_read!\n");
+	tb_sanity_check(active.nw < 0 || active.nr < 0 || active.aw < 0, "tribuf state inconsistent!");
+	
+	frms f;
+	f.v = 0;
+	f.arf = 1;
+	f.aw = active.aw;
+	
+	if(active.nrf) {
+		f.nw = active.nw;
+		f.ar = active.nr; // swap nr and ar
+		f.nr = active.ar;
+	} else {
+		tb_sanity_check(active.nwf, "Bad fresh bits");
+		f.ar = active.nw;
+		f.nr = active.nr; // swap nw and ar
+		f.nw = active.ar;
+	}
+	return f;
+}
+
+static frms do_finish_read(frms active)
+{
+	tb_sanity_check(active.ar < 0, "tribuf_finish_read without tribuf_get_read!");
+	tb_sanity_check(active.nw < 0 && active.nr < 0, "tribuf state inconsistent!");
+	tb_sanity_check(active.nw >= 0 && active.nr >= 0, "tribuf state inconsistent!");
+	
+	frms f;
+	f.v = 0;
+	f.aw = active.aw;
+	f.ar = -1;
+	if(active.nw < 0) {
+		f.nwf = active.arf;
+		f.nrf = active.nrf;
+		f.nw = active.ar;
+		f.nr = active.nr;
+	} else {
+		f.nwf = active.nwf;
+		f.nrf = active.arf;
+		f.nw = active.nw;
+		f.nr = active.ar;
+	}
+	return f;
+}
+
+#ifndef TB_NO_ATOMIC
 void* tribuf_get_write(tribuf *tb)
 {
+# ifdef TB_DEBUG_USER
+	if(!tb_trylock(&tb->debug_write_lock)) abort();
+# endif
 	frms active;
 	active.v = tb->active.v;
-
-#ifdef TB_DEBUG_USER
-	//tb_lock(&tb->debug_write_lock);
-	if(!tb_trylock(&tb->debug_write_lock)) abort();
-#endif
-
 	tb_sanity_check(active.aw < 0, "tribuf state inconsistent!");
 	return tb->data[active.aw];
 }
@@ -175,23 +253,7 @@ void tribuf_finish_write(tribuf *tb)
 	do {
 		active.v = tb->active.v;
 		tb_count_fw_try;
-
-		tb_sanity_check(active.aw < 0, "tribuf state inconsistent!");
-		tb_sanity_check(active.nw < 0 && (active.nr < 0 || active.ar < 0), "tribuf state inconsistent!");
-
-		f.v = 0;
-		
-		f.nrf = 1;
-		f.nr = active.aw;
-		f.ar = active.ar;
-
-		if(active.nw < 0) { // only steal nr if we absolutly have to (ie we're running faster than read side can draw)
-			f.aw = active.nr;
-			f.nw = active.nw;
-		} else {
-			f.nw = active.nr;
-			f.aw = active.nw;
-		}
+		f = do_finish_write(active);
 	} while(!__sync_bool_compare_and_swap(&tb->active.v, active.v, f.v));
 
 #ifdef TB_DEBUG_USER
@@ -209,25 +271,7 @@ void tribuf_finish_read(tribuf *tb)
 	do {
 		active.v = tb->active.v;
 		tb_count_fr_try;
-
-		tb_sanity_check(active.ar < 0, "tribuf_finish_read without tribuf_get_read!");
-		tb_sanity_check(active.nw < 0 && active.nr < 0, "tribuf state inconsistent!");
-		tb_sanity_check(active.nw >= 0 && active.nr >= 0, "tribuf state inconsistent!");
-
-		f.v = 0;
-		f.aw = active.aw;
-		f.ar = -1;
-		if(active.nw < 0) {
-			f.nwf = active.arf;
-			f.nrf = active.nrf;
-			f.nw = active.ar;
-			f.nr = active.nr;
-		} else {
-			f.nwf = active.nwf;
-			f.nrf = active.arf;
-			f.nw = active.nw;
-			f.nr = active.ar;
-		}
+		f = do_finish_read(active);
 	} while(!__sync_bool_compare_and_swap(&tb->active.v, active.v, f.v));
 
 #ifdef TB_DEBUG_USER
@@ -244,32 +288,10 @@ void* tribuf_get_read(tribuf *tb)
 	do {
 		active.v = tb->active.v;
 		tb_count_gr_try;
-
-		tb_sanity_check(active.ar >= 0, "tribuf_get_read without finish_read!\n");
-		tb_sanity_check(active.nw < 0 || active.nr < 0 || active.aw < 0, "tribuf state inconsistent!");
-
-		f.v = 0;
-		f.arf = 1;
-		f.aw = active.aw;
-		//f.nw = active.nw;
-		//f.ar = active.nr; // just swap nr and ar
-		//f.nr = active.ar;
-		
-		if(active.nrf) {
-			f.nw = active.nw;
-			f.ar = active.nr; // just swap nr and ar
-			f.nr = active.ar;
-		} else {
-			tb_sanity_check(active.nwf, "Bad fresh bits");
-			f.ar = active.nw;
-			f.nr = active.nr; // just swap nw and ar
-			f.nw = active.ar;
-		}
-		
+		f = do_get_read(active);
 	} while(!__sync_bool_compare_and_swap(&tb->active.v, active.v, f.v));
 
 #ifdef TB_DEBUG_USER
-	//tb_lock(&tb->debug_read_lock);
 	if(!tb_trylock(&tb->debug_read_lock)) abort();
 #endif
 
@@ -287,6 +309,55 @@ void* tribuf_get_read_nolock(tribuf *tb) { // should only be used by write side 
 int tribuf_get_frmnum(tribuf *tb) {
 	return tb->frame;
 }
+#else
+void* tribuf_get_write(tribuf *tb)
+{
+	int r;
+	tb_lock(&tb->lock);
+	tb_sanity_check(tb->active.aw < 0, "tribuf state inconsistent!");
+	r = tb->active.aw;
+	tb_unlock(&tb->lock);
+	return tb->data[r];
+}
+void tribuf_finish_write(tribuf *tb)
+{
+	tb_lock(&tb->lock);
+	tb->active = do_finish_write(tb->active);
+	tb->frame++;
+	tb_unlock(&tb->lock);
+}
+void tribuf_finish_read(tribuf *tb)
+{
+	tb_lock(&tb->lock);
+	tb->active = do_finish_read(tb->active);
+	tb_unlock(&tb->lock);
+}
+void* tribuf_get_read(tribuf *tb)
+{
+	int r;
+	tb_lock(&tb->lock);
+	tb->active = do_get_read(tb->active);
+	r = tb->active.ar;
+	tb_unlock(&tb->lock);
+	return tb->data[r];
+}
+void* tribuf_get_read_nolock(tribuf *tb)
+{
+	int r;
+	tb_lock(&tb->lock);
+	r = (tb->active.nr<0)?tb->active.ar:tb->active.nr; 
+	tb_unlock(&tb->lock);
+	return tb->data[r];
+}
+int tribuf_get_frmnum(tribuf *tb)
+{
+	int res;
+	tb_lock(&tb->lock);
+	res = tb->frame;
+	tb_unlock(&tb->lock);
+	return res;
+}
+#endif
 
 //TODO: add tests to make sure we never get stale stuff out of this
 //TODO: add a stress test
