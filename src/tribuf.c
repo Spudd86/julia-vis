@@ -80,6 +80,9 @@ static inline void tb_unlock(tb_mutex *m) {
 	   || t.aw == t.nr || t.aw == t.nw \
 	   || t.nr == t.nw) \
 		tribuf_error("tribuf duplicate buffer!\n");\
+	if(t.arf && t.ar < 0) tribuf_error("bad fresh bit!\n"); \
+	if(t.nrf && t.nr < 0) tribuf_error("bad fresh bit!\n"); \
+	if(t.nwf && t.nw < 0) tribuf_error("bad fresh bit!\n"); \
 	if(t.ar > 2 || t.ar < -1 ) tribuf_error("bad buffer index (ar)!\n"); \
 	if(t.nr > 2 || t.nr < -1 ) tribuf_error("bad buffer index (nr)!\n"); \
 	if(t.nw > 2 || t.nw < -1 ) tribuf_error("bad buffer index (nw)!\n"); \
