@@ -44,41 +44,41 @@ AC_SUBST(FFTW_CFLAGS)
 AC_SUBST(FFTW_LIBS)
 
 AC_ARG_ENABLE([directfb], AS_HELP_STRING([--enable-directfb], [build test-directfb (default: disabled)]))
-if test "x$enable_directfb" = xyes; then
+AS_IF([test "x$enable_directfb" = xyes], [
 	PKG_CHECK_MODULES([DIRECTFB], [directfb],
 		[AC_DEFINE([HAVE_DIRECTFB], [1], [Define if directfb is enabled])],
 		[AC_MSG_FAILURE([--enable-directfb was given, but test for directfb failed])]
 	)
-fi
+])
 AC_SUBST(DIRECTFB_CFLAGS)
 AC_SUBST(DIRECTFB_LIBS)
 AC_SUBST(enable_directfb)
 
 #TODO: default to enabled on windows
 AC_ARG_ENABLE([portaudio], AS_HELP_STRING([--enable-portaudio], [enable using portaudio for audio input (default: disabled)]))
-if test "x$enable_portaudio" = xyes; then
+AS_IF([test "x$enable_portaudio" = xyes], [
 PKG_CHECK_MODULES([PORTAUDIO], [portaudio-2.0],
 		[AC_DEFINE([HAVE_PORTAUDIO], [1], [Define if portaudio is enabled])],
 		[AC_MSG_FAILURE([--enable-portaudio was given, but test for portaudio failed])]
 	)
-fi
+])
 AC_SUBST(PORTAUDIO_CFLAGS)
 AC_SUBST(PORTAUDIO_LIBS)
 AC_SUBST(enable_portaudio)
 
 AC_ARG_ENABLE([jack], AS_HELP_STRING([--enable-jack], [enable using jack for audio input (default: disabled)]))
-if test "x$enable_jack" = xyes; then
+AS_IF([test "x$enable_jack" = xyes], [
 	PKG_CHECK_MODULES([JACK], [jack],
 		[AC_DEFINE([HAVE_JACK], [1], [Define if jack is enabled])],
 		[AC_MSG_FAILURE([--enable-jack was given, but test for jack failed])]
 	)
-fi
+])
 AC_SUBST(JACK_CFLAGS)
 AC_SUBST(JACK_LIBS)
 AC_SUBST(enable_jack)
 
 AC_ARG_ENABLE([pulseaudio], AS_HELP_STRING([--enable-pulseaudio], [enable using pulseaudio for audio input (default: disabled)]))
-if test "x$enable_pulseaudio" != xno; then
+AS_IF([ test "x$enable_pulseaudio" != xno], [
 	PKG_CHECK_MODULES([PULSE], [libpulse],[have_pulse=yes], [have_pulse=no])
 #		[AC_DEFINE([HAVE_PULSE], [1], [Define if pulseaudio is enabled])
 #		enable_pulseaudio=yes
@@ -90,72 +90,74 @@ if test "x$enable_pulseaudio" != xno; then
 #		enable_pulseaudio=no
 #		]
 #	)
-fi
+])
 
-if test "x$have_pulse" = xyes; then
+AS_IF([test "x$have_pulse" = xyes], [
 	AC_DEFINE([HAVE_PULSE], [1], [Define if pulseaudio is enabled])
 	enable_pulseaudio=yes
-else
+], [
 	if test "x$enable_pulseaudio" = xyes; then
 		AC_MSG_FAILURE([--enable-pulseaudio was given, but test for pulseaudio failed])
 	fi
 	enable_pulseaudio=no
-fi
+])
 AC_SUBST(PULSE_CFLAGS)
 AC_SUBST(PULSE_LIBS)
 AC_SUBST(enable_pulseaudio)
 
 AC_ARG_ENABLE([opengl], AS_HELP_STRING([--disable-opengl], [enable opengl based versions (default: enabled)]))
-if test "x$enable_opengl" != xno; then
+AS_IF([test "x$enable_opengl" != xno], [
 	enable_opengl=yes
-fi
+])
 AC_SUBST(enable_opengl)
 
 #TODO: make work on windows
-if test "x$enable_opengl" = xyes; then
+#TODO: fix the logic so that it doesn't error 
+# when opengl is not found unless --enable-opengl is actually given
+AS_IF([test "x$enable_opengl" = xyes], [
 	PKG_CHECK_MODULES([GL], [glu],
         [AC_DEFINE([HAVE_GL], [1], [Define if we have gl])],
-        [AC_MSG_FAILURE([--enable-gl was given, but test for gl failed (old gl?)])])
-fi
+        [AC_MSG_FAILURE([--enable-opengl was given, but test for gl failed (old gl?)])])
+])
 AC_SUBST(GL_CFLAGS)
 AC_SUBST(GL_LIBS)
 
-if test "x$enable_opengl" = xyes; then
+AS_IF([test "x$enable_opengl" = xyes], [
 	AC_ARG_ENABLE([egl], AS_HELP_STRING([--disable-egl], [enable egl based versions (default: enabled)]))
-	if test "x$enable_egl" = xno; then
+	AS_IF([test "x$enable_egl" = xno[, [
 		enable_egl=yes
-	fi
+	])
 	AC_SUBST(enable_egl)
 	
-	if test "x$enable_egl" = xyes; then
+	AS_IF([test "x$enable_egl" = xyes], [
 		PKG_CHECK_MODULES([EGL], [egl],
 		    [AC_DEFINE([HAVE_EGL], [1], [Define if we have egl])],
 		    [AC_MSG_FAILURE([--enable-egl was given, but test for egl failed (old egl?)])])
-	fi
+	])
 	AC_SUBST(EGL_CFLAGS)
 	AC_SUBST(EGL_LIBS)
-fi
+])
 
 AC_ARG_ENABLE([systemglee], AS_HELP_STRING([--enable-system-glee], [enable system copy of glee (default: disabled)]))
-if test "x$enable_systemglee" = xyes; then
+AS_IF([test "x$enable_systemglee" = xyes], [
 	AC_DEFINE([USE_SYSTEM_GLEE], [1], [Define if we should use system GLee])
-fi
+])
 AC_SUBST(enable_systemglee)
 
 AC_ARG_ENABLE([orc], AS_HELP_STRING([--enable-orc], [enable using orc (default: disabled)]))
-if test "x$enable_orc" = xyes; then
+AS_IF([test "x$enable_orc" = xyes], [
 	PKG_CHECK_MODULES([ORC], [orc-0.4], 
 		[AC_DEFINE([HAVE_ORC], [1], [Define if we have orc])],
 		[AC_MSG_FAILURE([--enable-orc was given, but test for orc failed])])
-fi
+])
 AC_SUBST(ORC_CFLAGS)
 AC_SUBST(ORC_LIBS)
 AC_SUBST(enable_orc)
 
 AC_ARG_ENABLE([atomics], AS_HELP_STRING([--disable-atomics], [enable using pthread locks to syncronize tribufs instead of atomic ops (default: disabled)]))
-if test "x$enable_atomics" = xno; then
+AS_IF([test "x$enable_atomics" = xno], [
 disable_atomics=yes
-fi 
+])
 AC_SUBST(disable_atomics)
 
 # Checks for typedefs, structures, and compiler characteristics.
