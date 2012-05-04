@@ -124,7 +124,7 @@ AC_SUBST(GL_LIBS)
 
 AS_IF([test "x$enable_opengl" = xyes], [
 	AC_ARG_ENABLE([egl], AS_HELP_STRING([--disable-egl], [enable egl based versions (default: enabled)]))
-	AS_IF([test "x$enable_egl" = xno[, [
+	AS_IF([test "x$enable_egl" = xno], [
 		enable_egl=yes
 	])
 	AC_SUBST(enable_egl)
