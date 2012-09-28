@@ -1,52 +1,131 @@
 
-#include "common.h"
 #include "tribuf.h"
 
-//#ifndef __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4
-// if we can't CAS 4 bytes then nothing works!
-//#define TB_NO_ATOMIC
-//#endif
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <malloc.h>
 
 //#define TB_DEBUG 1
 //#define TB_DEBUG_USER 1
 //#define TRIBBUF_PROFILE 1
+//#define TB_NO_ATOMIC 1
+
+#define tb_abort_if(c)  do {\
+	if( (c) ) { \
+	fprintf(stderr, "Abort in function '%s':\n%s:%d", \
+			__func__, __FILE__, __LINE__); \
+	abort(); } } while(0)
+#define tribuf_error(s) do {\
+		fflush(stdout); \
+		fprintf(stderr, "%s: In function '%s':\n", __FILE__, __func__); \
+		fprintf(stderr, "%s:%i error: %s", __FILE__, __LINE__, (s)); \
+		fflush(stderr); \
+		abort();\
+	} while(0)
+
+#if __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_ATOMICS__) && !defined(TB_NO_ATOMIC)
+#	define TB_STDATOMIC 1
+#	include <stdatomic.h>
+// use relaxed order for when the exchange fails
+#	define tb_comp_xchng(a, e, n, order) \
+		atomic_compare_exchange_weak_explicit(a, e, n, \
+			       order, \
+			       memory_order_relaxed)
+#	define tb_atomic_inc(x) do { atomic_fetch_add_explicit(a, 1, memory_order_relaxed); } while(0)
+#elif defined(__GNUC__)
+	typedef enum {
+		memory_order_relaxed,
+		memory_order_consume,
+		memory_order_acquire,
+		memory_order_release,
+		memory_order_acq_rel,
+		memory_order_seq_cst
+	} memory_order;
+	typedef uint_fast16_t atomic_uint_fast16_t;
+	typedef uint_fast32_t atomic_uint_fast32_t;
+
+	//TODO: something that works off x86
+#	define ATOMIC_VAR_INIT(v) (v)
+#	define atomic_init(obj, v) do { *obj = v; } while(0)
+#	define atomic_load(v) (*(v))
+#	define atomic_load_explicit(v, o) (*(v))
+//#	define tb_comp_xchng(a, e, n, o) __sync_bool_compare_and_swap(a, *e, n)
+static inline bool tb_comp_xchng(uint_fast16_t *a, uint_fast16_t *e, uint_fast16_t n, memory_order o)
+{
+	(void)o;
+//	return __sync_bool_compare_and_swap(a, *e, n);
+	uint_fast16_t t = __sync_val_compare_and_swap(a, *e, n);
+	if(t != *e) {
+		*e = t;
+		return 0;
+	}
+	return 1;
+}
+#	define tb_atomic_inc(x) do { __sync_add_and_fetch(x, 1); } while(0)
+#else
+#	warning "NO ATOMICS, using threads and locks"
+#	define TB_NO_ATOMIC 1
+#endif
 
 #if defined(TB_DEBUG_USER) || defined(TB_NO_ATOMIC)
-# include <sys/types.h>
-# include <pthread.h>
-# include <error.h>
-# include <errno.h>
-# include <assert.h>
-
-typedef pthread_mutex_t tb_mutex;
-static inline void tb_lock(tb_mutex *m) {
-	int r = pthread_mutex_lock(m);
-	if(r) {
-		error(0, r, "TRIBUF LOCK FAILED!");
-		abort();
+# if __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_THREADS__)
+#	include <threads.h>	
+	typedef mtx_t tb_mutex;
+	static inline void tb_lock(tb_mutex *m) {
+		int r = mtx_lock(m);
+		tb_abort_if(r != thrd_success);
 	}
-}
-
-static inline int tb_trylock(tb_mutex *m) {
-	int r = pthread_mutex_trylock(m);
-	if(r && r != EBUSY) {
-		error(0, r, "TRIBUF TRYLOCK FAILED!");
-		abort();
+	static inline bool tb_trylock(tb_mutex *m) {
+		int r = mtx_trylock(m);
+		tb_abort_if(r == thrd_error);
+		return r == thrd_success;
 	}
-	return !r;
-}
-
-static inline void tb_unlock(tb_mutex *m) {
-	int r = pthread_mutex_unlock(m);
-	if(r) {
-		error(0, r, "TRIBUF UNLOCK FAILED!");
-		abort();
+	static inline void tb_unlock(tb_mutex *m) {
+		int r = mtx_unlock(m);
+		tb_abort_if(r != thrd_success);
 	}
-}
-
-#define tb_mutex_destroy pthread_mutex_destroy
-#define tb_mutex_init(m) pthread_mutex_init((m), NULL)
-#endif
+	static inline void tb_mutex_init(tb_mutex *m) {
+		int r = mtx_init(m, mtx_plain);
+		tb_abort_if(r != thrd_success);
+	}
+	static inline void tb_mutex_destroy(tb_mutex *m) {
+		int r = mtx_destroy(m, mtx_destroy);
+		tb_abort_if(r != thrd_success);
+	}
+# else // no C11 threads, use pthreads
+#	include <sys/types.h>
+#	include <pthread.h>
+#	include <error.h>
+#	include <errno.h>
+	typedef pthread_mutex_t tb_mutex;
+	static inline void tb_lock(tb_mutex *m) {
+		int r = pthread_mutex_lock(m);
+		if(r) {
+			error(0, r, "TRIBUF LOCK FAILED!");
+			abort();
+		}
+	}
+	static inline int tb_trylock(tb_mutex *m) {
+		int r = pthread_mutex_trylock(m);
+		if(r && r != EBUSY) {
+			error(0, r, "TRIBUF TRYLOCK FAILED!");
+			abort();
+		}
+		return !r;
+	}
+	static inline void tb_unlock(tb_mutex *m) {
+		int r = pthread_mutex_unlock(m);
+		if(r) {
+			error(0, r, "TRIBUF UNLOCK FAILED!");
+			abort();
+		}
+	}
+#	define tb_mutex_destroy pthread_mutex_destroy
+#	define tb_mutex_init(m) pthread_mutex_init((m), NULL)
+# endif // __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_THREADS__)
+#endif // defined(TB_DEBUG_USER) || defined(TB_NO_ATOMIC)
 
 #ifdef TB_DEBUG_USER
 #define user_debug_lock(tb, action) do { \
@@ -60,22 +139,13 @@ static inline void tb_unlock(tb_mutex *m) {
 #define user_debug_unlock(tb, action) do { } while(0)
 #endif
 
-#define tribuf_error(s) do {\
-		fflush(stdout); \
-		fprintf(stderr, "%s: In function '%s':\n", __FILE__, __func__); \
-		fprintf(stderr, "%s:%i error: %s", __FILE__, __LINE__, (s)); \
-		fflush(stderr); \
-		abort();\
-	} while(0)
-
 #ifdef TB_DEBUG
 #define tb_sanity_check(c, m) do {\
 		if((c)) tribuf_error((m));\
 	} while(0)
-
 #define tb_check_invariants(state) do {\
 	frms t; t.v = (state).v;\
-	if((unsigned)t.arf + (unsigned)t.nwf + (unsigned)t.nrf == 1) tribuf_error("tribuf bad fresh bits!\n");\
+	if((int)(bool)t.arf + (int)(bool)t.nwf + (int)(bool)t.nrf != 1) tribuf_error("tribuf bad fresh bits!\n");\
 	if(   t.ar == t.aw || t.ar == t.nr || t.ar == t.nw \
 	   || t.aw == t.nr || t.aw == t.nw \
 	   || t.nr == t.nw) \
@@ -94,24 +164,24 @@ static inline void tb_unlock(tb_mutex *m) {
 #define tb_check_invariants(f) do { } while(0)
 #endif
 
-#if defined(TRIBBUF_PROFILE) && defined(__GNUC__)
-static uint32_t finish_writes = 0;
-static uint32_t finish_write_trys = 0;
-static uint32_t finish_reads = 0;
-static uint32_t finish_read_trys = 0;
-static uint32_t get_reads = 0;
-static uint32_t get_read_trys = 0;
-#define tb_count_fw __sync_add_and_fetch(&finish_writes, 1)
-#define tb_count_fw_try __sync_add_and_fetch(&finish_write_trys, 1)
-#define tb_count_fr __sync_add_and_fetch(&finish_reads, 1)
-#define tb_count_fr_try __sync_add_and_fetch(&finish_read_trys, 1)
-#define tb_count_gr __sync_add_and_fetch(&get_reads, 1)
-#define tb_count_gr_try __sync_add_and_fetch(&get_read_trys, 1)
+#if defined(TRIBBUF_PROFILE) && (defined(TB_STDATOMIC) || defined(__GNUC__))
+static atomic_uint_fast32_t finish_writes = ATOMIC_VAR_INIT(0);
+static atomic_uint_fast32_t finish_write_trys = ATOMIC_VAR_INIT(0);
+static atomic_uint_fast32_t finish_reads = ATOMIC_VAR_INIT(0);
+static atomic_uint_fast32_t finish_read_trys = ATOMIC_VAR_INIT(0);
+static atomic_uint_fast32_t get_reads = ATOMIC_VAR_INIT(0);
+static atomic_uint_fast32_t get_read_trys = ATOMIC_VAR_INIT(0);
+#define tb_count_fw tb_atomic_inc(&finish_writes)
+#define tb_count_fw_try tb_atomic_inc(&finish_write_trys)
+#define tb_count_fr tb_atomic_inc(&finish_reads)
+#define tb_count_fr_try tb_atomic_inc(&finish_read_trys)
+#define tb_count_gr tb_atomic_inc(&get_reads)
+#define tb_count_gr_try tb_atomic_inc(&get_read_trys)
 static void  tb_lock_prof_print(void) {
-	printf("tribuf stats:\n\tcat        ups        trys\n");
-	printf("\twrts: %9i %9i\n", finish_writes, finish_write_trys);
-	printf("\tfrs:  %9i %9i\n", finish_reads, finish_read_trys);
-	printf("\tgrs:  %9i %9i\n", get_reads, get_read_trys);
+	printf("tribuf stats:\n\tcat        ups        trys\n"); //TODO: use correct format specifier
+	printf("\twrts: %9i %9i\n", (int)atomic_load(&finish_writes), (int)atomic_load(&finish_write_trys));
+	printf("\tfrs:  %9i %9i\n", (int)atomic_load(&finish_reads), (int)atomic_load(&finish_read_trys));
+	printf("\tgrs:  %9i %9i\n", (int)atomic_load(&get_reads), (int)atomic_load(&get_read_trys));
 }
 static void __attribute__((constructor)) tb_lock_prof_init(void) {
 	atexit(tb_lock_prof_print);
@@ -144,8 +214,8 @@ static void __attribute__((constructor)) tb_lock_prof_init(void) {
 // b2 = get_read()
 // then b1 <= b2 always (provided the sequence numbers don't overflow)
 
-typedef union {
-	uint32_t v;
+typedef union frms {
+	uint_fast16_t v;
 	struct {
 		// invariant exactly one of these is 1, the other two are 0
 		int arf : 1;
@@ -171,23 +241,26 @@ struct tribuf_s {
 	tb_mutex lock;
 #endif
 
-	frms active;
-	uint32_t frame;
+	atomic_uint_fast32_t frame;
+	atomic_uint_fast16_t active; //< hold the current state of buffer assignment
 };
 
 tribuf* tribuf_new(void **data, int locking)
 { (void)locking;
-	tribuf *tb = xmalloc(sizeof(tribuf));
+	tribuf *tb = malloc(sizeof(tribuf));
+	if(tb == NULL) abort();
 
 	tb->data = data;
-	tb->frame = 0;
-	tb->active.v = 0;
-	tb->active.nrf = 1;
-	tb->active.aw =  0;
-	tb->active.nw =  1;
-	tb->active.nr =  2;
-	tb->active.ar = -1;
-	
+	atomic_init(&tb->frame, 0);
+	frms tmp;
+	tmp.v = 0;
+	tmp.nrf = 1;
+	tmp.aw =  0;
+	tmp.nw =  1;
+	tmp.nr =  2;
+	tmp.ar = -1;
+	atomic_init(&tb->active, tmp.v);
+
 #ifdef TB_DEBUG_USER
 	tb_mutex_init(&tb->debug_read_lock);
 	tb_mutex_init(&tb->debug_write_lock);
@@ -214,6 +287,8 @@ void tribuf_destroy(tribuf *tb)
 	free(tb);
 }
 
+#define static 
+
 static frms do_get_write(frms active)
 {
 	tb_sanity_check(active.aw < 0, "tribuf state inconsistent!");
@@ -233,7 +308,7 @@ static frms do_finish_write(frms active)
 	f.nr = active.aw;
 	f.ar = active.ar;
 
-	if(active.nw < 0) { // only steal nr if we absolutly have to (ie we're running faster than read side can draw)
+	if(active.nw < 0) {
 		f.aw = active.nr;
 		f.nw = active.nw;
 	} else {
@@ -298,14 +373,23 @@ static frms do_finish_read(frms active)
 	return f;
 }
 
+static int do_get_read_nolock(frms active) {
+	//tb_check_invariants(active);
+	//return (active.nr<0)?active.ar:active.nr;
+	if(active.nrf) return active.nr;
+	else if(active.arf) return active.ar;
+	else return active.nw;
+}
+
 #ifndef TB_NO_ATOMIC
 
 void* tribuf_get_write(tribuf *tb)
 {
 	frms f, active;
-	active.v = tb->active.v;
+	active.v = atomic_load_explicit(&tb->active, memory_order_relaxed);
 	
 	f = do_get_write(active); (void)f;
+	// If we were looping here I think it could use memory_order_relaxed on the xcng
 	
 	user_debug_lock(tb, write);
 	
@@ -317,25 +401,31 @@ void tribuf_finish_write(tribuf *tb)
 	user_debug_unlock(tb, write);
 	frms f, active;
 	tb_count_fw;
+	
+	active.v = atomic_load_explicit(&tb->active, memory_order_relaxed);
 	do {
-		active.v = tb->active.v;
 		tb_count_fw_try;
 		f = do_finish_write(active);
-	} while(!__sync_bool_compare_and_swap(&tb->active.v, active.v, f.v));
+	} while(!tb_comp_xchng(&tb->active, &active.v, f.v, memory_order_release));
+	//TODO: double check ordering stuff
 	
 	//TODO: work out weather or not we really need this to be atomic
-	__sync_add_and_fetch(&tb->frame, 1);
+	tb_atomic_inc(&tb->frame);
+	// if we make the inc of tb->frame non-atomic it needs to go before 
+	// the loop so it gets included in the release fence for the successful CAS
 }
 
 void* tribuf_get_read(tribuf *tb)
 {
 	frms f, active;
 	tb_count_gr;
+	
+	active.v = atomic_load_explicit(&tb->active, memory_order_relaxed);
 	do {
-		active.v = tb->active.v;
 		tb_count_gr_try;
 		f = do_get_read(active);
-	} while(!__sync_bool_compare_and_swap(&tb->active.v, active.v, f.v));
+	} while(!tb_comp_xchng(&tb->active, &active.v, f.v, memory_order_acquire));
+	//TODO: double check ordering stuff, can we use consume here?
 
 	user_debug_lock(tb, read);
 
@@ -348,22 +438,25 @@ void tribuf_finish_read(tribuf *tb)
 
 	frms f, active;
 	tb_count_fr;
+	
+	active.v = atomic_load_explicit(&tb->active, memory_order_relaxed);
 	do {
-		active.v = tb->active.v;
 		tb_count_fr_try;
 		f = do_finish_read(active);
-	} while(!__sync_bool_compare_and_swap(&tb->active.v, active.v, f.v));
+	} while(!tb_comp_xchng(&tb->active, &active.v, f.v, memory_order_relaxed));
+	//TODO: double check ordering stuff
 }
 
 void* tribuf_get_read_nolock(tribuf *tb) { // should only be used by write side to start up
 	frms active;
-	active.v = tb->active.v;
-	int r = (active.nr<0)?active.ar:active.nr;
-	return tb->data[r];
+	active.v = atomic_load_explicit(&tb->active, memory_order_relaxed);
+	return tb->data[do_get_read_nolock(active)];
 }
 
 int tribuf_get_frmnum(tribuf *tb) {
-	return tb->frame;
+	//TODO: do we really want relaxed here?
+	//return atomic_load_explicit(&tb->frame, memory_order_consume);
+	return atomic_load_explicit(&tb->frame, memory_order_relaxed);
 }
 
 #else // TB_NO_ATOMIC defined
@@ -371,8 +464,9 @@ int tribuf_get_frmnum(tribuf *tb) {
 void* tribuf_get_write(tribuf *tb)
 {
 	tb_lock(&tb->lock);
-	tb->active = do_get_write(tb->active);
-	int r = tb->active.aw;
+	frms f = do_get_write((frms)tb->active);
+	tb->active = f.v;
+	int r = f.aw;
 	tb_unlock(&tb->lock);
 	user_debug_lock(tb, write);
 	return tb->data[r];
@@ -382,7 +476,7 @@ void tribuf_finish_write(tribuf *tb)
 {
 	user_debug_unlock(tb, write);
 	tb_lock(&tb->lock);
-	tb->active = do_finish_write(tb->active);
+	tb->active = do_finish_write((frms)tb->active).v;
 	tb->frame++;
 	tb_unlock(&tb->lock);
 }
@@ -390,8 +484,8 @@ void tribuf_finish_write(tribuf *tb)
 void* tribuf_get_read(tribuf *tb)
 {
 	tb_lock(&tb->lock);
-	tb->active = do_get_read(tb->active);
-	int r = tb->active.ar;
+	frms f = do_get_read((frms)tb->active);
+	int r = f.ar;
 	tb_unlock(&tb->lock);
 	user_debug_lock(tb, read);
 	return tb->data[r];
@@ -401,14 +495,14 @@ void tribuf_finish_read(tribuf *tb)
 {
 	user_debug_unlock(tb, read);
 	tb_lock(&tb->lock);
-	tb->active = do_finish_read(tb->active);
+	tb->active = do_finish_read((frms)tb->active).v;
 	tb_unlock(&tb->lock);
 }
 
 void* tribuf_get_read_nolock(tribuf *tb)
 {
 	tb_lock(&tb->lock);
-	int r = (tb->active.nr<0)?tb->active.ar:tb->active.nr;
+	int r = do_get_read_nolock((frms)tb->active);
 	tb_unlock(&tb->lock);
 	return tb->data[r];
 }
