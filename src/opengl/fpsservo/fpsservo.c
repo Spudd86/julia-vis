@@ -244,7 +244,7 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 		//return self->delay - delay_off*3/4;
 	}
 	
-	runstat_insert(self->delaystat, self->count, self->delay);
+	runstat_insert(self->delaystat, self->count + 1, self->delay);
 	
 	return self->delay;
 }

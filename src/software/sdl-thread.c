@@ -27,7 +27,7 @@ static int run_map_thread(tribuf *tb)
 	unsigned int beats = beat_get_count();
 	unsigned int tick0, fps_oldtime, frmcnt=0, last_beat_time = 0;
 	tick0 = fps_oldtime = SDL_GetTicks();
-	uint32_t maxfrms = 0;
+	//uint32_t maxfrms = 0;
 
 	unsigned int fpstimes[40]; for(int i=0; i<40; i++) fpstimes[i] = 0;
 
@@ -59,8 +59,8 @@ static int run_map_thread(tribuf *tb)
 		} else update_points(pd, now, 0);
 		beats = newbeat;
 
-//		if(map_fps > 250)
-//			SDL_Delay(3); // hard limit ourselves to ~250FPS because 1500FPS is just pointless use of CPU (except of course to say that we can do it)
+		if(map_fps > 750)
+			SDL_Delay(1); // hard limit ourselves because 1500FPS is just pointless use of CPU (except of course to say that we can do it)
 							// also if we run at more that 1000FPS the point motion code might blow up without the microsecond accurate timers...
 							// high threshhold because we want it high enough that we don't notice if we jitter back
 							// and fourth across it

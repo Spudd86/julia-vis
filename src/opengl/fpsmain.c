@@ -203,8 +203,8 @@ int main(int argc, char **argv)
 
 	while(1) {
 		int err;
-		//if(err = poll(pfds, 2, 5) < 0) continue;
-		if((err = poll(pfds, 2, -1)) < 0) continue;
+		if(err = poll(pfds, 2, 5) < 0) continue;
+		//if((err = poll(pfds, 2, -1)) < 0) continue;
 		
 		if(pfds[0].revents) {
 			uint64_t timeouts;
@@ -340,7 +340,7 @@ void render_fps_hist(void)
 	draw_hist_array_col(framecnt, scl, fpsworktimes, fpslen, 1.0f, 1.0f, 0.0f);
 	draw_hist_array_xlate(framecnt, -scl, frame_int*scl, fpsslacks, fpslen, 1.0f, 0.0f, 1.0f);
 	
-	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = delayhist[HIST_LEN-i-1] + fpsworktimes[fpslen-i-1];
+	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = fpsdelays[fpslen-i-1] + fpsworktimes[fpslen-i-1];
 	draw_hist_array_col(framecnt, scl, tots, totslen, 0.0f, 1.0f, 1.0f);
 	glPopMatrix();
 	

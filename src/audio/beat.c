@@ -24,7 +24,7 @@ beat_ctx *beat_new() {
 }
 
 int beat_ctx_count(beat_ctx *self) { return self->beat_count; }
-int beat_ctx_bands(beat_ctx *self) { return BANDS; }
+int beat_ctx_bands(beat_ctx *self) {(void)self; return BANDS; }
 
 void beat_ctx_get_data(beat_ctx *ctx, beat_data *ad) {
 	ad->bands = BANDS;

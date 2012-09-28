@@ -80,7 +80,7 @@ static float *do_fft(float *in1, float *in2)
 #ifdef FFT_RINGBUF
 	size_t fft_len = sizeof(float)*(nr_samp/2 + 1);
 	if(rb_write_space(fft_rb) >=  fft_len)
-		rb_write(fft_rb, fft, fft_len);
+		rb_write(fft_rb, (char*)fft, fft_len);
 #endif
 
 	return fft;

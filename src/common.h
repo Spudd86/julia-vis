@@ -74,6 +74,11 @@ typedef bool _Bool
 # endif
 #endif
 
+#define gccStyleMessage(type, msg, ...) do { \
+		fprintf(stderr, "%s: In function '%s':\n%s:%d: %s: ", \
+			__FILE__, __func__, __FILE__, __LINE__, type); \
+		fprintf(stderr, msg, ## __VA_ARGS__); } while (0)
+
 typedef enum { AUDIO_PORTAUDIO, AUDIO_PULSE, AUDIO_JACK } opt_audio_drv;
 
 typedef struct {
