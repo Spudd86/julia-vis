@@ -10,6 +10,7 @@
 #include "pallet.h"
 #include "audio/audio.h"
 #include "glpallet.h"
+#include "glfract.h"
 
 /* TODO:
  *  - rewrite pallet handling so that in GLSL mode we can just let it look
@@ -40,9 +41,7 @@ static int worktimes[FPS_HIST_LEN];
 
 static uint64_t tick0 = 0;
 
-void fractal_init(const opt_data *opts, int width, int height, GLboolean force_fixed, GLboolean packed_intesity_pixels);
-void render_fractal(struct point_data *pd);
-GLint fract_get_tex(void);
+static struct glfract_ctx *glfract = NULL;
 
 bool check_res(int w, int h) {
 	GLint width = 0;
@@ -145,7 +144,11 @@ void init_gl(const opt_data *opt_data, int width, int height)
 
 	init_mandel(); CHECK_GL_ERR;
 
-	fractal_init(opts, im_w, im_h, force_fixed, packed_intesity_pixels); CHECK_GL_ERR;
+	//fractal_init(opts, im_w, im_h, force_fixed, packed_intesity_pixels); CHECK_GL_ERR;
+	if(!force_fixed) glfract = fractal_glsl_init(opts, im_w, im_h, packed_intesity_pixels); 
+	if(!glfract) glfract = fractal_fixed_init(opts, im_w, im_h);
+	CHECK_GL_ERR;
+	
 	gl_maxsrc_init(IMAX(im_w>>res_boost, 128), IMAX(im_h>>res_boost, 128), packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
 	pal_init(im_w, im_h, packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
 	pd = new_point_data(opts->rational_julia?4:2);
@@ -178,14 +181,14 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 		maxfrms++;
 	}
 
-	render_fractal(pd);
+	render_fractal(glfract, pd);
 
 	if(!debug_pal || !debug_maxsrc || !show_mandel) {
-		pal_render(fract_get_tex());
+		pal_render(fract_get_tex(glfract));
 	} else {
 		glPushAttrib(GL_VIEWPORT_BIT);
 		setup_viewport(scr_w/2, scr_h/2);
-		pal_render(fract_get_tex());
+		pal_render(fract_get_tex(glfract));
 		glPopAttrib();
 	}
 
@@ -194,7 +197,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	//TODO: figure out what attrib to push to save color
 	if(debug_pal || debug_maxsrc) { glPushAttrib(GL_TEXTURE_BIT); if(packed_intesity_pixels) glColor3f(1.0f, 1.0f, 1.0f); }
 	if(debug_pal) {
-		glBindTexture(GL_TEXTURE_2D, fract_get_tex());
+		glBindTexture(GL_TEXTURE_2D, fract_get_tex(glfract));
 		draw_tex_quad(0.5f, 0.5f, -0.5f);
 	}
 	if(debug_maxsrc) {

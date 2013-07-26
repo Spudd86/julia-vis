@@ -14,6 +14,14 @@
 #endif
 #include <GL/glu.h>
 
+//FBO management
+struct oscr_ctx;
+struct oscr_ctx *offscr_new(int width, int height, GLboolean force_fixed, GLboolean redonly);
+GLuint offscr_get_src_tex(struct oscr_ctx *ctx);
+GLuint offscr_start_render(struct oscr_ctx *ctx);
+void offscr_finish_render(struct oscr_ctx *ctx);
+
+
 void swap_buffers(void);
 uint32_t get_ticks(void);
 void dodelay(uint32_t ms);
@@ -65,10 +73,11 @@ void pixbuf_to_texture(Pixbuf *src, GLuint *tex, GLint clamp_mode, int rgb);
 void setup_viewport(int width, int height);
 void draw_string(const char *str);
 
-#define CHECK_GL_ERR do { GLint glerr = glGetError(); if(glerr != GL_NO_ERROR)\
+#define CHECK_GL_ERR do { GLint glerr = glGetError(); if(glerr != GL_NO_ERROR) {\
 	fprintf(stderr, "%s: In function '%s':\n%s:%d: Warning: %s\n", \
 		__FILE__, __func__, __FILE__, __LINE__, gluErrorString(glerr)); \
 		glerr = glGetError();\
+		exit(1); }\
 	} while(0)
 
 #ifdef NDEBUG

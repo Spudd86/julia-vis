@@ -100,7 +100,7 @@ COMMON_SRCS = src/terminusIBM.c src/isaac/isaac.c src/pallet.c src/optproc.c src
 
 SOFT_SRCS = src/software/map.c src/software/maxsrc.c src/software/palletblit.c src/software/pixmisc.c
 
-GL_SRCS = src/opengl/glmain.c src/opengl/glfract.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glscope.c src/opengl/glpallet.c src/opengl/fixed/glf_pal.c src/opengl/mandelbrot.c src/opengl/glmap.c
+GL_SRCS = src/opengl/glmain.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glscope.c src/opengl/glpallet.c src/opengl/fixed/glf_pal.c src/opengl/fixed/glmap.c src/opengl/mandelbrot.c src/opengl/offscreen.c src/opengl/glsl/glsl_fract.c src/opengl/fixed/glf_fract.c
 
 ifeq ($(ENABLE_JACK),yes)
 AUDIO_SRCS += src/audio/jack.c

@@ -4,7 +4,7 @@
  */
 
 #include "common.h"
-#include "glmisc.h"
+#include "opengl/glmisc.h"
 
 typedef GLint quadind[4];
 typedef GLfloat vtx[2];
