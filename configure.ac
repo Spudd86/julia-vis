@@ -43,17 +43,6 @@ PKG_CHECK_MODULES([FFTW], [fftw3f])
 AC_SUBST(FFTW_CFLAGS)
 AC_SUBST(FFTW_LIBS)
 
-AC_ARG_ENABLE([directfb], AS_HELP_STRING([--enable-directfb], [build test-directfb (default: disabled)]))
-if test "x$enable_directfb" = xyes; then
-	PKG_CHECK_MODULES([DIRECTFB], [directfb],
-		[AC_DEFINE([HAVE_DIRECTFB], [1], [Define if directfb is enabled])],
-		[AC_MSG_FAILURE([--enable-directfb was given, but test for directfb failed])]
-	)
-fi
-AC_SUBST(DIRECTFB_CFLAGS)
-AC_SUBST(DIRECTFB_LIBS)
-AC_SUBST(enable_directfb)
-
 #TODO: default to enabled on windows
 AC_ARG_ENABLE([portaudio], AS_HELP_STRING([--enable-portaudio], [enable using portaudio for audio input (default: disabled)]))
 if test "x$enable_portaudio" = xyes; then
@@ -106,23 +95,28 @@ AC_SUBST(PULSE_LIBS)
 AC_SUBST(enable_pulseaudio)
 
 AC_ARG_ENABLE([opengl], AS_HELP_STRING([--disable-opengl], [enable opengl based versions (default: enabled)]))
-if test "x$enable_opengl" != xno; then
-	enable_opengl=yes
-fi
-AC_SUBST(enable_opengl)
-
 #TODO: make work on windows
-if test "x$enable_opengl" = xyes; then
-	PKG_CHECK_MODULES([GL], [glu],
-        [AC_DEFINE([HAVE_GL], [1], [Define if we have gl])],
-        [AC_MSG_FAILURE([--enable-gl was given, but test for gl failed (old gl?)])])
-fi
+AS_IF([ test "x$enable_opengl" != xno], [
+	PKG_CHECK_MODULES([GL], [glu],[found_opengl=yes],[found_opengl=no])
+	#TODO: test windows GL here if we haven't found it yet
+    AS_IF([ test "x$found_opengl" = xno && test "x$enable_opengl" = xyes ], [AC_MSG_FAILURE([--enable-gl was given, but test for gl failed (old gl?)])],
+          [ test "x$found_opengl" = xyes ], [AC_DEFINE([HAVE_GL], [1], [Define if we have gl])
+                                             enable_opengl=yes],
+          [ test "x$found_opengl" = xno ], [ enable_opengl=no ])
+])
+AC_SUBST(enable_opengl)
 AC_SUBST(GL_CFLAGS)
 AC_SUBST(GL_LIBS)
 
-if test "x$enable_opengl" = xyes; then
+AC_ARG_ENABLE([kms], AS_HELP_STRING([--disable-kms], [enable kms/dri opengl based version (default: disabled)]))
+if test "x$enable_kms" != xyes; then
+	enable_kms=no
+fi
+AC_SUBST(enable_kms)
+
+AS_IF([ test "x$enable_opengl" = xyes], [
 	AC_ARG_ENABLE([egl], AS_HELP_STRING([--disable-egl], [enable egl based versions (default: enabled)]))
-	if test "x$enable_egl" = xno; then
+	if test "x$enable_egl" != xno; then
 		enable_egl=yes
 	fi
 	AC_SUBST(enable_egl)
@@ -134,7 +128,16 @@ if test "x$enable_opengl" = xyes; then
 	fi
 	AC_SUBST(EGL_CFLAGS)
 	AC_SUBST(EGL_LIBS)
+])
+
+if test "x$enable_kms" = xyes; then
+	PKG_CHECK_MODULES(GBM, [gbm], [gbm_enabled=yes], [gbm_enabled=no])
+	PKG_CHECK_MODULES(DRM, [libdrm], [drm_enabled=yes], [drm_enabled=no])
 fi
+AC_SUBST(GBM_CFLAGS)
+AC_SUBST(GBM_LIBS)
+AC_SUBST(DRM_CFLAGS)
+AC_SUBST(DRM_LIBS)
 
 AC_ARG_ENABLE([systemglee], AS_HELP_STRING([--enable-system-glee], [enable system copy of glee (default: disabled)]))
 if test "x$enable_systemglee" = xyes; then
@@ -170,7 +173,10 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT16_T
 AC_TYPE_UINT8_T
 AC_HEADER_STDBOOL
+AC_CHECK_HEADERS_ONCE([execinfo.h])
 #AC_CHECK_HEADERS_ONCE([sys/mman.h])
+
+#TODO: rig up a test and define HAVE_TYPEOF for ccan stuff
 
 # Checks for library functions.
 AC_FUNC_MMAP

@@ -90,11 +90,9 @@ GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, cons
 			dump_shader_src(defs, frag_shader);
 //			dump_shader_src(frag);
 		}
+		return 0;
 	}
 
-	// mesa crashes at quit if we do this...
-//	if(vert_shader != NULL) { glDeleteObjectARB(vert); }
-//	if(frag_shader != NULL) { glDeleteObjectARB(frag); }
 	return prog;
 }
 
@@ -190,40 +188,84 @@ void draw_hist_array(int off, float scl, const int *array, int len) {
 
 #include "terminusIBM.h"
 
+#define TEXTURE_TEXT 1
 #if TEXTURE_TEXT
 
 void draw_string(const char *str)
 {
-	static int txt_texture = 0;	
-		
+	static GLuint txt_texture = 0;
+	
 	if(!txt_texture) {
-		glPushClientAttrib( GL_CLIENT_PIXEL_STORE_BIT );
-		glPixelStorei( GL_UNPACK_SWAP_BYTES,  GL_FALSE );
-		glPixelStorei( GL_UNPACK_LSB_FIRST,   GL_FALSE );
-		glPixelStorei( GL_UNPACK_ROW_LENGTH,  0        );
-		glPixelStorei( GL_UNPACK_SKIP_ROWS,   0        );
-		glPixelStorei( GL_UNPACK_SKIP_PIXELS, 0        );
-		glPixelStorei( GL_UNPACK_ALIGNMENT,   1        );
-		
-		glPopClientAttrib();
-		CHECK_GL_ERR;
-		
-		
-		glGenTextures(1, &txt_texture);
-		uint8_t *data = malloc(sizeof(*data)*8*(16*128)); // no extended ASCII
-		
+		uint8_t *data = calloc(sizeof(*data),128*256);
 		// unpack font into data
-		
+		for(int i=0; i<256; i++) {
+			int xoff = (i%16)*8, yoff = (i/16)*16;
+			const uint8_t * restrict src = terminusIBM + 16 * i;
+			for(int y=0; y < 16; y++) {
+				uint8_t *dst = data + (yoff+y)*128 + xoff;
+				uint8_t line = *src++;
+				for(int o=0; o < 8; o++) {
+					if(line & (1<<(7-o))) dst[o] = UINT8_MAX;
+					else dst[o] = 0;
+				}
+			}
+		}
+		glPushAttrib(GL_TEXTURE_BIT);
+		glGenTextures(1, &txt_texture);
+		glBindTexture(GL_TEXTURE_2D, txt_texture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 128, 256, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glPopAttrib();
 		free(data);
-		
-		GL_UNSIGNED_BYTE
 	}
 	
-	float pos[4];
+	int vpw[4]; float pos[4];
+	glGetIntegerv(GL_VIEWPORT, vpw);
 	glGetFloatv(GL_CURRENT_RASTER_POSITION, pos);
+	
+	glPushAttrib(GL_TEXTURE_BIT | GL_COLOR_BUFFER_BIT);
+	glEnable(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER, 0.5f);
+	glBindTexture(GL_TEXTURE_2D, txt_texture);
+	for(const char *c = str; *c; c++) {
+		if(*c == '\n') {
+			pos[0] = 0;
+			pos[1] -= 16;
+			continue;
+		}
+		if(*c == '\t') {
+			pos[0] += 8*4;
+			continue;
+		}
+	
+		int tx = (*c%16)*8, ty = (*c/16)*16;
+		float verts[] = {
+			(tx+0)/128.0f, (ty+ 0)/256.0f, 2*(pos[0]+0)/vpw[2]-1, 2*(pos[1]+16)/vpw[3]-1,
+			(tx+8)/128.0f, (ty+ 0)/256.0f, 2*(pos[0]+8)/vpw[2]-1, 2*(pos[1]+16)/vpw[3]-1,
+			(tx+0)/128.0f, (ty+16)/256.0f, 2*(pos[0]+0)/vpw[2]-1, 2*(pos[1]- 0)/vpw[3]-1,
+			(tx+8)/128.0f, (ty+16)/256.0f, 2*(pos[0]+8)/vpw[2]-1, 2*(pos[1]- 0)/vpw[3]-1,
+		};
+		
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_TEXTURE_COORD_ARRAY);	
+		glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, verts);
+		glVertexPointer(2, GL_FLOAT, sizeof(float)*4, verts + 2);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		
+		pos[0] += 8;
+	}
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+	glPopAttrib();
+	
+	glWindowPos2fv(pos);
 }
 
 #else
+
 void draw_string(const char *str)
 {
 	glPushClientAttrib( GL_CLIENT_PIXEL_STORE_BIT );

@@ -2,11 +2,39 @@
 #include "common.h"
 #include "points.h"
 
-#include "mtwist/mtwist.h"
+//#include "mtwist/mtwist.h"
+#include "isaac/isaac.h"
+
+#ifdef _WIN32
+#undef WIN32
+#define WIN32
+#endif
+
+// for seeding
+#ifdef WIN32
+#include <sys/timeb.h>
+#else /* WIN32 */
+#include <sys/time.h>
+#endif
+
+static void seed(struct isaac_ctx *ctx)
+{
+#ifdef WIN32
+    struct _timeb	tb;		/* Time of day (Windows mode) */
+    (void) _ftime (&tb);
+    isaac_init(ctx, (void *)&tb, sizeof(tb));
+#else /* WIN32 */
+    struct timeval	tv;		/* Time of day */
+    (void) gettimeofday (&tv, NULL);
+    isaac_init(ctx, (void *)&tv, sizeof(tv));
+#endif /* WIN32 */
+}
 
 struct point_data *new_point_data(int dim) 
 {
 	struct point_data *pd = xmalloc(sizeof(struct point_data));
+	pd->rng = xmalloc(sizeof(isaac_ctx));
+	seed(pd->rng);
 	
 	pd->dim = dim;
 	pd->done_time = 0;
@@ -15,10 +43,11 @@ struct point_data *new_point_data(int dim)
 	pd->p = xmalloc(sizeof(float)*pd->dim);
 	pd->t = xmalloc(sizeof(float)*pd->dim);
 	
-	mt_goodseed(); // seed our PSRNG
 	for(int i=0; i<pd->dim; i++) {
-		pd->t[i] = 0.5f*((mt_lrand()%2048)*2.0f/2048 - 1.0f);
-		pd->p[i] = 0.5f*((mt_lrand()%2048)*2.0f/2048 - 1.0f);
+/*		pd->t[i] = 0.5f*((isaac_next_uint32(pd->rng)%2048)*2.0f/2048 - 1.0f);*/
+/*		pd->p[i] = 0.5f*((isaac_next_uint32(pd->rng)%2048)*2.0f/2048 - 1.0f);*/
+		pd->t[i] = 0.5f*isaac_next_signed_float(pd->rng);
+		pd->p[i] = 0.5f*isaac_next_signed_float(pd->rng);
 		pd->v[i] = 0.0f;
 	}
 	
@@ -33,7 +62,8 @@ void update_points(struct point_data *pd, unsigned int passed_time, int retarget
 {
 	if(retarget) {
 		for(int i=0; i<pd->dim; i++) 
-			pd->t[i] = 0.5f*((mt_lrand()%2048)*2.0f/2048 - 1.0f);
+			pd->t[i] = 0.5f*((isaac_next_uint32(pd->rng)%2048)*2.0f/2048 - 1.0f);
+/*			pd->t[i] = 0.5f*isaac_next_signed_float(pd->rng);*/
 	}
 	
 	const float tsped = 0.002f;

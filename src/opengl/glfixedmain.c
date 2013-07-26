@@ -11,11 +11,6 @@
 #include "audio/audio.h"
 #include "glpallet.h"
 
-/* TODO:
- *  - rewrite pallet handling so that in GLSL mode we can just let it look
- *     after switching/position and skip the mixing work and active pallet 
- */
-
 void init_mandel();
 void render_mandel(struct point_data *pd);
 
@@ -51,42 +46,12 @@ bool check_res(int w, int h) {
 	CHECK_GL_ERR; return width != 0;
 }
 
-void draw_tex_quad(float sc, float xo, float yo)
-{
-	float verts[] = {
-		0, 0 , -1*sc+xo, -1*sc+yo,
-		1, 0 ,  1*sc+xo, -1*sc+yo,
-		0, 1 , -1*sc+xo,  1*sc+yo,
-		1, 1 ,  1*sc+xo,  1*sc+yo
-	};
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-	glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, verts);
-	glVertexPointer(2, GL_FLOAT, sizeof(float)*4, verts + 2);
-	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-}
-
-/*static void APIENTRY gl_debug_callback(enum source,*/
-/*                                              enum type,*/
-/*                                              uint id,*/
-/*                                              enum severity,*/
-/*                                              sizei length,*/
-/*                                              const char* message,*/
-/*                                              const void* userParam)*/
-/*{*/
-/*	fprintf(stderr, "%s: In function '%s':\n%s:%d: Warning: %s\n",*/
-/*	        __FILE__, __func__, __FILE__, __LINE__, gluErrorString(id));*/
-/*}*/
-
 void init_gl(const opt_data *opt_data, int width, int height)
 { CHECK_GL_ERR;
 	opts = opt_data;
-	GLboolean force_fixed = opts->gl_opts != NULL && strstr(opts->gl_opts, "fixed") != NULL;
 	GLboolean res_boost = opts->gl_opts != NULL && strstr(opts->gl_opts, "rboost") != NULL;
-	packed_intesity_pixels = opts->gl_opts != NULL && strstr(opts->gl_opts, "pintens") != NULL;
 	scr_w = width; scr_h = height;
-	if(opts->fullscreen) im_w = scr_w, im_h=scr_h;
-	else im_w = IMAX(make_pow2(IMAX(scr_w, scr_h)), 128)<<res_boost; im_h = im_w;
+	im_w = IMAX(make_pow2(IMAX(scr_w, scr_h)), 128)<<res_boost; im_h = im_w;
 	while(!check_res(im_w, im_h)) { // shrink textures until they work
 		printf(" %ix%i Too big! Shrink texture\n", im_h, im_w);
 		im_w = im_w/2;
@@ -103,20 +68,12 @@ void init_gl(const opt_data *opt_data, int width, int height)
 
 	glClear(GL_COLOR_BUFFER_BIT); CHECK_GL_ERR;
 	glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));
-	//draw_string("Loading... "); swap_buffers(); CHECK_GL_ERR;
 
 	printf("GL_VENDOR: %s\n", glGetString(GL_VENDOR));
 	printf("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
 	printf("GL_VERSION: %s\n", glGetString(GL_VERSION));
-	if(GLEE_ARB_shading_language_100) printf("GL_SL_VERSION: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 	printf("GL_EXTENSIONS: %s\n", glGetString(GL_EXTENSIONS));
 	printf("\n\n");
-	
-/*	if(GLEE_ARB_debug_output) {*/
-/*		glDebugMessageCallbackARB(gl_debug_callback, NULL);*/
-/*		glEnable(GL_DEBUG_OUTPUT);*/
-/*		printf("Have ARB_debug_output: registered callback\n");*/
-/*	} */
 
 	if(!GLEE_EXT_blend_minmax) {
 		printf("missing required gl extension EXT_blend_minmax!\n");
@@ -127,27 +84,17 @@ void init_gl(const opt_data *opt_data, int width, int height)
 		exit(1);
 	}
 
-	if(!GLEE_ARB_shading_language_100)
-		printf("No GLSL using all fixed function! (might be slow)\n");
-
-	if(!GLEE_ARB_shading_language_100 && !GLEE_ARB_pixel_buffer_object)
-		printf("Missing GLSL and no pixel buffer objects, WILL be slow!\n");
-
-	if(force_fixed) {
-		printf("Fixed function code forced\n");
-		packed_intesity_pixels = GL_FALSE;
-	}
+	if(!GLEE_ARB_pixel_buffer_object)
+		printf("no pixel buffer objects, WILL be slow!\n");
 	CHECK_GL_ERR;
-
-	if(packed_intesity_pixels) printf("Packed intensity enabled\n");
 
 	glEnable(GL_TEXTURE_2D); CHECK_GL_ERR;
 
 	init_mandel(); CHECK_GL_ERR;
 
-	fractal_init(opts, im_w, im_h, force_fixed, packed_intesity_pixels); CHECK_GL_ERR;
-	gl_maxsrc_init(IMAX(im_w>>res_boost, 128), IMAX(im_h>>res_boost, 128), packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
-	pal_init(im_w, im_h, packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
+	fractal_init(opts, im_w, im_h, true, GL_FALSE); CHECK_GL_ERR;
+	gl_maxsrc_init(IMAX(im_w>>res_boost, 128), IMAX(im_h>>res_boost, 128), GL_FALSE, true); CHECK_GL_ERR;
+	pal_init_fixed(im_w, im_h); CHECK_GL_ERR;
 	pd = new_point_data(opts->rational_julia?4:2);
 
 	memset(frametimes, 0, sizeof(frametimes));
@@ -181,11 +128,11 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	render_fractal(pd);
 
 	if(!debug_pal || !debug_maxsrc || !show_mandel) {
-		pal_render(fract_get_tex());
+		pal_render_fixed(fract_get_tex());
 	} else {
 		glPushAttrib(GL_VIEWPORT_BIT);
 		setup_viewport(scr_w/2, scr_h/2);
-		pal_render(fract_get_tex());
+		pal_render_fixed(fract_get_tex());
 		glPopAttrib();
 	}
 
@@ -195,11 +142,21 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	if(debug_pal || debug_maxsrc) { glPushAttrib(GL_TEXTURE_BIT); if(packed_intesity_pixels) glColor3f(1.0f, 1.0f, 1.0f); }
 	if(debug_pal) {
 		glBindTexture(GL_TEXTURE_2D, fract_get_tex());
-		draw_tex_quad(0.5f, 0.5f, -0.5f);
+		glBegin(GL_TRIANGLE_STRIP);
+			glTexCoord2d(0,0); glVertex2d( 0, -1);
+			glTexCoord2d(1,0); glVertex2d( 1, -1);
+			glTexCoord2d(0,1); glVertex2d( 0,  0);
+			glTexCoord2d(1,1); glVertex2d( 1,  0);
+		glEnd();
 	}
 	if(debug_maxsrc) {
 		glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
-		draw_tex_quad(0.5f, -0.5f, 0.5f);
+		glBegin(GL_TRIANGLE_STRIP);
+			glTexCoord2d(0,0); glVertex2d(-1,  0);
+			glTexCoord2d(1,0); glVertex2d( 0,  0);
+			glTexCoord2d(0,1); glVertex2d(-1,  1);
+			glTexCoord2d(1,1); glVertex2d( 0,  1);
+		glEnd();
 	}
 	if(debug_pal || debug_maxsrc) { glPopAttrib(); if(packed_intesity_pixels) glColor3f(1.0f, 1.0f, 1.0f); }
 	
@@ -217,7 +174,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 		glColor3f(1.0f, 1.0f, 1.0f);
 		char buf[128];
 		glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));
-		sprintf(buf,"%6.1f FPS %6.1f", FPS_HIST_LEN*1000000.0f/totframetime, maxfrms*1000000.0f/(now-tick0));
+		sprintf(buf,"%6.1f FPS %6.1f\n", FPS_HIST_LEN*1000000.0f/totframetime, maxfrms*1000000.0f/(now-tick0));
 		draw_string(buf); DEBUG_CHECK_GL_ERR;
 		glRasterPos2f(-1,0.75-20.0f/(scr_h*0.5f));
 		sprintf(buf,"%7.1fns frametime\n%7.1fns worktime\n", totframetime/((float)FPS_HIST_LEN), totworktime/((float)FPS_HIST_LEN));
@@ -227,13 +184,12 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	}
 
 	render_debug_overlay();
-	
+
 	swap_buffers(); CHECK_GL_ERR;
 
 	now = uget_ticks();
 	if(now - lastpalstep >= 1000*2048/256 && get_pallet_changing()) { // want pallet switch to take ~2 seconds
-		if(pallet_step(IMIN((now - lastpalstep)*256/(2048*1000), 32)))
-			pal_pallet_changed();
+		pallet_step(IMIN((now - lastpalstep)*256/(2048*1000), 32));
 		lastpalstep = now;
 	}
 	int newbeat = beat_get_count();

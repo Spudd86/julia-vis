@@ -4,9 +4,11 @@
 #include <sys/time.h>
 #include <sys/timerfd.h>
 #include <poll.h>
+#include <limits.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xatom.h>
 #include <X11/keysym.h>
 
 #include "glmisc.h"
@@ -15,6 +17,8 @@
 
 #include "audio/audio.h"
 #include "fpsservo/fpsservo.h"
+
+//#define USE_GLX_INTEL_swap_event 1
 
 #ifndef GLX_INTEL_swap_event
 # define GLX_INTEL_swap_event 1
@@ -31,6 +35,10 @@
 #  define GLX_BUFFER_SWAP_COMPLETE_INTEL_MASK 0x04000000
 # endif
 
+#define _NET_WM_STATE_REMOVE        0
+#define _NET_WM_STATE_ADD           1
+#define _NET_WM_STATE_TOGGLE        2
+
 typedef struct {
 	int event_type;	      /* GLX_EXCHANGE_COMPLETE_INTEL,
 				 GLX_COPY_COMPLETE, GLX_FLIP_COMPLETE */
@@ -46,6 +54,7 @@ typedef struct {
 
 static struct fps_data *fps_data = NULL;
 
+static Window root;
 static Display *dpy = NULL;
 static GLXWindow glxWin;
 
@@ -85,6 +94,150 @@ static int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
 
 static opt_data opts;
 
+static int timer_fd = 0;
+
+static Atom          wmPing;            // _NET_WM_PING atom
+static Atom          wmState;           // _NET_WM_STATE atom
+static Atom          wmStateFullscreen; // _NET_WM_STATE_FULLSCREEN atom
+static Atom          wmActiveWindow;    // _NET_ACTIVE_WINDOW atom
+
+static unsigned long getWindowProperty( Window window,
+                                        Atom property,
+                                        Atom type,
+                                        unsigned char** value )
+{
+    Atom actualType;
+    int actualFormat;
+    unsigned long itemCount, bytesAfter;
+
+    XGetWindowProperty( dpy,
+                        window,
+                        property,
+                        0,
+                        LONG_MAX,
+                        False,
+                        type,
+                        &actualType,
+                        &actualFormat,
+                        &itemCount,
+                        &bytesAfter,
+                        value );
+
+    if( actualType != type )
+    {
+        return 0;
+    }
+
+    return itemCount;
+}
+
+static Atom getSupportedAtom( Atom* supportedAtoms,
+                              unsigned long atomCount,
+                              const char* atomName )
+{
+    Atom atom = XInternAtom( dpy, atomName, True );
+    if( atom != None )
+    {
+        unsigned long i;
+
+        for( i = 0;  i < atomCount;  i++ )
+        {
+            if( supportedAtoms[i] == atom )
+            {
+                return atom;
+            }
+        }
+    }
+
+    return None;
+}
+
+static GLboolean checkForEWMH( void )
+{
+    Window *windowFromRoot = NULL;
+    Window *windowFromChild = NULL;
+
+    // Hey kids; let's see if the window manager supports EWMH!
+
+    // First we need a couple of atoms, which should already be there
+    Atom supportingWmCheck = XInternAtom( dpy,
+                                          "_NET_SUPPORTING_WM_CHECK",
+                                          True );
+    Atom wmSupported = XInternAtom( dpy,
+                                    "_NET_SUPPORTED",
+                                    True );
+    if( supportingWmCheck == None || wmSupported == None )
+    {
+        return GL_FALSE;
+    }
+
+    // Then we look for the _NET_SUPPORTING_WM_CHECK property of the root window
+    if( getWindowProperty( root,
+                           supportingWmCheck,
+                           XA_WINDOW,
+                           (unsigned char**) &windowFromRoot ) != 1 )
+    {
+        XFree( windowFromRoot );
+        return GL_FALSE;
+    }
+
+    // It should be the ID of a child window (of the root)
+    // Then we look for the same property on the child window
+    if( getWindowProperty( *windowFromRoot,
+                           supportingWmCheck,
+                           XA_WINDOW,
+                           (unsigned char**) &windowFromChild ) != 1 )
+    {
+        XFree( windowFromRoot );
+        XFree( windowFromChild );
+        return GL_FALSE;
+    }
+
+    // It should be the ID of that same child window
+    if( *windowFromRoot != *windowFromChild )
+    {
+        XFree( windowFromRoot );
+        XFree( windowFromChild );
+        return GL_FALSE;
+    }
+
+    XFree( windowFromRoot );
+    XFree( windowFromChild );
+
+    // We are now fairly sure that an EWMH-compliant window manager is running
+
+    Atom *supportedAtoms;
+    unsigned long atomCount;
+
+    // Now we need to check the _NET_SUPPORTED property of the root window
+    atomCount = getWindowProperty( root,
+                                   wmSupported,
+                                   XA_ATOM,
+                                   (unsigned char**) &supportedAtoms );
+
+    // See which of the atoms we support that are supported by the WM
+
+    wmState = getSupportedAtom( supportedAtoms,
+                                         atomCount,
+                                         "_NET_WM_STATE" );
+
+    wmStateFullscreen = getSupportedAtom( supportedAtoms,
+                                                   atomCount,
+                                                   "_NET_WM_STATE_FULLSCREEN" );
+
+    wmPing = getSupportedAtom( supportedAtoms,
+                                        atomCount,
+                                        "_NET_WM_PING" );
+
+    wmActiveWindow = getSupportedAtom( supportedAtoms,
+                                                atomCount,
+                                                "_NET_ACTIVE_WINDOW" );
+
+    XFree( supportedAtoms );
+
+    return GL_TRUE;
+}
+
 
 int main(int argc, char **argv)
 {
@@ -118,7 +271,7 @@ int main(int argc, char **argv)
     glXQueryExtension(dpy, &glxErrBase, &glxEventBase);
     printf("GLX: errorBase = %i, eventBase = %i\n", glxErrBase, glxEventBase);
     
-    Window xwin = 0, root = DefaultRootWindow(dpy);
+    Window xwin = 0; root = DefaultRootWindow(dpy);
     int numReturned = 0;
     GLXFBConfig *fbConfigs = NULL;
     fbConfigs = glXChooseFBConfig( dpy, DefaultScreen(dpy), fbattrib, &numReturned );
@@ -129,6 +282,14 @@ int main(int argc, char **argv)
    	}
    	
    	XVisualInfo  *vinfo = glXGetVisualFromFBConfig( dpy, fbConfigs[0] );
+   	
+   	bool haveEWMH = checkForEWMH();
+   	
+   	if( opts.fullscreen && haveEWMH)
+   	{
+   		h = opts.h = DisplayHeight(dpy, DefaultScreen(dpy));
+   		w = opts.w = DisplayWidth(dpy, DefaultScreen(dpy));
+   	}
    	
    	/* window attributes */
    	XSetWindowAttributes attrs;
@@ -163,6 +324,51 @@ int main(int argc, char **argv)
     XMapWindow(dpy, xwin);
     //XIfEvent(dpy, &event, WaitForNotify, (XPointer) xwin);
     
+    if( opts.fullscreen && haveEWMH)
+    {
+            // Ask the window manager to raise and focus our window
+            // Only focused windows with the _NET_WM_STATE_FULLSCREEN state end
+            // up on top of all other windows ("Stacking order" in EWMH spec)
+
+            XEvent event;
+            memset( &event, 0, sizeof(event) );
+
+            event.type = ClientMessage;
+            event.xclient.window = xwin;
+            event.xclient.format = 32; // Data is 32-bit longs
+            event.xclient.message_type = wmActiveWindow;
+            event.xclient.data.l[0] = 1; // Sender is a normal application
+            event.xclient.data.l[1] = 0; // We don't really know the timestamp
+
+            XSendEvent( dpy,
+                        root,
+                        False,
+                        SubstructureNotifyMask | SubstructureRedirectMask,
+                        &event );
+
+        // Ask the window manager to make our window a fullscreen window
+        // Fullscreen windows are undecorated and, when focused, are kept
+        // on top of all other windows
+
+        //XEvent event;
+        memset( &event, 0, sizeof(event) );
+
+        event.type = ClientMessage;
+        event.xclient.window = xwin;
+        event.xclient.format = 32; // Data is 32-bit longs
+        event.xclient.message_type = wmState;
+        event.xclient.data.l[0] = _NET_WM_STATE_ADD;
+        event.xclient.data.l[1] = wmStateFullscreen;
+        event.xclient.data.l[2] = 0; // No secondary property
+        event.xclient.data.l[3] = 1; // Sender is a normal application
+
+        XSendEvent( dpy,
+                    root,
+                    False,
+                    SubstructureNotifyMask | SubstructureRedirectMask,
+                    &event );
+    }
+    
     glXMakeContextCurrent(dpy, glxWin, glxWin, context);
 	
 	const GLubyte *glx_ext_str = glXQueryExtensionsString(dpy, 0);
@@ -171,11 +377,13 @@ int main(int argc, char **argv)
 		PFNGLXSWAPINTERVALMESAPROC swap_interval = glXGetProcAddressARB("glXSwapIntervalMESA");
 		printf("INTERVAL SET\n");
 		opts.draw_rate = 300;
-		swap_interval(1);
+		//swap_interval(1);
 	}
+#if USE_GLX_INTEL_swap_event
 	if(strstr(glx_ext_str, "GLX_INTEL_swap_event")) {
     	glXSelectEvent(dpy, glxWin, GLX_BUFFER_SWAP_COMPLETE_INTEL_MASK);
     }
+#endif
     
     init_gl(&opts, w, h);
 	
@@ -187,12 +395,12 @@ int main(int argc, char **argv)
 		int tmp = gcd(swap_period.n, swap_period.d);
 		swap_period.n /= tmp; swap_period.d /= tmp;
 		glXGetSyncValuesOML(dpy, glxWin, &ust, &msc, &sbc);
-		glXWaitForMscOML(dpy, glxWin, msc + 1, 1, 0, &ust, &msc, &sbc);
+		glXWaitForMscOML(dpy, glxWin, msc + 1, 0, 0, &ust, &msc, &sbc);
 		fps_data = fps_data_new(swap_period, msc, uget_ticks());
 	}
 	
 	int xfd = ConnectionNumber(dpy);
-	int tfd = timerfd_create(CLOCK_MONOTONIC, 0);
+	int tfd = timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
 
 	struct pollfd pfds[] = {
 		{tfd, POLLIN, 0 },
@@ -203,18 +411,21 @@ int main(int argc, char **argv)
 
 	while(1) {
 		int err;
-		if(err = poll(pfds, 2, 5) < 0) continue;
+		if( (err = poll(pfds, 2, 1)) < 0) continue;
 		//if((err = poll(pfds, 2, -1)) < 0) continue;
 		
 		if(pfds[0].revents) {
+			uint64_t now = uget_ticks();
 			uint64_t timeouts;
-			read(tfd, &timeouts, sizeof(timeouts));			
-			//printf("Render (timeouts = %" PRId64 ")\n", timeouts);
+			read(tfd, &timeouts, sizeof(timeouts));
+			
+			frame_start(fps_data, now);
 			render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
-#if 0			
+#if 0 && !USE_GLX_INTEL_swap_event
 			int64_t ust, msc, sbc;
-			glXWaitForSbcOML(dpy, glxWin, 0, &ust, &msc, &sbc);
-			int64_t now = uget_ticks();
+			glXWaitForMscOML(dpy, glxWin, fps_get_target_msc(fps_data), 0, 0, &ust, &msc, &sbc);
+			//glXWaitForSbcOML(dpy, glxWin, sbc+1, &ust, &msc, &sbc);
+			now = uget_ticks();
 			int delay = swap_complete(fps_data, now, msc, sbc);
 			delayhist_total -= delayhist[framecnt%HIST_LEN];
 			delayhist_total += (delayhist[framecnt%HIST_LEN] = delay);
@@ -225,27 +436,32 @@ int main(int argc, char **argv)
 		
 		//if(!pfds[1].revents) continue;
 	
-		int clear_key = 1;
+		//int clear_key = 1;
 		while (XPending(dpy) > 0) 
 		{
 			XNextEvent(dpy, &event);
-#if 1			
+#if USE_GLX_INTEL_swap_event
 			if(event.type == glxEventBase + GLX_BufferSwapComplete) {
-				int64_t now = uget_ticks();
-				
-				//int64_t ust, msc, sbc; glXGetSyncValuesOML(dpy, glxWin, &ust, &msc, &sbc);
-				//int delay = swap_complete(fps_data, now, msc, sbc);
 				GLXBufferSwapEventINTEL *swap_event = &event;
+#if 1
+				int64_t now = uget_ticks();
 				int delay = swap_complete(fps_data, now, swap_event->msc, swap_event->sbc);
-				
+#else
+				int64_t ust, msc, sbc;
+				glXWaitForMscOML(dpy, glxWin, fps_get_target_msc(fps_data), 0, 0, &ust, &msc, &sbc);
+				int64_t now = uget_ticks();
+				int delay = swap_complete(fps_data, now, swap_event->msc, swap_event->sbc);
+#endif
 				//printf("swap_complete: delay = %d\n", delay);
 							
 				delayhist_total -= delayhist[framecnt%HIST_LEN];
 				delayhist_total += (delayhist[framecnt%HIST_LEN] = delay);
 				framecnt++;
 				
-				if(delay <= 0) render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
-				else arm_timer(tfd, now+delay); // schedual next frame
+				if(delay <= 0) {
+					frame_start(fps_data, now);
+					render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
+				} else arm_timer(tfd, now+delay); // schedual next frame
 				
 				continue;
 			}
@@ -257,9 +473,7 @@ int main(int argc, char **argv)
 				break;
 				case KeyPress:
 				{
-					clear_key = 0;
-					char buffer[10];
-					int r, code;
+					int code;
 					code = XLookupKeysym(&event.xkey, 0);
 					if (code == XK_F1) {
 						debug_maxsrc = !debug_maxsrc;
@@ -314,9 +528,32 @@ void render_fps_hist(void)
 	float scl = swap_period.n/(swap_period.d*1000000.0f);
 	int frame_int = (int)(swap_period.d*INT64_C(1000000)/swap_period.n);
 	
+	int max_worktime = 0;
 	int totslen = MIN(fpslen, HIST_LEN);
 	int tots[MAX(fpslen, HIST_LEN)];
+	for(int i=0; i < totslen; i++) {
+		tots[totslen - i - 1] = fpsdelays[fpslen-i-1] + fpsworktimes[fpslen-i-1];
+		max_worktime = MAX(max_worktime, fpsworktimes[fpslen-i-1]);
+	}
+	
+	glColor3f(1.0f, 1.0f, 1.0f);
+	char buf[256];
+	sprintf(buf,
+	        "AVG delay %7.1f\n"
+	        "    delay %7.1f\n"
+	        "    slack %7.1f\n"
+	        "    swap  %7.1f\n"
+	        " worktime %7.1f\n"
+	        "  wrk max %d\n",
+	        (float)delayhist_total/HIST_LEN,
+	        (float)fpsdelaytotal/fpslen,
+	        (float)slacktotal/fpslen,
+	        (float)swaptotal/fpslen,
+	        (float)fpstotal/fpslen,
+	        max_worktime);
+	draw_string(buf); DEBUG_CHECK_GL_ERR;
 
+	// draw the nice big graph
 	glPushMatrix();
 	//glScalef(1.0, 0.25, 1); glTranslatef(0, -4, 0);
 	glScalef(1.0, 0.5, 1); glTranslatef(0, -2, 0);
@@ -339,25 +576,49 @@ void render_fps_hist(void)
 	draw_hist_array_col(framecnt, scl, delayhist, HIST_LEN, 0.0f, 1.0f, 0.0f);
 	draw_hist_array_col(framecnt, scl, fpsworktimes, fpslen, 1.0f, 1.0f, 0.0f);
 	draw_hist_array_xlate(framecnt, -scl, frame_int*scl, fpsslacks, fpslen, 1.0f, 0.0f, 1.0f);
-	
-	for(int i=0; i < totslen; i++) tots[totslen - i - 1] = fpsdelays[fpslen-i-1] + fpsworktimes[fpslen-i-1];
 	draw_hist_array_col(framecnt, scl, tots, totslen, 0.0f, 1.0f, 1.0f);
 	glPopMatrix();
 	
-	glPushMatrix();
-	glScalef(0.5, 0.25, 1); glTranslatef(-2, -4, 0);
-	//glScalef(0.5, 0.5, 1); glTranslatef(-1, -2, 0);
-	draw_hist_array_xlate(framecnt, -scl, frame_int*scl, fpsslacks, fpslen, 1.0f, 0.0f, 0.0f);
-	draw_hist_array_col(framecnt, scl, fpsdelays, fpslen, 0.0f, 1.0f, 0.0f);
-	//for(int i=0; i < fpslen; i++) tots[i] = fpsdelays[i] + fpsworktimes[i];
-	draw_hist_array_col(framecnt, scl, tots, fpslen, 0.0f, 1.0f, 1.0f);
-	glPopMatrix();
+	glColor3f(0.0f, 1.0f, 0.0f);
+	glRasterPos2f(0, -0.5);// - 20.0f/(opts.h*0.5f));
+	draw_string("delay"); DEBUG_CHECK_GL_ERR;
 	
+	glColor3f(1.0f, 0.0f, 1.0f);
+	glRasterPos2f(0, -0.5);// - 20.0f/(opts.h*0.5f));
+	draw_string("      -slack"); DEBUG_CHECK_GL_ERR;
+	
+	glColor3f(1.0f, 1.0f, 0.0f);
+	glRasterPos2f(0, -0.5);// - 20.0f/(opts.h*0.5f));
+	draw_string("             worktimes"); DEBUG_CHECK_GL_ERR;
+	
+	glColor3f(0.0f, 1.0f, 1.0f);
+	glRasterPos2f(0, -0.5); 
+	draw_string("                       wkt+delay"); DEBUG_CHECK_GL_ERR;
+	
+	// draw the others
+
+/*	glPushMatrix();*/
+/*	glScalef(0.5, 0.25, 1); glTranslatef(-2, -4, 0);*/
+/*	draw_hist_array_xlate(framecnt, -scl, frame_int*scl, fpsslacks, fpslen, 1.0f, 0.0f, 0.0f);*/
+/*	draw_hist_array_col(framecnt, scl, fpsdelays, fpslen, 0.0f, 1.0f, 0.0f);*/
+/*	//for(int i=0; i < fpslen; i++) tots[i] = fpsdelays[i] + fpsworktimes[i];*/
+/*	draw_hist_array_col(framecnt, scl, tots, fpslen, 0.0f, 1.0f, 1.0f);*/
+/*	glPopMatrix();*/
+/*	glColor3f(0.0f, 1.0f, 1.0f);*/
+/*	glRasterPos2f(-1, -0.8); draw_string("wkt+delay"); DEBUG_CHECK_GL_ERR;*/
+/*	glColor3f(1.0f, 0.0f, 0.0f);*/
+/*	glRasterPos2f(-1, -0.8); draw_string("          -slack"); DEBUG_CHECK_GL_ERR;*/
+	
+	glColor3f(1.0f, 1.0f, 1.0f);
 	glPushMatrix();
 	glScalef(0.5, 0.25, 1); glTranslatef(-2, -3, 0);
 	glColor3f(0.6f, 0.6f, 0.6f); glBegin(GL_LINES); gl_hline(0.5f, 0.0f, 1.05f); glEnd();
 	draw_hist_array_xlate(framecnt, scl/2, 0.5f, fpsframetimes, fpslen, 1.0f,0.0f,1.0f);
 	glPopMatrix();
+	
+	glColor3f(1.0f, 0.0f, 1.0f);
+	glRasterPos2f(-1, -0.75);
+	draw_string("swaptimes"); DEBUG_CHECK_GL_ERR;
 
 	glPushMatrix();
 	glScalef(0.5, 0.25, 1); glTranslatef(-2, -2, 0);
@@ -366,45 +627,9 @@ void render_fps_hist(void)
 	draw_hist_array_col(framecnt, fps_scl_avg, fpsworktimes, fpslen, 0.0f,1.0f,0.0f);
 	glPopMatrix();
 	
-	glColor3f(1.0f, 1.0f, 1.0f);
-	char buf[256];
-	sprintf(buf,
-	        "AVG delay %7.1f\n"
-	        "    delay %7.1f\n"
-	        "    slack %7.1f\n"
-	        "    swap  %7.1f\n"
-	        " worktime %7.1f\n",
-	        (float)delayhist_total/HIST_LEN,
-	        (float)fpsdelaytotal/fpslen,
-	        (float)slacktotal/fpslen,
-	        (float)swaptotal/fpslen,
-	        (float)fpstotal/fpslen);
-	draw_string(buf); DEBUG_CHECK_GL_ERR;
-	
 	glColor3f(0.0f, 1.0f, 0.0f);
-	glRasterPos2f(-1, -0.5);
+	glRasterPos2f(-1, -0.25);
 	draw_string("worktimes"); DEBUG_CHECK_GL_ERR;
-	
-	glColor3f(0.0f, 1.0f, 1.0f);
-	glRasterPos2f(-1, -0.75);
-	draw_string("wkt+delay"); DEBUG_CHECK_GL_ERR;
-	glColor3f(1.0f, 0.0f, 0.0f);
-	glRasterPos2f(-1, -0.75);
-	draw_string("          -slack"); DEBUG_CHECK_GL_ERR;
-	
-	glColor3f(0.0f, 1.0f, 0.0f);
-	glRasterPos2f(0.25, -0.5);// - 20.0f/(opts.h*0.5f));
-	draw_string("delay"); DEBUG_CHECK_GL_ERR;
-	
-	glColor3f(1.0f, 0.0f, 1.0f);
-	glRasterPos2f(0.25, -0.5);// - 20.0f/(opts.h*0.5f));
-	//draw_string(" slack"); DEBUG_CHECK_GL_ERR;
-	draw_string("      -slack"); DEBUG_CHECK_GL_ERR;
-	
-	glColor3f(1.0f, 1.0f, 0.0f);
-	glRasterPos2f(0.25, -0.5);// - 20.0f/(opts.h*0.5f));
-	//draw_string(" worktimes"); DEBUG_CHECK_GL_ERR;
-	draw_string("             worktimes"); DEBUG_CHECK_GL_ERR;
 	
 	glColor3f(1.0f, 1.0f, 1.0f);
 }
@@ -416,13 +641,24 @@ void render_debug_overlay(void)
 
 void swap_buffers(void)
 {
-	int msc = 0;
+	int64_t targetmsc = 0;
 	if(fps_data)
-		msc = swap_begin(fps_data, uget_ticks());
+		targetmsc = swap_begin(fps_data, uget_ticks());
 	//TODO: when intel swap buffer event isn't present wait for msc
 	// then call swap complete
-	//glFlush();
-	glXSwapBuffersMscOML(dpy, glxWin, 0, 0, 0);
+	int64_t targetsbc = glXSwapBuffersMscOML(dpy, glxWin, targetmsc, 0, 0);
+	//int64_t targetsbc = glXSwapBuffersMscOML(dpy, glxWin, 0, 0, 0);
+#if 1
+	int64_t ust, msc, sbc;
+	//glXWaitForMscOML(dpy, glxWin, targetmsc, 0, 0, &ust, &msc, &sbc);
+	glXWaitForSbcOML(dpy, glxWin, targetsbc, &ust, &msc, &sbc);
+	int64_t now = uget_ticks();
+	int delay = swap_complete(fps_data, now, msc, sbc);
+	delayhist_total -= delayhist[framecnt%HIST_LEN];
+	delayhist_total += (delayhist[framecnt%HIST_LEN] = delay);
+	framecnt++;
+	arm_timer(timer_fd, now+delay);
+#endif
 }
 
 #define NSECS_IN_SEC INT64_C(1000000000)

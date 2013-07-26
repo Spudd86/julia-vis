@@ -95,8 +95,9 @@ void draw_string(const char *str);
 		"}\n"\
 		"float decode(vec4 rgba ) {\n"\
 		"//	return clamp(dot(rgba.xyz, vec3(1.0, 1/255.0, 1/65025.0) ), 0.0, 1.0);\n"\
-		"	return dot(rgba.xyz, vec3(1.0, 1.0/255.0, 1.0/65025.0) );\n"\
-		"//	return dot(rgba.xy, vec2(1.0, 1.0/255.0) );\n"\
+		"//	return dot(rgba.xyz, vec3(1.0, 1.0/255.0, 1.0/65025.0) );\n"\
+		"	return dot(rgba.xy, vec2(1.0, 1.0/255.0) );\n"\
+		"//	return clamp( dot(rgba.xy, vec2(1.0-1.0/255.0, 1.0/255.0) ), 0.0, 1.0);\n"\
 		"//	return rgba.x;\n"\
 		"}\n"
 

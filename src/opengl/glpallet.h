@@ -10,4 +10,7 @@ void pal_init(int width, int height, GLboolean float_packed_pixels, GLboolean fo
 void pal_pallet_changed(void);
 void pal_render(GLuint srctex);
 
+void pal_init_fixed(int width, int height);
+void pal_render_fixed(GLuint srctex);
+
 #endif /* include guard */

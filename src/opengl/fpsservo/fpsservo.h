@@ -18,6 +18,10 @@ void fps_get_frametimes(struct fps_data *self, int *total, const int **frametime
 void fps_get_delays(struct fps_data *self, int *total, const int **delays);
 void fps_get_slacks(struct fps_data *self, int *total, const int **slacktimes);
 int fps_get_cur_slack(struct fps_data *self);
+int64_t fps_get_target_msc(struct fps_data *self);
+
+
+void frame_start(struct fps_data *self, int64_t now);
 
 /**
  * Call this just before XXXSwapBuffers()

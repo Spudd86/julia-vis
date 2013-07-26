@@ -1,10 +1,10 @@
 /* src/config.h.in.  Generated from configure.ac by autoheader.  */
 
-/* Define if directfb is enabled */
-#undef HAVE_DIRECTFB
-
 /* Define if we have egl */
 #undef HAVE_EGL
+
+/* Define to 1 if you have the <execinfo.h> header file. */
+#undef HAVE_EXECINFO_H
 
 /* Define to 1 if you have the `getpagesize' function. */
 #undef HAVE_GETPAGESIZE

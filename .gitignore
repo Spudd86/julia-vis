@@ -14,3 +14,4 @@ src/config.h
 .cproject
 .project
 .settings
+*~

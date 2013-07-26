@@ -1,5 +1,4 @@
 
-//TODO: test w/o mmx/sse
 //TODO: test 8/16 bit code paths (32-bit seems to work)
 
 #include "common.h"
@@ -10,9 +9,20 @@ struct pallet_colour {
 	uint8_t pos;
 };
 
-#define NUM_PALLETS 5
-static const int num_pallets = NUM_PALLETS;
+#define NUM_PALLETS 10
 static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
+
+#if 0
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0},
+		{   0, 255, 255,   1},
+		{   0,   0,   0,   2},
+		{   0,   0,  64,  60},
+		{ 255, 128,  64, 137},
+		{ 255, 255, 255, 240},
+		{ 255, 255, 255, 255}
+	},
+#endif
 
 	{	//  r    g    b  pos
 		{   0,   0,   0,   0},
@@ -53,17 +63,94 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 		{ 196,  23,   0,  60},
 		{ 255, 255, 255, 150},
 		{  32,  96,   0, 200},
-//		{ 115, 230,   0, 255},
-		{  45, 255, 255, 255}
-	}
+		{ 115, 230,   0, 255},
+	},
 
+	/*//punkie25 BLUEMETA, tweaked
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0},
+		{ 255, 255, 255, 103},
+		{   0,   0,   0, 135},
+		{   0,  64, 128, 200},
+		{   0,   0,   0, 255},
+	}, */
+	
+	//punkie21 STRANGE
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0},
+		{ 119,   0,   0,  26},
+		{ 128,   0,  64, 110},
+		{ 133,   9,  62, 111},
+		{ 255, 255,   0, 189},
+		{ 255, 255, 255, 255},
+	},
+	
+	//punkie22 GORTOX
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0},
+		{  96,   8,  72,  28},
+		{   0,   0, 252,  44},
+		{   0, 252, 252,  60},
+		{   0,   0, 252,  92},
+		{  96,   8,  72, 124},
+		{   0,   0,   0, 133},
+		{  60,   4,  44, 144},
+		{  96,   8,  76, 156},
+		{ 252,   0,   0, 172},
+		{ 252, 252,   0, 197},
+		{ 252,   0,   0, 220},
+		{  96,   8,  76, 236},
+		{   0,   0,   0, 255},
+	},
+	
+	//punkie20 OUTERDUST
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0},
+		{ 228, 231, 152, 172},
+		{   0,   0,   0, 255},
+	},
+	
+	//punkie18 GOTSOME
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0},
+		{ 255, 255,   0,  96},
+		{   0,   0,   0, 191},
+		{   0, 255,   0, 255},
+	},
+	
+	//punkie16 VULCANO
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0},
+		{ 100,  48,  48,   8},
+		{ 252,   0,   0,  32},
+		{ 252, 252,   0,  64},
+		{ 252, 252, 252,  96},
+		{ 252, 120,   0, 160},
+		{ 252,   0,   0, 192},
+		{ 160,   0,   0, 224},
+		{  60,  60,  60, 255},
+	},
+
+/*	
+	{	//  r    g    b  pos
+		{   0,   0,   0,   0},
+		{ 255, 255, 255, 255},
+	}
+*/
 	// END
 	//{   0,   0,   0,   0},
 	//{   0,   0,   0,   0}
 };
 
 
+//#include "data/punkie_pal.h"
+
 static uint32_t pallets32[NUM_PALLETS][256] __attribute__((aligned(16)));
+
+/*#undef NUM_PALLETS*/
+/*#define NUM_PALLETS NUM_PUNKIE_PAL*/
+/*#define pallets32 punkie_pals*/
+static const int num_pallets = NUM_PALLETS;
 
 static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, int bswap)
 {
@@ -149,6 +236,9 @@ void pallet_init(int bswap) {
 }
 
 const uint32_t *get_active_pal(void) { return glbl_ctx.active_pal; }
+//const uint32_t *get_active_pal(void) { return pallets32[0]; }
+//const uint32_t *get_active_pal(void) { return punkie_pals[FIRE]; }
+
 int get_pallet_changing(void) { return glbl_ctx.pallet_changing; }
 void pallet_start_switch(int next) { pal_ctx_start_switch(&glbl_ctx, next); }
 int pallet_step(int step) { return pal_ctx_step(&glbl_ctx, step); }
@@ -159,59 +249,9 @@ float pallet_get_pos(void) { return pal_ctx_get_pos(&glbl_ctx); }
 int pallet_get_curpal(void) { return glbl_ctx.curpal; }
 int pallet_get_nextpal(void) { return glbl_ctx.nextpal; }
 
-
-#if HAVE_ORC
-//#if 0
-#include <orc/orc.h>
-static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_t *restrict next, const uint8_t *restrict prev) {
-	static OrcProgram *p = NULL;
-	OrcExecutor _ex;
-	OrcExecutor *ex = &_ex;
-	static int palp, vt;
-
-	if (p == NULL) {
-		p = orc_program_new_dss(1,1,1);
-#ifndef 1 // some of the orc stuff used below doesn't work on arm... (works on altivec/x86)
-		palp = orc_program_add_parameter(p, 1, "palpos");
-		vt = orc_program_add_parameter(p, 1, "vt");
-
-		orc_program_add_temporary(p, 1, "nx");
-		orc_program_add_temporary(p, 1, "pr");
-		orc_program_append_str(p, "mulhub", "nx", "s1", "palpos");
-		orc_program_append_str(p, "mulhub", "pr", "s2", "vt");
-		//orc_program_append_str(p, "mulubw", "nx", "s1", "palpos");
-		//orc_program_append_str(p, "mulubw", "pr", "s2", "vt");
-		orc_program_append_str(p, "addb", "d1", "nx", "pr");
-#else
-		palp = orc_program_add_parameter(p, 2, "palpos");
-		vt = orc_program_add_parameter(p, 2, "vt");
-		orc_program_add_temporary(p, 2, "nx");
-		orc_program_add_temporary(p, 2, "pr");
-
-		orc_program_append_ds_str(p, "convubw", "nx", "s1");
-		orc_program_append_ds_str(p, "convubw", "pr", "s2");
-		orc_program_append_str(p, "mullw", "nx", "nx", "palpos");
-		orc_program_append_str(p, "mullw", "pr", "pr", "vt");
-		orc_program_append_str(p, "addw", "nx", "nx", "pr");
-		orc_program_append_ds_str(p, "select1wb", "d1", "nx");
-#endif
-		orc_program_compile (p); //TODO: check return value here
-	}
-	orc_executor_set_program (ex, p);
-	orc_executor_set_n (ex, 256*4);
-	orc_executor_set_array (ex, ORC_VAR_S1, next);
-	orc_executor_set_array (ex, ORC_VAR_S2, prev);
-	orc_executor_set_array (ex, ORC_VAR_D1, active_pal);
-	orc_executor_set_param (ex, palp, pos);
-	orc_executor_set_param (ex, vt, 255-pos);
-
-	orc_executor_run (ex);
-}
-#else
 static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_t *restrict next, const uint8_t *restrict prev) {
 	uint8_t *restrict d = (uint8_t *restrict)active_pal;
 	for(int i=0; i<256*4; i++)
 		d[i] = (uint8_t)((next[i]*pos + prev[i]*(255-pos))>>8);
 }
-#endif
 

@@ -1,27 +1,49 @@
 
 #include "tribuf.h"
 
+#include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <malloc.h>
 
-//#define TB_DEBUG 1
+#define TB_DEBUG 1
 //#define TB_DEBUG_USER 1
 //#define TRIBBUF_PROFILE 1
 //#define TB_NO_ATOMIC 1
+
+// defining TB_DEBUG_USER to 1 will cause the implementation to take locks in
+// such a way that many incorrect uses of the tribuf will cause a deadlock
+// so that you can debug your use of the tribuf with any of the various lock 
+// debugging tools.
+
+#if __GNU_LIBRARY__
+#	include <execinfo.h>
+	static void tb_backtrace_stderr(void)
+	{
+		void *bt_buf[20];
+		fprintf(stderr, "Backtrace:\n");
+		fflush(stderr);
+		size_t size = backtrace(bt_buf, 20);
+		backtrace_symbols_fd(bt_buf, size, STDERR_FILENO);
+	}
+#else
+#	define tb_backtrace_stderr() do { } while(0)
+#endif
 
 #define tb_abort_if(c)  do {\
 	if( (c) ) { \
 	fprintf(stderr, "Abort in function '%s':\n%s:%d", \
 			__func__, __FILE__, __LINE__); \
+	tb_backtrace_stderr(); \
 	abort(); } } while(0)
 #define tribuf_error(s) do {\
 		fflush(stdout); \
 		fprintf(stderr, "%s: In function '%s':\n", __FILE__, __func__); \
 		fprintf(stderr, "%s:%i error: %s", __FILE__, __LINE__, (s)); \
 		fflush(stderr); \
+		tb_backtrace_stderr(); \
 		abort();\
 	} while(0)
 
@@ -51,19 +73,20 @@
 #	define atomic_init(obj, v) do { *obj = v; } while(0)
 #	define atomic_load(v) (*(v))
 #	define atomic_load_explicit(v, o) (*(v))
-//#	define tb_comp_xchng(a, e, n, o) __sync_bool_compare_and_swap(a, *e, n)
-static inline bool tb_comp_xchng(uint_fast16_t *a, uint_fast16_t *e, uint_fast16_t n, memory_order o)
-{
-	(void)o;
-//	return __sync_bool_compare_and_swap(a, *e, n);
-	uint_fast16_t t = __sync_val_compare_and_swap(a, *e, n);
-	if(t != *e) {
-		*e = t;
-		return 0;
+	//#	define tb_comp_xchng(a, e, n, o) __sync_bool_compare_and_swap(a, *e, n)
+	static inline bool tb_comp_xchng(uint_fast16_t *a, uint_fast16_t *e, uint_fast16_t n, memory_order o)
+	{
+		(void)o;
+	//	return __sync_bool_compare_and_swap(a, *e, n);
+		uint_fast16_t t = __sync_val_compare_and_swap(a, *e, n);
+		if(t != *e) {
+			*e = t;
+			return 0;
+		}
+		return 1;
 	}
-	return 1;
-}
 #	define tb_atomic_inc(x) do { __sync_add_and_fetch(x, 1); } while(0)
+#	warning "Using gcc __sync_* builtins for atomic ops"
 #else
 #	warning "NO ATOMICS, using threads and locks"
 #	define TB_NO_ATOMIC 1
@@ -140,23 +163,24 @@ static inline bool tb_comp_xchng(uint_fast16_t *a, uint_fast16_t *e, uint_fast16
 #endif
 
 #ifdef TB_DEBUG
+// invariant checking macro
 #define tb_sanity_check(c, m) do {\
 		if((c)) tribuf_error((m));\
 	} while(0)
 #define tb_check_invariants(state) do {\
-	frms t; t.v = (state).v;\
-	if((int)(bool)t.arf + (int)(bool)t.nwf + (int)(bool)t.nrf != 1) tribuf_error("tribuf bad fresh bits!\n");\
-	if(   t.ar == t.aw || t.ar == t.nr || t.ar == t.nw \
-	   || t.aw == t.nr || t.aw == t.nw \
-	   || t.nr == t.nw) \
-		tribuf_error("tribuf duplicate buffer!\n");\
-	if(t.arf && t.ar < 0) tribuf_error("bad fresh bit!\n"); \
-	if(t.nrf && t.nr < 0) tribuf_error("bad fresh bit!\n"); \
-	if(t.nwf && t.nw < 0) tribuf_error("bad fresh bit!\n"); \
-	if(t.ar > 2 || t.ar < -1 ) tribuf_error("bad buffer index (ar)!\n"); \
-	if(t.nr > 2 || t.nr < -1 ) tribuf_error("bad buffer index (nr)!\n"); \
-	if(t.nw > 2 || t.nw < -1 ) tribuf_error("bad buffer index (nw)!\n"); \
-	if(t.aw > 2 || t.aw <  0 ) tribuf_error("bad buffer index (aw)!\n"); \
+		frms t; t.v = (state).v;\
+		if((int)(bool)t.arf + (int)(bool)t.nwf + (int)(bool)t.nrf != 1) tribuf_error("tribuf bad fresh bits!\n");\
+		if(   t.ar == t.aw || t.ar == t.nr || t.ar == t.nw \
+		   || t.aw == t.nr || t.aw == t.nw \
+		   || t.nr == t.nw) \
+			tribuf_error("tribuf duplicate buffer!\n");\
+		if(t.arf && t.ar < 0) tribuf_error("bad fresh bit!\n"); \
+		if(t.nrf && t.nr < 0) tribuf_error("bad fresh bit!\n"); \
+		if(t.nwf && t.nw < 0) tribuf_error("bad fresh bit!\n"); \
+		if(t.ar > 2 || t.ar < -1 ) tribuf_error("bad buffer index (ar)!\n"); \
+		if(t.nr > 2 || t.nr < -1 ) tribuf_error("bad buffer index (nr)!\n"); \
+		if(t.nw > 2 || t.nw < -1 ) tribuf_error("bad buffer index (nw)!\n"); \
+		if(t.aw > 2 || t.aw <  0 ) tribuf_error("bad buffer index (aw)!\n"); \
 	} while(0)
 // note aw is special, it should always have an actual buffer in it (not -1)
 #else
@@ -197,11 +221,10 @@ static void __attribute__((constructor)) tb_lock_prof_init(void) {
 
 // only write thread will ever change aw, and only read thread will ever change ar
 // when either thread wants a to put a new buffer into it's 'active' slot
-// it can choose either nw or nr, (whichever is NOT -1) however the read thread
-// will prefer nr and the write thread will prefer nw
+// it can choose either nw or nr, (whichever is NOT -1)
 
-// the choice between nr and nw when each are not -1 is not quite just preference
-// anymore, now we have a bit for each of ar, nw, and nr that indicates it is 'fresh'
+// the choice between nr and nw when both are not -1 is based on the 'fresh' bits
+// there is a bit for each of ar, nw, and nr that indicates it is 'fresh'
 // only the buffer most recently written to (post finish_write()) has it's fresh
 // bit set, so on the write it side it really doesn't matter which we pick since
 // we are about to set the fresh bit anyway, while on the read side we always take
@@ -213,6 +236,12 @@ static void __attribute__((constructor)) tb_lock_prof_init(void) {
 // finish_read()
 // b2 = get_read()
 // then b1 <= b2 always (provided the sequence numbers don't overflow)
+
+// The names of the 'available' buffer fields in this struct are stupid now, but 
+// they used to mean something and I can't think of better names for now
+// so they keep the ones they have (They used to mean 'next write' and 'next read'
+// and when both were non-negative we picked a specific one in an attempt to always
+// get the 'freshest' data... it didn't work)
 
 typedef union frms {
 	uint_fast16_t v;
@@ -231,19 +260,25 @@ typedef union frms {
 }frms;
 
 struct tribuf_s {
-	void **data;
-
 #ifdef TB_DEBUG_USER
 	tb_mutex debug_read_lock, debug_write_lock;
 #endif
 
+// might want to do something to force this onto a seperate cache line from 
+// everything else so that the lock elision coming in glibc doesn't always abort
+// since the only thing we do that might cause an abort is write to the ints if
+// they share a cache line
 #ifdef TB_NO_ATOMIC
 	tb_mutex lock;
 #endif
 
-	atomic_uint_fast32_t frame;
+	void **data;
+
+	atomic_uint_fast32_t frame; //< holds a count of the number of frames finished
 	atomic_uint_fast16_t active; //< hold the current state of buffer assignment
 };
+
+//***************************** init and teardown ******************************
 
 tribuf* tribuf_new(void **data, int locking)
 { (void)locking;
@@ -269,7 +304,7 @@ tribuf* tribuf_new(void **data, int locking)
 #ifdef TB_NO_ATOMIC
 	tb_mutex_init(&tb->lock);
 #endif
-
+	
 	return tb;
 }
 
@@ -287,7 +322,7 @@ void tribuf_destroy(tribuf *tb)
 	free(tb);
 }
 
-#define static 
+// *********************** logic and management *****************************
 
 static frms do_get_write(frms active)
 {
@@ -380,6 +415,12 @@ static int do_get_read_nolock(frms active) {
 	else if(active.arf) return active.ar;
 	else return active.nw;
 }
+
+
+// ********************* syncronization wrappers for logic *********************
+
+// here we have the functions that are actually visible, they handle syncronization
+// there are two different implementations, one using locks and one using atomics
 
 #ifndef TB_NO_ATOMIC
 

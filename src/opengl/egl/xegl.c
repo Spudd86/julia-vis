@@ -106,7 +106,7 @@ void egl_destroy_native_display(EGLNativeDisplayType dpy)
 }
 
 int egl_event_poll(EGLNativeDisplayType dpy, EGLNativeWindowType win, egl_event *ev)
-{
+{(void)win;
 	int nevent = XPending(dpy);
 	*ev = E_NO_EVENT;
 	if(nevent > 0) {
@@ -119,7 +119,7 @@ int egl_event_poll(EGLNativeDisplayType dpy, EGLNativeWindowType win, egl_event 
 			case KeyPress:
 			{
 				char buffer[10];
-				int r, code;
+				int code;
 				code = XLookupKeysym(&event.xkey, 0);
 				if(code == XK_F1) {
 					*ev = EKEY_F1;
@@ -130,7 +130,7 @@ int egl_event_poll(EGLNativeDisplayType dpy, EGLNativeWindowType win, egl_event 
 				} else if(code == XK_F4) {
 					*ev = EKEY_F4;
 				} else {
-					r = XLookupString(&event.xkey, buffer, sizeof(buffer), NULL, NULL);
+					XLookupString(&event.xkey, buffer, sizeof(buffer), NULL, NULL);
 					if (buffer[0] == 27) {
 						// escape
 						*ev = EKEY_ESC;

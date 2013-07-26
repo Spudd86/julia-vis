@@ -3,6 +3,7 @@
 #include "audio/audio.h"
 #include "tribuf.h"
 #include "pixmisc.h"
+#include "getsamp.h"
 #include <mm_malloc.h>
 
 typedef struct {
@@ -188,59 +189,6 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 
 static float tx=0, ty=0, tz=0;
 
-//#define OLD_SAMP 1
-
-#if OLD_SAMP
-static inline float getsamp(audio_data *d, int i, int w) {
-	float res = 0;
-	int l = IMAX(i-w, 0);
-	int u = IMIN(i+w, d->len);
-	for(int i = l; i < u; i++) {
-		res += d->data[i];
-	}
-	return res / (2*w);
-}
-#else
-typedef struct {
-	audio_data ad;
-	int l, u, w;
-	float cursum;
-	float err;
-} samp_state;
-
-static void init_samp_state(samp_state *self, int w) {
-	self->cursum = self->err = 0.0f;
-	self->l = 0;
-	self->u = 0;
-	audio_get_samples(&(self->ad));
-	self->w = self->ad.len/w;
-}
-
-// TODO: turn off fast math for this function
-static inline float getsamp(samp_state *self, int i) {
-	const float *const data = self->ad.data;
-	const int w = self->w;
-	int l = IMAX(i-w, 0);
-	int u = IMIN(i+w, self->ad.len);
-	
-	for(int i=self->l; i<l; i++) {  
-		float y = -data[i] + self->err;
-		float t = self->cursum + y;
-		self->err = (t - self->cursum) - y;
-		self->cursum = t;
-	}
-	for(int i = self->u; i < u; i++) {
-		float y = data[i] + self->err;
-		float t = self->cursum + y;
-		self->err = (t - self->cursum) - y;
-		self->cursum = t;
-	}
-	
-	self->l = l, self->u = u;
-	return self->cursum / (2*w);
-}
-#endif
-
 // MUST NOT be called < frame of consumer apart (only uses double buffering)
 // if it's called too soon consumer may be using the frame we are modifying
 // we don't use triple buffering because this really doesn't need to run very
@@ -263,15 +211,10 @@ void maxsrc_update(void)
 
 	zoom(dst, prev_src, iw, ih, R);
 
-#if OLD_SAMP
 	audio_data ad; audio_get_samples(&ad);
 	for(int i=0; i<samp; i++) {
-		float s = getsamp(&ad, i*ad.len/(samp-1), ad.len/96);
-#else
-	samp_state sm; init_samp_state(&sm, 96);
-	for(int i=0; i<samp; i++) {
-		float s = getsamp(&sm, i*sm.ad.len/(samp-1));
-#endif
+		float s = getsamp(ad.data, ad.len, i*ad.len/(samp-1), ad.len/96);
+
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
 		float xt = (i - (samp-1)/2.0f)*(1.0f/(samp-1));

@@ -31,7 +31,7 @@ static const char *vtx_shader =
 		"	gl_TexCoord[1] = gl_MultiTexCoord0*2.0-1.0;\n"
 		"	gl_Position = gl_Vertex;\n"
 		"}";
-/*
+#if 0
 // mandelbox http://sites.google.com/site/mandelbox/what-is-a-mandelbox
 static const char *map_frag_shader =
 	"uniform sampler2D prev;\n"
@@ -76,7 +76,7 @@ and ballFold(r, v) means for v's magnitude m:
   else if m<1 m = 1/m^2
 */
 
-
+#else
 static const char *map_frag_shader =
 	"#ifdef FLOAT_PACK_PIX\n"
 	FLOAT_PACK_FUNCS
@@ -142,7 +142,7 @@ static const char *map_frag_shader =
 	"	));\n"
 	"}\n"
 	"#endif\n";
-/**/
+#endif
 static const char *rat_map_frag_shader = 
 	"uniform sampler2D prev;\n"
 	"uniform sampler2D maxsrc;\n"
@@ -241,7 +241,7 @@ GEN_MAP_CB(rat_map_cb, rat_map_vtx);
 
 static GLint map_prog  = -1;
 static GLint map_c_loc=-1, map_prev_loc=-1, map_maxsrc_loc=-1;
-static GLuint fbo, fbo_tex[NUM_FBO_TEX];
+static GLuint fbos[NUM_FBO_TEX], fbo_tex[NUM_FBO_TEX];
 static GLboolean rational_julia = GL_FALSE;
 
 static Map *fixed_map = NULL;
@@ -251,13 +251,10 @@ static uint32_t frm  = 0;
 
 GLint fract_get_tex(void) {
 	return fbo_tex[(frm)%NUM_FBO_TEX];
-//	return fbo_tex[(frm+1)%NUM_FBO_TEX];
-//	return fbo_tex[(frm+2)%NUM_FBO_TEX];
 }
 
 void render_fractal(struct point_data *pd)
 {	DEBUG_CHECK_GL_ERR;
-	GLint draw_tex = fbo_tex[frm%NUM_FBO_TEX];
 	GLint src_tex = fbo_tex[(frm+1)%NUM_FBO_TEX];
 	
 	// GL_COLOR_BUFFER_BIT
@@ -265,8 +262,7 @@ void render_fractal(struct point_data *pd)
 	// GL_TEXTURE_BIT
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 //	glPushAttrib(GL_COLOR_BUFFER_BIT | GL_VIEWPORT_BIT | GL_TEXTURE_BIT);
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbo);
-	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, draw_tex, 0);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbos[frm%NUM_FBO_TEX]);
 	setup_viewport(im_w, im_h);
 
 	if(use_glsl) {
@@ -278,11 +274,11 @@ void render_fractal(struct point_data *pd)
 		glBindTexture(GL_TEXTURE_2D, src_tex);
 		glActiveTextureARB(GL_TEXTURE0_ARB);
 		glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
-		glBegin(GL_QUADS);
+		glBegin(GL_TRIANGLE_STRIP);
 			glTexCoord2d( 0, 0); glVertex2d(-1, -1);
 			glTexCoord2d( 1, 0); glVertex2d( 1, -1);
-			glTexCoord2d( 1, 1); glVertex2d( 1,  1);
 			glTexCoord2d( 0, 1); glVertex2d(-1,  1);
+			glTexCoord2d( 1, 1); glVertex2d( 1,  1);
 		glEnd();
 		glUseProgramObjectARB(0);
 	} else {
@@ -300,11 +296,11 @@ void render_fractal(struct point_data *pd)
 		glActiveTextureARB(GL_TEXTURE0_ARB);
 		glBlendEquationEXT(GL_MAX_EXT);
 		glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
-		glBegin(GL_QUADS);
+		glBegin(GL_TRIANGLE_STRIP);
 			glTexCoord2d( 0, 0); glVertex2d(-1, -1);
 			glTexCoord2d( 1, 0); glVertex2d( 1, -1);
-			glTexCoord2d( 1, 1); glVertex2d( 1,  1);
 			glTexCoord2d( 0, 1); glVertex2d(-1,  1);
+			glTexCoord2d( 1, 1); glVertex2d( 1,  1);
 		glEnd();
 	}
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
@@ -358,12 +354,13 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 	
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
-	glGenFramebuffersEXT(1, &fbo);
+	//glGenFramebuffersEXT(1, &fbo);
+	glGenFramebuffersEXT(NUM_FBO_TEX, fbos);
 	glGenTextures(NUM_FBO_TEX, fbo_tex);
 	for(int i=0; i<NUM_FBO_TEX; i++) {
 		glBindTexture(GL_TEXTURE_2D, fbo_tex[i]);
 		
-		if(GLEE_ARB_texture_rg) { //TODO: use RG8 if we're doing float pack stuff
+		if(GLEE_ARB_texture_rg && !packed_intesity_pixels) { //TODO: use RG8 if we're doing float pack stuff
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, im_w, im_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 		} else {
 		//if(map_prog && !packed_intesity_pixels && GLEE_ARB_half_float_pixel)
@@ -380,7 +377,12 @@ void fractal_init(const opt_data *opts, int width, int height, GLboolean force_f
 		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, foo);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fbos[i]);		
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, fbo_tex[i], 0);
 	}
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);	
 	glPopClientAttrib();
 	glPopAttrib();
 	CHECK_GL_ERR;

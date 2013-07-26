@@ -51,19 +51,12 @@ void init_mandel()
 
 void render_mandel(struct point_data *pd)
 {
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-
 	glBindTexture(GL_TEXTURE_2D, mandel_tex);
-	glBegin(GL_QUADS);
-//		glTexCoord2d(0.0,1.0); glVertex2f(0.5f,  1.0f);
-//		glTexCoord2d(1.0,1.0); glVertex2f(1.0f,  1.0f);
-//		glTexCoord2d(1.0,0.0); glVertex2f(1.0f,  0.5f);
-//		glTexCoord2d(0.0,0.0); glVertex2f(0.5f,  0.5f);
+	glBegin(GL_TRIANGLE_STRIP);
 		glTexCoord2d(0.0,1.0); glVertex2f(0.0f,  1.0f);
 		glTexCoord2d(1.0,1.0); glVertex2f(1.0f,  1.0f);
-		glTexCoord2d(1.0,0.0); glVertex2f(1.0f,  0.0f);
 		glTexCoord2d(0.0,0.0); glVertex2f(0.0f,  0.0f);
+		glTexCoord2d(1.0,0.0); glVertex2f(1.0f,  0.0f);
 	glEnd();
 	glBindTexture(GL_TEXTURE_2D, 0);
 
@@ -71,13 +64,9 @@ void render_mandel(struct point_data *pd)
 	glBegin(GL_POINTS);
 		glColor3f(0.0f, 1.0f, 0.0f);
 		glVertex2d((pd->p[0]+1.0)*0.5, 1-(pd->p[1]+1)*0.5);
-//		glVertex2d((pd->p[0]+1.0)*0.25+0.5, 1-(pd->p[1]+1)*0.25);
-	glEnd();
-	glBegin(GL_POINTS);
 		glColor3f(1.0f, 0.0f, 0.0f);
 		glVertex2d((pd->t[0]+1.0)*0.5, 1-(pd->t[1]+1)*0.5);
-//		glVertex2d((pd->t[0]+1.0)*0.25+0.5, 1-(pd->t[1]+1)*0.25);
 	glEnd();
-	glPopAttrib();
+	glColor3f(1.0f, 1.0f, 1.0f);
 }
 
