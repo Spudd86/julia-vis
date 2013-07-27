@@ -7,7 +7,7 @@
 #define GL_MAXSRC_H_
 
 void gl_maxsrc_init(int width, int height, GLboolean packed_intesity, GLboolean force_fixed);
-void gl_maxsrc_update(void);
+void gl_maxsrc_update(const float *audio, int audiolen);
 GLuint gl_maxsrc_get(void);
 
 #endif /* include guard */

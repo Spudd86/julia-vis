@@ -4,6 +4,7 @@
 #include "glmaxsrc.h"
 #include "glscope.h"
 
+static struct glscope_ctx *glscope = NULL;
 static int scr_w = 0, scr_h = 0;
 
 void init_gl(const opt_data *opt_data, int width, int height)
@@ -20,8 +21,7 @@ void init_gl(const opt_data *opt_data, int width, int height)
 		exit(1);
 	}
 	
-	gl_scope_init(width, height, 8, false);CHECK_GL_ERR;
-	gl_maxsrc_init(width, height, false, false); CHECK_GL_ERR;
+	glscope = gl_scope_init(width, height, 8, false);CHECK_GL_ERR;
 }
 
 static int frm = 0;
@@ -41,33 +41,14 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 		{0, 0, 1 }
 	};
 	
-	glClear(GL_COLOR_BUFFER_BIT);
-/*	setup_viewport(scr_w, scr_h);*/
-	
-/*	glColor4f(0.0f, 1.0f, 1.0f, 1.0f);*/
-/*	glBegin(GL_TRIANGLE_STRIP);*/
-/*		glTexCoord2d( 0, 0); glVertex2d(-1, -1);*/
-/*		glTexCoord2d( 1, 0); glVertex2d( 1, -1);*/
-/*		glTexCoord2d( 0, 1); glVertex2d(-1,  1);*/
-/*		glTexCoord2d( 1, 1); glVertex2d( 1,  1);*/
-/*	glEnd();*/
-/*	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);*/
-/*	*/
-/*	gl_maxsrc_update();*/
-/*	gl_maxsrc_get();*/
-/*	glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());*/
-/*	glBegin(GL_TRIANGLE_STRIP);*/
-/*		glTexCoord2d(0,0); glVertex2d(-1,  0);*/
-/*		glTexCoord2d(1,0); glVertex2d( 0,  0);*/
-/*		glTexCoord2d(0,1); glVertex2d(-1,  1);*/
-/*		glTexCoord2d(1,1); glVertex2d( 0,  1);*/
-/*	glEnd();*/
-	
+	glClear(GL_COLOR_BUFFER_BIT);	
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 	glPushMatrix();
 	glScalef(2, 2, 1);
-	render_scope(R);
+	audio_data ad; audio_get_samples(&ad);
+	render_scope(glscope, R, ad.data, ad.len); CHECK_GL_ERR;
+	audio_finish_samples();
 	glPopMatrix();
 	glPopClientAttrib();
 	glPopAttrib();
@@ -76,7 +57,6 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	char buf[128];
 	sprintf(buf,"Test %i", frm);
 	draw_string(buf);
-	glFlush();
 	swap_buffers(); CHECK_GL_ERR;
 	frm++;
 }

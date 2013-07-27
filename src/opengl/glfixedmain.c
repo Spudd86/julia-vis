@@ -23,7 +23,6 @@ static int make_pow2(int x) {
 
 #define FPS_HIST_LEN 64
 
-static GLboolean packed_intesity_pixels = GL_FALSE;
 static int im_w = 0, im_h = 0;
 static int scr_w = 0, scr_h = 0;
 static struct point_data *pd = NULL;
@@ -35,9 +34,8 @@ static int worktimes[FPS_HIST_LEN];
 
 static uint64_t tick0 = 0;
 
-void fractal_init(const opt_data *opts, int width, int height, GLboolean force_fixed, GLboolean packed_intesity_pixels);
-void render_fractal(struct point_data *pd);
-GLint fract_get_tex(void);
+static struct glfract_ctx *glfract = NULL;
+static struct glpal_ctx *glpal = NULL;
 
 bool check_res(int w, int h) {
 	GLint width = 0;
@@ -92,9 +90,9 @@ void init_gl(const opt_data *opt_data, int width, int height)
 
 	init_mandel(); CHECK_GL_ERR;
 
-	fractal_init(opts, im_w, im_h, true, GL_FALSE); CHECK_GL_ERR;
-	gl_maxsrc_init(IMAX(im_w>>res_boost, 128), IMAX(im_h>>res_boost, 128), GL_FALSE, true); CHECK_GL_ERR;
-	pal_init_fixed(im_w, im_h); CHECK_GL_ERR;
+	glfract = fractal_fixed_init(opts, im_w, im_h); CHECK_GL_ERR;
+	gl_maxsrc_init(IMAX(im_w>>res_boost, 128), IMAX(im_h>>res_boost, 128), false, true); CHECK_GL_ERR;
+	glpal = pal_init_fixed(im_w, im_h); CHECK_GL_ERR;
 	pd = new_point_data(opts->rational_julia?4:2);
 
 	memset(frametimes, 0, sizeof(frametimes));
@@ -121,18 +119,20 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	// rate limit our maxsrc updates, but run at full frame rate if we're close the opts.maxsrc_rate to avoid choppyness
 	if((tick0-now)*opts->maxsrc_rate + (maxfrms*INT64_C(1000000)) > INT64_C(1000000) ) {
 //			|| (totframetime + 10*FPS_HIST_LEN > FPS_HIST_LEN*1000/opts->maxsrc_rate ) ) {
-		gl_maxsrc_update();
+		audio_data ad; audio_get_samples(&ad);
+		gl_maxsrc_update(ad.data, ad.len);
+		audio_finish_samples();
 		maxfrms++;
 	}
 
-	render_fractal(pd);
+	render_fractal(glfract, pd);
 
 	if(!debug_pal || !debug_maxsrc || !show_mandel) {
-		pal_render_fixed(fract_get_tex());
+		gl_pal_render(glpal, fract_get_tex(glfract));
 	} else {
 		glPushAttrib(GL_VIEWPORT_BIT);
 		setup_viewport(scr_w/2, scr_h/2);
-		pal_render_fixed(fract_get_tex());
+		gl_pal_render(glpal, fract_get_tex(glfract));
 		glPopAttrib();
 	}
 
@@ -141,7 +141,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	//TODO: figure out what attrib to push to save color
 	if(debug_pal || debug_maxsrc) { glPushAttrib(GL_TEXTURE_BIT); if(packed_intesity_pixels) glColor3f(1.0f, 1.0f, 1.0f); }
 	if(debug_pal) {
-		glBindTexture(GL_TEXTURE_2D, fract_get_tex());
+		glBindTexture(GL_TEXTURE_2D, fract_get_tex(glfract));
 		glBegin(GL_TRIANGLE_STRIP);
 			glTexCoord2d(0,0); glVertex2d( 0, -1);
 			glTexCoord2d(1,0); glVertex2d( 1, -1);
@@ -188,13 +188,13 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	swap_buffers(); CHECK_GL_ERR;
 
 	now = uget_ticks();
-	if(now - lastpalstep >= 1000*2048/256 && get_pallet_changing()) { // want pallet switch to take ~2 seconds
-		pallet_step(IMIN((now - lastpalstep)*256/(2048*1000), 32));
+	if(now - lastpalstep >= 1000*2048/256 && gl_pal_changing(glpal)) { // want pallet switch to take ~2 seconds
+		if(gl_pal_step(glpal, IMIN((now - lastpalstep)*256/(2048*1000), 32)))
 		lastpalstep = now;
 	}
 	int newbeat = beat_get_count();
 	if(newbeat != beats) {
-		pallet_start_switch(newbeat);
+		gl_pal_start_switch(glpal, newbeat);
 	}
 	if(newbeat != beats && now - last_beat_time > 1000000) {
 		last_beat_time = now;
@@ -213,3 +213,4 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 
 	cnt++;
 }
+

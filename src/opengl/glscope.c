@@ -16,6 +16,8 @@
 
 #define PNT_RADIUS 1.5f
 
+//#define USE_VBO 1
+
 static uint16_t *setup_point_16(int w, int h)
 {
 	uint16_t *buf = malloc(w * h * sizeof(*buf));
@@ -30,41 +32,43 @@ static uint16_t *setup_point_16(int w, int h)
 }
 
 static const char *pnt_vtx_shader =
+	"varying vec2 uv;\n"
 	"void main() {\n"
-	"	gl_TexCoord[0] = gl_MultiTexCoord0 - 1;\n"
+	"	uv = (gl_MultiTexCoord0.st - 1.0f) * " xstr(PNT_RADIUS) ";\n"
 	"	gl_Position = gl_Vertex;\n"
 	"}";
 
 static const char *pnt_shader_src =
+	"varying vec2 uv;\n"
 	"void main() {\n"
-	"	vec2 uv = gl_TexCoord[0].st*" xstr(PNT_RADIUS) ";\n"
-	"	gl_FragColor = vec4(clamp(exp(-4.5f*0.5f*log2(dot(uv,uv)+1)), 0.0, 1.0-1.0/255));\n"
+	"	gl_FragColor = vec4(clamp(exp(-4.5f*0.5f*log2(dot(uv,uv)+1.0f)), 0.0f, 1.0f-1.0f/255.0f));\n"
 	"}";
 
-static GLhandleARB shader_prog = 0;
-static GLuint pnt_tex = 0;
-static GLfloat sco_verts[128*8*4];
-static GLint sco_ind[128*3*6];
-static int samp = 0;
-static int iw, ih;
-static float pw = 0, ph = 0;
+struct glscope_ctx {
+	GLhandleARB shader_prog ;
+	GLuint pnt_tex;
+	int samp;
+	float pw, ph;
+	GLfloat sco_verts[128*8*4];
+	GLint sco_ind[128*3*6];
+};
 
-void gl_scope_init(int width, int height, int num_samp, GLboolean force_fixed)
+struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean force_fixed)
 {
-	iw=width, ih=height;
-	pw = PNT_RADIUS*0.5f*fmaxf(1.0f/24, 8.0f/iw), ph = PNT_RADIUS*0.5f*fmaxf(1.0f/24, 8.0f/ih);
-	samp = num_samp;
+	struct glscope_ctx *ctx = calloc(sizeof(*ctx), 1);
+	ctx->pw = PNT_RADIUS*0.5f*fmaxf(1.0f/24, 8.0f/width), ctx->ph = PNT_RADIUS*0.5f*fmaxf(1.0f/24, 8.0f/height);
+	ctx->samp = num_samp;
 	
 	//GLint oldtex;
 	//glGetIntegerv(GL_TEXTURE_BINDING_2D, &oldtex);
 	if(!force_fixed) { // compile succeed
-		shader_prog = compile_program_defs("#version 120\n", pnt_vtx_shader, pnt_shader_src);
+		ctx->shader_prog = compile_program_defs("#version 110\n", pnt_vtx_shader, pnt_shader_src);
 		printf("scope shader compiled\n");
 	}
 	
-	if(!shader_prog) {
-		glGenTextures(1, &pnt_tex);
-		glBindTexture(GL_TEXTURE_2D, pnt_tex);
+	if(!ctx->shader_prog) {
+		glGenTextures(1, &ctx->pnt_tex);
+		glBindTexture(GL_TEXTURE_2D, ctx->pnt_tex);
 
 		int pnt_size = 32;
 		uint16_t *data = setup_point_16(pnt_size, pnt_size);
@@ -77,8 +81,10 @@ void gl_scope_init(int width, int height, int num_samp, GLboolean force_fixed)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}
-
-	for(int i=0; i<samp; i++) {
+	
+	GLfloat *sco_verts = ctx->sco_verts;
+	GLint *sco_ind = ctx->sco_ind;
+	for(int i=0; i<ctx->samp; i++) {
 		sco_verts[(i*8+0)*4+0] = 0; sco_verts[(i*8+0)*4+1] = 2;
 		sco_verts[(i*8+1)*4+0] = 0; sco_verts[(i*8+1)*4+1] = 0;
 		sco_verts[(i*8+2)*4+0] = 1; sco_verts[(i*8+2)*4+1] = 2;
@@ -89,7 +95,7 @@ void gl_scope_init(int width, int height, int num_samp, GLboolean force_fixed)
 		sco_verts[(i*8+7)*4+0] = 2; sco_verts[(i*8+7)*4+1] = 0;
 	}
 
-	for(int i=0; i<samp; i++) {
+	for(int i=0; i<ctx->samp; i++) {
 		sco_ind[(i*6+0)*3+0] = i*8+0; sco_ind[(i*6+0)*3+1] = i*8+1; sco_ind[(i*6+0)*3+2] = i*8+3;
 		sco_ind[(i*6+1)*3+0] = i*8+0; sco_ind[(i*6+1)*3+1] = i*8+3; sco_ind[(i*6+1)*3+2] = i*8+2;
 		
@@ -99,30 +105,26 @@ void gl_scope_init(int width, int height, int num_samp, GLboolean force_fixed)
 		sco_ind[(i*6+4)*3+0] = i*8+4; sco_ind[(i*6+4)*3+1] = i*8+6; sco_ind[(i*6+4)*3+2] = i*8+7;
 		sco_ind[(i*6+5)*3+0] = i*8+4; sco_ind[(i*6+5)*3+1] = i*8+7; sco_ind[(i*6+5)*3+2] = i*8+5;
 	}
-	
-#ifdef USE_VBO
-	if(GLEE_ARB_vertex_buffer_object) {
-		use_vbo = true;
-		glGenBuffersARB(1, &bufobjs.ind);
-		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, bufobjs.ind);
-		glBufferDataARB(GL_ELEMENT_ARRAY_BUFFER_ARB, sizeof(GLint)*samp*4*3, sco_ind, GL_STATIC_DRAW_ARB);
-		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);
-	}
-#endif
 	CHECK_GL_ERR;
+	
+	return ctx;
 }
 
-void render_scope(float R[3][3])
+void render_scope(struct glscope_ctx *ctx, float R[3][3], const float *data, int len)
 {
 	// do the rotate/project ourselves because the GL matrix won't do the right
 	// thing if we just send it our verticies, we want wour tris to always be 
 	// parrallel to the view plane, because we're actually drawing a fuzzy line
 	// not a 3D object
 	// also it makes it easier to match the software implementation
-	audio_data ad; audio_get_samples(&ad);
+	
+	GLfloat *sco_verts = ctx->sco_verts;
+	const float pw = ctx->pw, ph = ctx->ph;
+	const int samp = ctx->samp;
+	
 	float px, py;
 	{
-		float s = getsamp(ad.data, ad.len, 0, ad.len/96);
+		float s = getsamp(data, len, 0, len/96);
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 		float xt = -0.5f, yt = 0.2f*s, zt = 0.0f;
 		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
@@ -133,7 +135,7 @@ void render_scope(float R[3][3])
 	}
 
 	for(int i=0; i<samp; i++) {
-		float s = getsamp(ad.data, ad.len, (i+1)*ad.len/(samp), ad.len/96);
+		float s = getsamp(data, len, (i+1)*len/(samp), len/96);
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
 		float xt = (i+1 - (samp)/2.0f)*(1.0f/(samp)), yt = 0.2f*s, zt = 0.0f;
@@ -158,31 +160,23 @@ void render_scope(float R[3][3])
 		sco_verts[(i*8+7)*4+2] =  x+nx+tx; sco_verts[(i*8+7)*4+3] =  y+ny+ty;
 		px=x,py=y;
 	}
-	audio_finish_samples();
 	
+	//TODO: save/restore GL state
 	glEnable(GL_BLEND);
 	glBlendEquationEXT(GL_MAX_EXT);
-	if(shader_prog) glUseProgramObjectARB(shader_prog);
-	if(pnt_tex) glBindTexture(GL_TEXTURE_2D, pnt_tex);
+	if(ctx->shader_prog) glUseProgramObjectARB(ctx->shader_prog);
+	if(ctx->pnt_tex) glBindTexture(GL_TEXTURE_2D, ctx->pnt_tex);
+	
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts);
 	glVertexPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts + 2);
-#ifdef USE_VBO
-	if(use_vbo) {
-		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, bufobjs.ind);
-		glDrawElements(GL_TRIANGLES, samp*3*6, GL_UNSIGNED_INT, NULL);
-		glBindBufferARB(GL_ELEMENT_ARRAY_BUFFER_ARB, 0);
-	} else {
-		glDrawElements(GL_TRIANGLES, samp*3*6, GL_UNSIGNED_INT, sco_ind);
-	}
-#else
-	glDrawElements(GL_TRIANGLES, samp*3*6, GL_UNSIGNED_INT, sco_ind);
-#endif
+	glDrawElements(GL_TRIANGLES, samp*3*6, GL_UNSIGNED_INT, ctx->sco_ind);
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-	if(shader_prog) glUseProgramObjectARB(0);
+	
+	if(ctx->shader_prog) glUseProgramObjectARB(0);
 	CHECK_GL_ERR;
 }
 

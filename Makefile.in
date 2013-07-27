@@ -100,7 +100,7 @@ COMMON_SRCS = src/terminusIBM.c src/isaac/isaac.c src/pallet.c src/optproc.c src
 
 SOFT_SRCS = src/software/map.c src/software/maxsrc.c src/software/palletblit.c src/software/pixmisc.c
 
-GL_SRCS = src/opengl/glmain.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glscope.c src/opengl/glpallet.c src/opengl/fixed/glf_pal.c src/opengl/fixed/glmap.c src/opengl/mandelbrot.c src/opengl/offscreen.c src/opengl/glsl/glsl_fract.c src/opengl/fixed/glf_fract.c
+GL_SRCS = src/opengl/glmain.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glscope.c src/opengl/glsl/glsl_pallet.c src/opengl/fixed/glf_pal.c src/opengl/fixed/glmap.c src/opengl/mandelbrot.c src/opengl/offscreen.c src/opengl/glsl/glsl_fract.c src/opengl/fixed/glf_fract.c
 
 ifeq ($(ENABLE_JACK),yes)
 AUDIO_SRCS += src/audio/jack.c
@@ -160,10 +160,9 @@ bin/gl-test$(EXEEXT): $(GLEE) src/opengl/sdlmain.c src/sdl-misc.c $(GL_SRCS) $(C
 	src/sdl-misc.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) $(GL_CFLAGS) $(GL_LIBS) $(GLEE) -o $@
 
-bin/glscope-test$(EXEEXT): $(GLEE) src/opengl/sdlmain.c src/opengl/glscope-test.c src/opengl/glscope.c src/opengl/glmaxsrc.c src/opengl/glmisc.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+bin/glscope-test$(EXEEXT): $(GLEE) src/opengl/sdlmain.c src/opengl/glscope-test.c src/opengl/glscope.c src/opengl/glmisc.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL -DUSE_GL \
-	src/opengl/sdlmain.c src/opengl/glscope-test.c src/opengl/glscope.c src/opengl/glmaxsrc.c src/opengl/glmisc.c \
-	src/opengl/glmap.c \
+	src/opengl/sdlmain.c src/opengl/glscope-test.c src/opengl/glscope.c src/opengl/glmisc.c \
 	src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) $(GL_CFLAGS) $(GL_LIBS) $(GLEE) -o $@
 	
@@ -187,7 +186,7 @@ bin/fps-test$(EXEEXT): $(GLEE) src/opengl/fpsmain.c src/opengl/fpsservo/fpsservo
 	$(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
 	$(AUDIO_FLAGS) $(GL_CFLAGS) $(GL_LIBS) $(GLEE) -o $@
 
-bin/egl-test$(EXEEXT): $(GLEE) src/opengl/eglmain.c src/opengl/egl/xegl.c src/opengl/glmain.c src/opengl/glfract.c src/opengl/glmisc.c src/opengl/glmaxsrc.c src/opengl/glscope.c src/opengl/glpallet.c src/opengl/fixed/glf_pal.c src/opengl/mandelbrot.c src/opengl/glmap.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+bin/egl-test$(EXEEXT): $(GLEE) src/opengl/eglmain.c src/opengl/egl/xegl.c $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_GL \
 	src/opengl/eglmain.c src/opengl/egl/xegl.c $(GL_SRCS) \
 	$(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \

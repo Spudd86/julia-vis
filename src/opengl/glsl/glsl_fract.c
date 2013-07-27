@@ -7,25 +7,25 @@
 static const char *map_defs_list[2][5] =
 {
  {
-  "#version 120\n",
-  "#version 120\n#define MAP_SAMP 4\n\n",
-  "#version 120\n#define MAP_SAMP 5\n\n",
-  "#version 120\n#define MAP_SAMP 8\n\n",
-  "#version 120\n#define MAP_SAMP 9\n\n",
+  "#version 110\n",
+  "#version 110\n#define MAP_SAMP 4\n\n",
+  "#version 110\n#define MAP_SAMP 5\n\n",
+  "#version 110\n#define MAP_SAMP 8\n\n",
+  "#version 110\n#define MAP_SAMP 9\n\n",
  },
  {
-  "#version 120\n#define FLOAT_PACK_PIX\n",
-  "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 4\n",
-  "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 5\n",
-  "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 8\n",
-  "#version 120\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 9\n",
+  "#version 110\n#define FLOAT_PACK_PIX\n",
+  "#version 110\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 4\n",
+  "#version 110\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 5\n",
+  "#version 110\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 8\n",
+  "#version 110\n#define FLOAT_PACK_PIX\n#define MAP_SAMP 9\n",
  }
 };
 
 static const char *vtx_shader =
 		"void main() {\n"
 		"	gl_TexCoord[0] = gl_MultiTexCoord0;\n"
-		"	gl_TexCoord[1] = gl_MultiTexCoord0*2.0-1.0;\n"
+		"	gl_TexCoord[1] = gl_MultiTexCoord0*2.0f-1.0f;\n"
 		"	gl_Position = gl_Vertex;\n"
 		"}";
 #if 0
@@ -91,26 +91,26 @@ static const char *map_frag_shader =
 	"#ifdef MAP_SAMP\n"
 	"float smap(const in vec2 s) {\n"
 	"	vec2 t = s*s;\n"
-	"	return max(decode(texture2D(prev, vec2(t.x - t.y, 2*s.x*s.y) + c)), decode(texture2D(maxsrc, gl_TexCoord[0].st)));\n"
+	"	return max(decode(texture2D(prev, vec2(t.x - t.y, 2.0f*s.x*s.y) + c)), decode(texture2D(maxsrc, gl_TexCoord[0].st)));\n"
 	"}\n"
 	"void main() {\n"
 	"#if MAP_SAMP == 4\n"
 	"	vec2 dx = dFdx(gl_TexCoord[1].st); vec2 dy = dFdy(gl_TexCoord[1].st);\n"
-	"	float r = (254/(4*256.0f))*(\n"
+	"	float r = (254.0f/(4.0f*256.0f))*(\n"
 	"			smap(gl_TexCoord[1].st-0.485852f*dx+0.142659f*dy) +\n"
 	"			smap(gl_TexCoord[1].st+0.485852f*dx-0.142659f*dy) +\n"
 	"			smap(gl_TexCoord[1].st+0.142659f*dx+0.485852f*dy) +\n"
 	"			smap(gl_TexCoord[1].st-0.142659f*dx-0.485852f*dy) );\n"
 	"#elif MAP_SAMP == 5\n"
 	"	vec2 dx = dFdx(gl_TexCoord[1].st); vec2 dy = dFdy(gl_TexCoord[1].st);\n"
-	"	float r = smap(gl_TexCoord[1].st)*(0.201260f*254/256) + \n"
+	"	float r = smap(gl_TexCoord[1].st)*(0.201260f*254.0f/256.0f) + \n"
 	"			(smap(gl_TexCoord[1].st+0.23594f*dx+0.50000f*dy) + "
 	"			 smap(gl_TexCoord[1].st+0.50000f*dx-0.23594f*dy) +\n"
 	"			 smap(gl_TexCoord[1].st-0.23594f*dx-0.50000f*dy) +"
-	"			 smap(gl_TexCoord[1].st-0.50000f*dx+0.23594f*dy))*(0.199685f*254/256);\n"
+	"			 smap(gl_TexCoord[1].st-0.50000f*dx+0.23594f*dy))*(0.199685f*254.0f/256.0f);\n"
 	"#elif MAP_SAMP == 8\n"
 	"	vec2 dx = dFdx(gl_TexCoord[1].st); vec2 dy = dFdy(gl_TexCoord[1].st);\n"
-	"	float r = (253.0f/(8*256.0f))*(\n"
+	"	float r = (253.0f/(8.0f*256.0f))*(\n"
 	"			smap(gl_TexCoord[1].st-0.500f*dx+0.143f*dy) +\n"
 	"			smap(gl_TexCoord[1].st+0.288f*dx+0.500f*dy) +\n"
 	"			smap(gl_TexCoord[1].st+0.429f*dx+0.288f*dy) +\n"
@@ -121,20 +121,19 @@ static const char *map_frag_shader =
 	"			smap(gl_TexCoord[1].st+0.143f*dx-0.429f*dy) );\n"
 	"#elif MAP_SAMP == 9\n"
 	"	vec2 dx = dFdx(gl_TexCoord[1].st)*0.5f; vec2 dy = dFdy(gl_TexCoord[1].st)*0.5f;\n"
-	"	float r = (253.0f/(9*256.0f))*(smap(gl_TexCoord[1].st) + \n"
+	"	float r = (253.0f/(9.0f*256.0f))*(smap(gl_TexCoord[1].st) + \n"
 	"			smap(gl_TexCoord[1].st+dy) + smap(gl_TexCoord[1].st+dx) +\n"
 	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx) +\n"
 	"			smap(gl_TexCoord[1].st+dy+dx) + smap(gl_TexCoord[1].st+dy-dx) +\n"
 	"			smap(gl_TexCoord[1].st-dx-dy) + smap(gl_TexCoord[1].st-dy+dx) );\n"
 	"#endif\n"
 	"	gl_FragData[0] = encode(r);\n"
-//	"	gl_FragData[0] = encode(max(decode(r), decode(texture2D(maxsrc, gl_TexCoord[0].st))));\n"
 	"}\n"
 	"#else\n"
 	"void main() {\n"
 	"	vec2 t = gl_TexCoord[1].st * gl_TexCoord[1].st;\n"
 	"	gl_FragData[0] = encode(max("
-	"			decode( texture2D(prev, vec2(t.x - t.y, 2*gl_TexCoord[1].x*gl_TexCoord[1].y) + c)*(253/256.0f) ),"
+	"			decode( texture2D(prev, vec2(t.x - t.y, 2.0f*gl_TexCoord[1].x*gl_TexCoord[1].y) + c)*(253.0f/256.0f) ),"
 	"			decode( texture2D(maxsrc, gl_TexCoord[0].st) )"
 	"	));\n"
 	"}\n"
@@ -155,41 +154,40 @@ static const char *rat_map_frag_shader =
 	"#endif\n"
 	"#ifndef MAP_SAMP\n"
 	"void main() {\n"
-	"	vec2 s = gl_TexCoord[1].st*2.5;\n"
+	"	vec2 s = gl_TexCoord[1].st*2.5f;\n"
 	"	vec2 t = s*s;\n"
 	"	float ab = s.x*s.y;\n"
-	"	s = vec2(4*ab*(t.x - t.y), t.x*t.x - 6*t.x*t.y + t.y*t.y) + c.xy;\n"
-	"	t = vec2(t.x - t.y, 2*ab)+c.zw;\n"
-	"	gl_FragColor = encode(max(decode(texture2D(prev,(0.5f/2.5)*vec2(dot(s,t), dot(s,t.yx))/dot(t,t)+0.5f)), decode(texture2D(maxsrc, gl_TexCoord[0].st))));\n"
+	"	s = vec2(4.0f*ab*(t.x - t.y), t.x*t.x - 6.0f*t.x*t.y + t.y*t.y) + c.xy;\n"
+	"	t = vec2(t.x - t.y, 2.0f*ab)+c.zw;\n"
+	"	gl_FragColor = encode(max(decode(texture2D(prev,(0.5f/2.5f)*vec2(dot(s,t), dot(s,t.yx))/dot(t,t)+0.5f)), decode(texture2D(maxsrc, gl_TexCoord[0].st))));\n"
 	"}\n"
 	"#else\n"
 	"float smap(const in vec2 tmp) {\n"
 	"	vec2 s = tmp*2.5;\n"
 	"	vec2 t = s*s;\n"
 	"	float ab = s.x*s.y;\n"
-	"	s = vec2(4*ab*(t.x - t.y), t.x*t.x - 6*t.x*t.y + t.y*t.y) + c.xy;\n"
-	"	t = vec2(t.x - t.y, 2*ab)+c.zw;\n"
-	"	return max(decode(texture2D(prev,(0.5f/2.5)*vec2(dot(s,t), dot(s,t.yx))/dot(t,t)+0.5f)), decode(texture2D(maxsrc, gl_TexCoord[0].st)));\n"
+	"	s = vec2(4.0f*ab*(t.x - t.y), t.x*t.x - 6.0f*t.x*t.y + t.y*t.y) + c.xy;\n"
+	"	t = vec2(t.x - t.y, 2.0f*ab)+c.zw;\n"
+	"	return max(decode(texture2D(prev,(0.5f/2.5f)*vec2(dot(s,t), dot(s,t.yx))/dot(t,t)+0.5f)), decode(texture2D(maxsrc, gl_TexCoord[0].st)));\n"
 	"}\n"
 	"void main() {\n"
 	"#if MAP_SAMP == 4\n"
 	"	vec2 dx = dFdx(gl_TexCoord[1].st); vec2 dy = dFdy(gl_TexCoord[1].st);\n"
-	"	float r = (254/(4*256.0f))*(\n"
+	"	float r = (254.0f/(4.0f*256.0f))*(\n"
 	"			smap(gl_TexCoord[1].st-0.485852f*dx+0.142659f*dy) +\n"
 	"			smap(gl_TexCoord[1].st+0.485852f*dx-0.142659f*dy) +\n"
 	"			smap(gl_TexCoord[1].st+0.142659f*dx+0.485852f*dy) +\n"
 	"			smap(gl_TexCoord[1].st-0.142659f*dx-0.485852f*dy) );\n"
 	"#elif MAP_SAMP == 5\n"
 	"	vec2 dx = dFdx(gl_TexCoord[1].st); vec2 dy = dFdy(gl_TexCoord[1].st);\n"
-	"	float r = smap(gl_TexCoord[1].st)*(0.201260f*254/(256.0f)) + \n"
+	"	float r = smap(gl_TexCoord[1].st)*(0.201260f*254.0f/(256.0f)) + \n"
 	"			(smap(gl_TexCoord[1].st+0.23594f*dx+0.50000f*dy) + "
 	"			 smap(gl_TexCoord[1].st+0.50000f*dx-0.23594f*dy) +\n"
 	"			 smap(gl_TexCoord[1].st-0.23594f*dx-0.50000f*dy) +"
-	"			 smap(gl_TexCoord[1].st-0.50000f*dx+0.23594f*dy))*(0.199685f*254/(256.0f));\n"
+	"			 smap(gl_TexCoord[1].st-0.50000f*dx+0.23594f*dy))*(0.199685f*254.0f/(256.0f));\n"
 	"#elif MAP_SAMP == 8\n"
 	"	vec2 dx = dFdx(gl_TexCoord[1].st); vec2 dy = dFdy(gl_TexCoord[1].st);\n"
-//	"	vec2 dx = vec2(1.0f/1024, 0); const vec2 dy = vec2(0,1.0f/1024);"
-	"	float r = (253.0f/(8*256.0f))*(\n"
+	"	float r = (253.0f/(8.0f*256.0f))*(\n"
 	"			smap(gl_TexCoord[1].st-0.500f*dx+0.143f*dy) +\n"
 	"			smap(gl_TexCoord[1].st+0.288f*dx+0.500f*dy) +\n"
 	"			smap(gl_TexCoord[1].st+0.429f*dx+0.288f*dy) +\n"
@@ -201,13 +199,12 @@ static const char *rat_map_frag_shader =
 	"			smap(gl_TexCoord[1].st+0.143f*dx-0.429f*dy) );\n"
 	"#elif MAP_SAMP == 9\n"
 	"	vec2 dx = dFdx(gl_TexCoord[1].st); vec2 dy = dFdy(gl_TexCoord[1].st);\n"
-	"	float r = (253.0f/(9*256.0f))*(smap(gl_TexCoord[1].st) + \n"
+	"	float r = (253.0f/(9.0f*256.0f))*(smap(gl_TexCoord[1].st) + \n"
 	"			(smap(gl_TexCoord[1].st+dy) + smap(gl_TexCoord[1].st+dx) +\n"
-	"			smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx)) +\n"
+	"			 smap(gl_TexCoord[1].st-dy) + smap(gl_TexCoord[1].st-dx)) +\n"
 	"			(smap(gl_TexCoord[1].st+dy+dx) + smap(gl_TexCoord[1].st+dy-dx) +\n"
-	"			smap(gl_TexCoord[1].st-dx-dy) + smap(gl_TexCoord[1].st-dy+dx)) );\n"
+	"			 smap(gl_TexCoord[1].st-dx-dy) + smap(gl_TexCoord[1].st-dy+dx)) );\n"
 	"#endif\n"
-//	"	gl_FragData[0] = encode(max(decode(r), decode(texture2D(maxsrc, gl_TexCoord[0].st))));\n"
 	"	gl_FragData[0] = encode(r);\n"
 	"}\n"
 	"#endif\n";
@@ -225,13 +222,13 @@ static void render_glsl(struct glfract_ctx *ctx, const struct point_data *pd)
 	
 	GLint src_tex = offscr_start_render(ctx->offscr);
 	glPushAttrib(GL_TEXTURE_BIT);
-	glUseProgramObjectARB(priv->prog);
-	if(!priv->rational_julia) glUniform2fARB(priv->c_loc, (pd->p[0]-0.5f)*0.25f + 0.5f, pd->p[1]*0.25f + 0.5f);
-	else glUniform4fARB(priv->c_loc, pd->p[0], pd->p[1], pd->p[2], pd->p[3]);
+	glUseProgram(priv->prog);
+	if(!priv->rational_julia) glUniform2f(priv->c_loc, (pd->p[0]-0.5f)*0.25f + 0.5f, pd->p[1]*0.25f + 0.5f);
+	else glUniform4f(priv->c_loc, pd->p[0], pd->p[1], pd->p[2], pd->p[3]);
 
-	glActiveTextureARB(GL_TEXTURE1_ARB);
+	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, src_tex);
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
 	glBegin(GL_TRIANGLE_STRIP);
 		glTexCoord2d( 0, 0); glVertex2d(-1, -1);
@@ -239,7 +236,7 @@ static void render_glsl(struct glfract_ctx *ctx, const struct point_data *pd)
 		glTexCoord2d( 0, 1); glVertex2d(-1,  1);
 		glTexCoord2d( 1, 1); glVertex2d( 1,  1);
 	glEnd();
-	glUseProgramObjectARB(0);
+	glUseProgram(0);
 	glPopAttrib();
 	offscr_finish_render(ctx->offscr);
 }
@@ -262,13 +259,13 @@ struct glfract_ctx *fractal_glsl_init(const opt_data *opts, int width, int heigh
 		ctx->prog = compile_program_defs(map_defs, vtx_shader, map_frag_shader);
 
 	if(ctx->prog) {
-		glUseProgramObjectARB(ctx->prog);
-		ctx->c_loc = glGetUniformLocationARB(ctx->prog, "c");
-		ctx->prev_loc = glGetUniformLocationARB(ctx->prog, "prev");
-		ctx->maxsrc_loc = glGetUniformLocationARB(ctx->prog, "maxsrc");
-		glUniform1iARB(ctx->maxsrc_loc, 0);
-		glUniform1iARB(ctx->prev_loc, 1);
-		glUseProgramObjectARB(0);
+		glUseProgram(ctx->prog);
+		ctx->c_loc = glGetUniformLocation(ctx->prog, "c");
+		ctx->prev_loc = glGetUniformLocation(ctx->prog, "prev");
+		ctx->maxsrc_loc = glGetUniformLocation(ctx->prog, "maxsrc");
+		glUniform1i(ctx->maxsrc_loc, 0);
+		glUniform1i(ctx->prev_loc, 1);
+		glUseProgram(0);
 		printf("Map shader compiled\n");
 	} else {
 		free(ctx);

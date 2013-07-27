@@ -17,35 +17,34 @@
 // and final co-ords are still R*p, except we can make R a mat3x2 and maybe save some MAD's
 
 static const char *vtx_shader =
+	"varying vec2 uv;\n"
 	"void main() {\n"
-	"	gl_TexCoord[0] = gl_MultiTexCoord0;\n"
+	"	uv = gl_MultiTexCoord0.st;\n"
 	"	gl_Position = gl_Vertex;\n"
 	"}";
 
 static const char *frag_src =
+	"varying vec2 uv;\n"
 	"uniform sampler2D prev;\n"
-	"uniform mat2x3 R;\n"
+	"uniform mat3 R;\n"
 	"#ifdef FLOAT_PACK_PIX\n"
 	FLOAT_PACK_FUNCS
-	"#else\n"
-	"#define encode(X) vec4(X)\n#define decode(X) (X)\n"
 	"#endif\n"
 	"void main() {\n"
-	"	vec3 p;\n"
+	"	vec2 p;\n"
 	"	{\n"
-	"		vec2 uv = gl_TexCoord[0].st;\n"
 	"		vec3 t = vec3(0.5f);\n"
 	"		t.yz = vec2(0.95f*0.5f + (0.05f*0.5f)*length(uv));\n"
-	"		p = (uv.x*R[0] + uv.y*R[1])*t;\n"
+	"		t = (uv.x*R[0] + uv.y*R[1])*t;\n"
+	"		p = (t*R).xy + 0.5f;\n"
 	"	}\n"
 	"#ifdef FLOAT_PACK_PIX\n" //TODO: use this formula whenver we have extra prescision in the FBO
-	"	gl_FragColor = encode(decode(texture2D(prev, p*R + 0.5f))*0.978f);\n"
+	"	gl_FragColor = encode(decode(texture2D(prev, p))*0.978f);\n"
 	"#else\n"
-	//"	gl_FragColor.r = texture2D(prev, p*R + 0.5f).r*0.978f;\n"
-	"	vec4 c = texture2D(prev, p*R + 0.5f);\n"
+//	"	gl_FragColor.r = texture2D(prev, p).r*0.978f;\n"
+	"	gl_FragColor = texture2D(prev, p)*0.975f;\n" //TODO: use 0.978 if we have GL_R16 textures...
+//	"	vec4 c = texture2D(prev, p);\n"
 //	"	gl_FragColor = vec4(c.x - max(2/256.0f, c.x*(1.0f/100)));\n"
-	"	gl_FragColor = texture2D(prev, p*R + 0.5f)*0.975f;\n"
-//	"	const vec4 c = texture2D(prev, p*R + 0.5f);\n"
 //	"	gl_FragColor = (c - max(vec4(2/256.0f), c*0.01f));\n"
 	"#endif\n"
 	"}\n";
@@ -65,61 +64,38 @@ static void bg_vtx(float u, float v, vec2f *restrict txco, const void *cb_data) 
 static float tx=0, ty=0, tz=0;
 static GLhandleARB shader_prog = 0;
 static GLint shad_R_loc = -1;
-static GLuint max_fbos[] = {0, 0}, fbo_tex[2] = { 0, 0 };
 static int iw, ih;
 static GLboolean use_glsl = GL_FALSE;
 static Map *fixed_map = NULL;
+static struct glscope_ctx *glscope = NULL;
+static struct oscr_ctx *offscr = NULL;
+
 GEN_MAP_CB(fixed_map_cb, bg_vtx);
 
 void gl_maxsrc_init(int width, int height, GLboolean packed_intesity_pixels, GLboolean force_fixed)
 {CHECK_GL_ERR;
 	iw=width, ih=height;
 	
-	int samp = (int)fminf(fminf(iw/2,ih/2), 128);
+	int samp = (int)fminf(fminf(width/2, width/2), 128);
 	printf("maxsrc using %i points\n", samp);	
-	gl_scope_init(iw, ih, samp, force_fixed);
+	glscope = gl_scope_init(width, height, samp, force_fixed);
+	offscr = offscr_new(width, height, force_fixed, !packed_intesity_pixels);
 
 	if(!force_fixed) {
 		printf("Compiling maxsrc shader:\n");
-		const char *defs = packed_intesity_pixels?"#version 120\n#define FLOAT_PACK_PIX\n":"#version 120\n";
+		const char *defs = packed_intesity_pixels?"#version 110\n#define FLOAT_PACK_PIX\n":"#version 110\n";
 		shader_prog = compile_program_defs(defs, vtx_shader, frag_src);
 		if(shader_prog) { // compile succeed
 			printf("maxsrc shader compiled\n");
-			glUseProgramObjectARB(shader_prog);
-			glUniform1iARB(glGetUniformLocationARB(shader_prog, "prev"), 0);
-			shad_R_loc = glGetUniformLocationARB(shader_prog, "R");
-			glUseProgramObjectARB(0);
+			glUseProgram(shader_prog);
+			glUniform1i(glGetUniformLocation(shader_prog, "prev"), 0);
+			shad_R_loc = glGetUniformLocation(shader_prog, "R");
+			glUseProgram(0);
 			use_glsl = GL_TRUE;
 		}
 	}
 	if(!use_glsl)
 		fixed_map = map_new(24, fixed_map_cb);
-
-	if(GLEE_ARB_texture_rg) {
-		printf("glmaxsrc: using R textures\n");
-	}
-
-	glPushAttrib(GL_ALL_ATTRIB_BITS);
-
-	glGenFramebuffersEXT(2, max_fbos);
-	glGenTextures(2, fbo_tex);
-	for(int i=0; i<2; i++) {
-		glBindTexture(GL_TEXTURE_2D, fbo_tex[i]);
-		if(GLEE_ARB_texture_rg && !packed_intesity_pixels) { //TODO: use RG8 if we're doing float pack stuff
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-		} else {
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8,  width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-		}
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, max_fbos[i]);
-		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, fbo_tex[i], 0);
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-	}
-	glPopAttrib();
 
 	CHECK_GL_ERR;
 }
@@ -133,8 +109,8 @@ static void render_bg_glsl(float R[3][3], GLint tex)
 	 R[0][1], R[1][1], R[2][1],
 	 R[0][2], R[1][2], R[2][2],
 	};
-	glUseProgramObjectARB(shader_prog);
-	glUniformMatrix2x3fv(shad_R_loc, 1, 0, Rt);
+	glUseProgram(shader_prog);
+	glUniformMatrix3fv(shad_R_loc, 1, 0, Rt);
 	glBindTexture(GL_TEXTURE_2D, tex);
 	glBegin(GL_TRIANGLE_STRIP);
 		glTexCoord2d(-1,-1); glVertex2d(-1, -1);
@@ -142,7 +118,7 @@ static void render_bg_glsl(float R[3][3], GLint tex)
 		glTexCoord2d(-1, 1); glVertex2d(-1,  1);
 		glTexCoord2d( 1, 1); glVertex2d( 1,  1);
 	glEnd();
-	glUseProgramObjectARB(0);
+	glUseProgram(0);
 	DEBUG_CHECK_GL_ERR;
 }
 
@@ -163,8 +139,7 @@ static void render_bg_fixed(float R[3][3], GLint tex)
 	map_render(fixed_map, R);
 }
 
-static uint32_t frm = 0;
-void gl_maxsrc_update(void)
+void gl_maxsrc_update(const float *audio, int audiolen)
 {DEBUG_CHECK_GL_ERR;
 	static uint32_t lastupdate = 0;
 	const uint32_t now = get_ticks();
@@ -179,32 +154,26 @@ void gl_maxsrc_update(void)
 		{sz*cy+cz*sx*sy,  cz*cx, -sy*sz+cy*cz*sx},
 		{cx*sy         ,    -sx,  cy*cx}
 	};
-
-	GLint src_tex = fbo_tex[(frm+1)%2];
+	
+	GLint src_tex = offscr_start_render(offscr);
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
-	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
-
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, max_fbos[frm%2]);
-	setup_viewport(iw, ih);
 
 	if(use_glsl) render_bg_glsl(R, src_tex);
 	else render_bg_fixed(R, src_tex);
 	DEBUG_CHECK_GL_ERR;
 
-	render_scope(R);
+	render_scope(glscope, R, audio, audiolen);
 	DEBUG_CHECK_GL_ERR;
 
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-	glPopClientAttrib();
 	glPopAttrib();
+	offscr_finish_render(offscr);
+	
 	tx+=0.02*dt; ty+=0.01*dt; tz-=0.003*dt;
-	frm++;
 
 	DEBUG_CHECK_GL_ERR;
 }
 
 GLuint gl_maxsrc_get(void) {
-//	return fbo_tex[(frm+1)%2];
-	return fbo_tex[(frm)%2];
+	return offscr_get_src_tex(offscr);
 }
 

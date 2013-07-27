@@ -62,11 +62,19 @@ GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, cons
 
 	if(vert_shader != NULL) {
 		vert = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
-		do_shader_compile_defs(vert, defs, vert_shader);
+		if(!do_shader_compile_defs(vert, defs, vert_shader)) {
+			printf("Vertex Shader Failed compile\nSource dump:\n");
+			dump_shader_src(defs, vert_shader);
+			return 0;
+		}
 	}
 	if(frag_shader != NULL) {
 		frag = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
-		do_shader_compile_defs(frag, defs, frag_shader);
+		if(!do_shader_compile_defs(frag, defs, frag_shader)) {
+			printf("Fragment Shader Failed compile\nSource dump:\n");
+			dump_shader_src(defs, frag_shader);
+			return 0;
+		}
 	}
 
 	// delete so that the shaders go away as soon as they are detached from the program
