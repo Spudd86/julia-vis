@@ -138,6 +138,8 @@ static void render(struct glpal_ctx *ctx, GLuint srctex) //FIXME
 		glReadBuffer(read_buf);
 
 		//TODO: figure out how to make sure this uses a fast format
+		//TODO: see if we can't convince the GL imaging stuff to do the color indexing for us...
+		//      it'll probably suck but it might be fun to try
 		glBindBufferARB(GL_PIXEL_PACK_BUFFER_ARB, priv->srcpbos[(frm+1)%2]);
 		glReadPixels(0, 0, vp_w, vp_h, GL_BGRA, GL_UNSIGNED_BYTE, 0);
 #if PALLET_OFFSCREEN_TEMP

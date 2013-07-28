@@ -24,7 +24,7 @@ struct oscr_ctx *offscr_new(int width, int height, GLboolean force_fixed, GLbool
 		
 		if(GLEE_ARB_texture_rg && redonly) { //TODO: use RG8 if we're doing float pack stuff
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, ctx->w, ctx->h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-			printf("using R textures\n");
+			printf("using R16 textures\n");
 		} else {
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, ctx->w, ctx->h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 		}

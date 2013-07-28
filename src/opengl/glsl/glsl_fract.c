@@ -1,7 +1,6 @@
 #include "common.h"
 #include "points.h"
 #include "opengl/glmisc.h"
-#include "opengl/glmaxsrc.h"
 #include "opengl/glfract.h"
 
 static const char *map_defs_list[2][5] =
@@ -216,7 +215,7 @@ struct glsl_ctx {
 	GLboolean rational_julia;
 };
 
-static void render_glsl(struct glfract_ctx *ctx, const struct point_data *pd)
+static void render_glsl(struct glfract_ctx *ctx, const struct point_data *pd, GLuint maxsrc_tex)
 {
 	struct glsl_ctx *priv = (struct glsl_ctx *)ctx;
 	
@@ -229,7 +228,7 @@ static void render_glsl(struct glfract_ctx *ctx, const struct point_data *pd)
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, src_tex);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
+	glBindTexture(GL_TEXTURE_2D, maxsrc_tex);
 	glBegin(GL_TRIANGLE_STRIP);
 		glTexCoord2d( 0, 0); glVertex2d(-1, -1);
 		glTexCoord2d( 1, 0); glVertex2d( 1, -1);

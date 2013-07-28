@@ -42,6 +42,7 @@ static int worktimes[FPS_HIST_LEN];
 static uint64_t tick0 = 0;
 
 static struct glfract_ctx *glfract = NULL;
+static struct glmaxsrc_ctx *glmaxsrc = NULL;
 static struct glpal_ctx *glpal = NULL;
 
 bool check_res(int w, int h) {
@@ -118,7 +119,15 @@ void init_gl(const opt_data *opt_data, int width, int height)
 /*		printf("Have ARB_debug_output: registered callback\n");*/
 /*	} */
 
-	if(!GLEE_EXT_blend_minmax) {
+	// for ES we need:
+	//    EXT_blend_minmax
+	//    EXT_texture_format_BGRA8888
+	
+	// optionally we should use
+	//    EXT_texture_rg + OES_texture_float/OES_texture_half_float
+	//    OES_mapbuffer
+
+	if(!GLEE_EXT_blend_minmax) { // can stop checking for this, it's in OpenGL 1.5
 		printf("missing required gl extension EXT_blend_minmax!\n");
 		exit(1);
 	}
@@ -149,9 +158,11 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	if(!glfract) glfract = fractal_fixed_init(opts, im_w, im_h);
 	CHECK_GL_ERR;
 	
-	gl_maxsrc_init(IMAX(im_w>>res_boost, 128), IMAX(im_h>>res_boost, 128), packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
+	//gl_maxsrc_init(IMAX(im_w>>res_boost, 128), IMAX(im_h>>res_boost, 128), packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
+	if(!force_fixed) glmaxsrc = maxsrc_new_glsl(im_w, im_h, packed_intesity_pixels); 
+	if(!glmaxsrc) glmaxsrc = maxsrc_new_fixed(im_w, im_h);
+	CHECK_GL_ERR;
 	
-	//pal_init(im_w, im_h, packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
 	if(!force_fixed) glpal = pal_init_glsl(packed_intesity_pixels);
 	if(!glpal) glpal = pal_init_fixed(im_w, im_h);
 	CHECK_GL_ERR;
@@ -183,12 +194,12 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	if((tick0-now)*opts->maxsrc_rate + (maxfrms*INT64_C(1000000)) > INT64_C(1000000) ) {
 //			|| (totframetime + 10*FPS_HIST_LEN > FPS_HIST_LEN*1000/opts->maxsrc_rate ) ) {
 		audio_data ad; audio_get_samples(&ad);
-		gl_maxsrc_update(ad.data, ad.len);
+		maxsrc_update(glmaxsrc, ad.data, ad.len);
 		audio_finish_samples();
 		maxfrms++;
 	}
 
-	render_fractal(glfract, pd);
+	render_fractal(glfract, pd, maxsrc_get_tex(glmaxsrc));
 
 	if(!debug_pal || !debug_maxsrc || !show_mandel) {
 		gl_pal_render(glpal, fract_get_tex(glfract));
@@ -208,7 +219,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 		draw_tex_quad(0.5f, 0.5f, -0.5f);
 	}
 	if(debug_maxsrc) {
-		glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
+		glBindTexture(GL_TEXTURE_2D, maxsrc_get_tex(glmaxsrc));
 		draw_tex_quad(0.5f, -0.5f, 0.5f);
 	}
 	if(debug_pal || debug_maxsrc) { glPopAttrib(); if(packed_intesity_pixels) glColor3f(1.0f, 1.0f, 1.0f); }

@@ -45,10 +45,11 @@ static const char *pnt_shader_src =
 	"}";
 
 struct glscope_ctx {
-	GLhandleARB shader_prog ;
+	GLuint shader_prog ;
 	GLuint pnt_tex;
 	int samp;
 	float pw, ph;
+	
 	GLfloat sco_verts[128*8*4];
 	GLint sco_ind[128*3*6];
 };
@@ -163,7 +164,7 @@ void render_scope(struct glscope_ctx *ctx, float R[3][3], const float *data, int
 	
 	//TODO: save/restore GL state
 	glEnable(GL_BLEND);
-	glBlendEquationEXT(GL_MAX_EXT);
+	glBlendEquation(GL_MAX_EXT);
 	if(ctx->shader_prog) glUseProgramObjectARB(ctx->shader_prog);
 	if(ctx->pnt_tex) glBindTexture(GL_TEXTURE_2D, ctx->pnt_tex);
 	

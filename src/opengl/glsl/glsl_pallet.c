@@ -4,18 +4,7 @@
 #include "opengl/glmisc.h"
 #include "opengl/glpallet.h"
 
-//#define OPENGL_ES 1
-
-#if OPENGL_ES
-static const char *vtx_shader =
-	"#version 110\n"
-	"attribute vec4 vertex;\n"
-	"varying vec2 uv;\n"
-	"void main() {\n"
-	"	uv = vertex.xy;\n"
-	"	gl_Position = vec4(vertex.zw, 0.0f, 1.0f);\n"
-	"}";
-#else
+#if 0
 static const char *vtx_shader =
 	"#version 110\n"
 	"varying vec2 uv;\n"
@@ -23,9 +12,7 @@ static const char *vtx_shader =
 	"	uv = gl_MultiTexCoord0.xy;\n"
 	"	gl_Position = gl_Vertex;\n"
 	"}";
-#endif
 
-#if 0
 static const char *pal_frag_mix =
 	"#version 110\n"
 	FLOAT_PACK_FUNCS
@@ -156,6 +143,16 @@ static struct glpal_ctx * pal_init_glsl(GLboolean float_packed_pixels)
 	return (struct glpal_ctx *)priv;
 }
 #else
+
+static const char *vtx_shader =
+	"#version 110\n"
+	"attribute vec4 vertex;\n"
+	"varying vec2 uv;\n"
+	"void main() {\n"
+	"	uv = vertex.xy;\n"
+	"	gl_Position = vec4(vertex.zw, 0.0f, 1.0f);\n"
+	"}";
+
 static const char *pal_frag_mix =
 	"#version 110\n"
 	FLOAT_PACK_FUNCS
@@ -178,7 +175,7 @@ static const char *pal_frag_shader =
 struct priv_ctx {
 	struct glpal_ctx pubctx;
 
-	GLhandleARB prog;
+	GLuint prog;
 	GLuint texture;
 };
 
@@ -190,8 +187,8 @@ static void render(struct glpal_ctx *ctx, GLuint draw_tex)
 		0, 1 , -1,  1,
 		1, 1 ,  1,  1
 	};
-	struct priv_ctx *priv = (typeof(priv))ctx;
-#if 1
+	struct priv_ctx *priv = (struct priv_ctx *)ctx;
+
 	glUseProgram(priv->prog);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, draw_tex);
@@ -210,40 +207,9 @@ static void render(struct glpal_ctx *ctx, GLuint draw_tex)
 	glBindTexture(GL_TEXTURE_1D, 0);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	
-#else
-	glPushAttrib(GL_TEXTURE_BIT);
-		glUseProgram(priv->prog);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, draw_tex);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_1D, priv->texture);
-		
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-		glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, verts);
-		glVertexPointer(2, GL_FLOAT, sizeof(float)*4, verts + 2);
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-		
-		glUseProgram(0);
-		glDisableClientState(GL_VERTEX_ARRAY);
-		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-		
-		glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, pal_ctx_get_active(ctx->pal));
-	glPopAttrib();
-#endif
+
 	DEBUG_CHECK_GL_ERR;
 }
-
-/*static void pal_pallet_changed(struct glpal_ctx *ctx) {*/
-/*	DEBUG_CHECK_GL_ERR;*/
-/*	struct priv_ctx *priv = (typeof(priv))ctx;*/
-/*	glPushAttrib(GL_TEXTURE_BIT);*/
-/*	glBindTexture(GL_TEXTURE_1D, priv->texture);*/
-/*	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, pal_ctx_get_active(ctx->pal));*/
-/*	glPopAttrib();*/
-/*	DEBUG_CHECK_GL_ERR;*/
-/*}*/
 
 struct glpal_ctx *pal_init_glsl(GLboolean float_packed_pixels)
 {CHECK_GL_ERR;
@@ -260,9 +226,7 @@ struct glpal_ctx *pal_init_glsl(GLboolean float_packed_pixels)
 	glUseProgram(prog);
 	glUniform1i(glGetUniformLocation(prog, "src"), 0);
 	glUniform1i(glGetUniformLocation(prog, "pal"), 1);
-#if OPENGL_ES
-	glBindAttribLocation(priv->prog, 0, "vertex");
-#endif
+	glBindAttribLocation(prog, 0, "vertex");
 	glUseProgram(0);
 	printf("Pallet shader compiled\n");
 	
@@ -271,15 +235,15 @@ struct glpal_ctx *pal_init_glsl(GLboolean float_packed_pixels)
 	priv->pubctx.pal = pal_ctx_new();
 	priv->prog = prog;
 
-	glPushAttrib(GL_TEXTURE_BIT);
 	glGenTextures(1, &priv->texture);
 	glBindTexture(GL_TEXTURE_1D, priv->texture);
 	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, pal_ctx_get_active(priv->pubctx.pal));
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glPopAttrib(); CHECK_GL_ERR;
-
+	glBindTexture(GL_TEXTURE_1D, 0);
+	
+	CHECK_GL_ERR;
 	return (struct glpal_ctx *)priv;
 }
 #endif

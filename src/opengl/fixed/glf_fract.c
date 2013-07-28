@@ -1,7 +1,6 @@
 #include "common.h"
 #include "points.h"
 #include "opengl/glmisc.h"
-#include "opengl/glmaxsrc.h"
 #include "opengl/glfract.h"
 
 static void map_vtx(float u, float v, vec2f *txco, const void *cb_data) {
@@ -32,7 +31,7 @@ struct fixed_ctx {
 	Map *map;
 };
 
-static void render(struct glfract_ctx *ctx, const struct point_data *pd)
+static void render(struct glfract_ctx *ctx, const struct point_data *pd, GLuint maxsrc_tex)
 {
 	struct fixed_ctx *priv = (struct fixed_ctx *)ctx;	
 	GLint src_tex = offscr_start_render(ctx->offscr);
@@ -51,7 +50,7 @@ static void render(struct glfract_ctx *ctx, const struct point_data *pd)
 
 	glActiveTextureARB(GL_TEXTURE0_ARB);
 	glBlendEquationEXT(GL_MAX_EXT);
-	glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
+	glBindTexture(GL_TEXTURE_2D, maxsrc_tex);
 	glBegin(GL_TRIANGLE_STRIP);
 		glTexCoord2d( 0, 0); glVertex2d(-1, -1);
 		glTexCoord2d( 1, 0); glVertex2d( 1, -1);
