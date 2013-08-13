@@ -3,6 +3,7 @@
 #include "opengl/glmisc.h"
 #include "opengl/glmaxsrc.h"
 #include "opengl/glscope.h"
+#include "glmap.h"
 #include "getsamp.h"
 
 struct priv_ctx {
@@ -67,7 +68,7 @@ static void update(struct glmaxsrc_ctx *ctx, const float *audio, int audiolen)
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_CONSTANT_ALPHA, GL_ONE);
-	glBlendEquationEXT(GL_FUNC_SUBTRACT_EXT);
+	glBlendEquation(GL_FUNC_SUBTRACT);
 	glBlendColor(0, 0, 0, 63.0f/64);
 	DEBUG_CHECK_GL_ERR;
 

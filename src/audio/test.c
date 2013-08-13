@@ -2,6 +2,7 @@
 #include "sdl-misc.h"
 #include "audio.h"
 #include "beat.h"
+#include "getsamp.h"
 
 #define IM_SIZE (768)
 
@@ -59,16 +60,6 @@ static inline void putpixel_mono(SDL_Surface *surface, int x, int y, int bri) {
 	}
 }
 
-static inline float getsamp(float *data, int len, int i, int w) {
-	float res = 0;
-	int l = IMAX(i-w, 1); // skip sample 0 it's average for energy for entire interval
-	int u = IMIN(i+w, len);
-	for(int i = l; i < u; i++) {
-		res += data[i];
-	}
-	return res / (u-l);
-}
-
 static inline float sigmoid(float x) {
 	float e = expf(x);
 	return e/(1+e);
@@ -115,41 +106,53 @@ int main(int argc, char **argv)
 		if(event.type == SDL_QUIT
 			|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE))
 			break;
+		
+		//TODO: when we get new buffers make sure we process all of them before we attempt
+		// to actually update the front buffer, so that if we're running slow we don't
+		// waste time drawing frames that won't be seen
 
 		int avpx = audio_get_buf_count() % im_w;
-		//if(ovpx == vpx) SDL_Delay(2000/982);
 		while(ovpx == avpx) { //SDL_Delay(0);
 			avpx = audio_get_buf_count() % im_w;
 		}
-		int vpx = (ovpx+1) % im_w;
-
-		SDL_Rect r = {0,0, im_w, im_h/2+1};
-		SDL_FillRect(screen, &r, 0);
-
+		int vpx = 0, beat_count = 0;
 		audio_data d;
-		audio_get_fft(&d);
 		
-		beat_ctx_update(beat_ctx, d.data, d.len);
-		int beat_count = beat_ctx_count(beat_ctx);
+		while (ovpx != avpx) {
+			vpx = (ovpx+1) % im_w;
+
+			SDL_Rect r = {0,0, im_w, im_h/2+1};
+			SDL_FillRect(screen, &r, 0);
+
+			audio_get_fft(&d);
 		
-		for(int b=0; b < 16; b++) {
-			float samp = getsamp(d.data, d.len, b*d.len/(beat_nbands*2), d.len/(beat_nbands*4));
-			float s = 1 - 0.2f*log2f(1+31*samp);
-			beath[b][ovpx] = MAX((b + s)*(im_h/32), b);
+			beat_ctx_update(beat_ctx, d.data, d.len);
+			beat_count = beat_ctx_count(beat_ctx);
+		
+			for(int b=0; b < 16; b++) {
+				float samp = getsamp(d.data, d.len, b*d.len/(beat_nbands*2), d.len/(beat_nbands*4));
+				float s = 1 - 0.2f*log2f(1+31*samp);
+				beath[b][ovpx] = MAX((b + s)*(im_h/32), b);
+			}
+
+			if(SDL_MUSTLOCK(voice_print) && SDL_LockSurface(voice_print) < 0) { printf("failed to lock voice_print\n"); break; }
+
+			for(int i=0; i < MIN(d.len,im_h/2); i++) {
+				int bri = 255*log2f(d.data[i*d.len/MIN(d.len,im_h/2)]*255+1.0f)/8;
+				putpixel_mono(voice_print, vpx, i, bri);
+			}
+
+			if(SDL_MUSTLOCK(voice_print)) SDL_UnlockSurface(voice_print);
+
+			if(oldbc != beat_count)
+				draw_line(voice_print, vpx, im_h/4-5, vpx, im_h/4+5, 0xffffffff);
+		
+			beat_throb = beat_throb*(0.996) + (oldbc != beat_count);
+			oldbc = beat_count;
+			ovpx = vpx;
 		}
-
-		if(SDL_MUSTLOCK(voice_print) && SDL_LockSurface(voice_print) < 0) { printf("failed to lock voice_print\n"); break; }
-
-		for(int i=0; i < MIN(d.len,im_h/2); i++) {
-			int bri = 255*log2f(d.data[i*d.len/MIN(d.len,im_h/2)]*255+1.0f)/8;
-			putpixel_mono(voice_print, vpx, i, bri);
-		}
-		ovpx = vpx;
-
-		if(SDL_MUSTLOCK(voice_print)) SDL_UnlockSurface(voice_print);
-
-		if(oldbc != beat_count)
-			draw_line(voice_print, vpx, im_h/4-5, vpx, im_h/4+5, 0xffffffff);
+		
+		// screen update down here
 
 		SDL_Rect blit_rect = { 0, 0, vpx, im_h/2 };
 		SDL_Rect blit_rect2 = { im_w-vpx-1, im_h/2+1, vpx, im_h/2 };
@@ -201,8 +204,6 @@ int main(int argc, char **argv)
 		draw_line(screen, 2, im_h-10, 2, (sigmoid(-0.1*beat_throb)+0.5)*(im_h-12), 0xffffffff);
 		draw_line(screen, 3, im_h-10, 3, (sigmoid(-0.1*beat_throb)+0.5)*(im_h-12), 0xffffffff);
 
-		audio_fft_finsih_read();
-
 		if(SDL_MUSTLOCK(screen)) SDL_UnlockSurface(screen);
 
 		char buf[128];
@@ -213,18 +214,15 @@ int main(int argc, char **argv)
 
 		frmcnt++;
 		Uint32 now = SDL_GetTicks();
-		int delay =  (tick0 + frmcnt*10000/982) - now;
-		beat_throb = beat_throb*(0.996) + (oldbc != beat_count);
-		oldbc = beat_count;
-
-		if(delay > 0)
-			SDL_Delay(delay);
-
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		fps_oldtime = now;
+		
+		//int delay =  (tick0 + frmcnt*10000/982) - now;
+		int delay =  (tick0 + frmcnt*10000/491) - now;
+		if(delay > 0) SDL_Delay(delay);
 	}
 
 	SDL_FreeSurface(voice_print);
-	frmcnt++;
+
     return 0;
 }

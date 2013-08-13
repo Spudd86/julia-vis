@@ -74,6 +74,20 @@ typedef bool _Bool
 # endif
 #endif
 
+#if __GNU_LIBRARY__
+#	include <execinfo.h>
+	static void __attribute__((unused)) print_backtrace_stderr(void)
+	{
+		void *bt_buf[20];
+		fprintf(stderr, "Backtrace:\n");
+		fflush(stderr);
+		size_t size = backtrace(bt_buf, 20);
+		backtrace_symbols_fd(bt_buf, size, STDERR_FILENO);
+	}
+#else
+#	define print_backtrace_stderr() do { } while(0)
+#endif
+
 #define gccStyleMessage(type, msg, ...) do { \
 		fprintf(stderr, "%s: In function '%s':\n%s:%d: %s: ", \
 			__FILE__, __func__, __FILE__, __LINE__, type); \
@@ -81,7 +95,7 @@ typedef bool _Bool
 
 typedef enum { AUDIO_PORTAUDIO, AUDIO_PULSE, AUDIO_JACK } opt_audio_drv;
 
-typedef struct {
+typedef struct opt_data {
 	int w, h;
 	int fullscreen;
 	unsigned int maxsrc_rate;
@@ -97,22 +111,11 @@ typedef struct {
 	const char *gl_opts;
 
 	const char *map_name;
-}opt_data;
+	
+	const char *backend_opts;
+} opt_data;
 
 void optproc(int argc, char **argv, opt_data *res);
-
-#ifdef USE_DIRECTFB
-#define DFBCHECK(x...)                                         \
-  {                                                            \
-    DFBResult err = x;                                         \
-                                                               \
-    if (err != DFB_OK)                                         \
-      {                                                        \
-        fprintf( stderr, "%s <%d>:\n\t", __FILE__, __LINE__ ); \
-        DirectFBErrorFatal( #x, err );                         \
-      }                                                        \
-  }
-#endif
 
 static inline void *xmalloc(size_t s) { void *res = malloc(s); if(!res) abort(); return res; }
 

@@ -49,6 +49,8 @@ struct priv_ctx {
 
 static void update(struct glmaxsrc_ctx *ctx, const float *audio, int audiolen);
 
+//TODO: teardown
+
 struct glmaxsrc_ctx *maxsrc_new_glsl(int width, int height, GLboolean packed_intesity_pixels)
 {
 	printf("Compiling maxsrc shader:\n");
@@ -58,10 +60,10 @@ struct glmaxsrc_ctx *maxsrc_new_glsl(int width, int height, GLboolean packed_int
 	if(!prog) return NULL;
 	
 	printf("maxsrc shader compiled\n");
-	glUseProgram(prog);
-	glUniform1i(glGetUniformLocation(prog, "prev"), 0);
-	R_loc = glGetUniformLocation(prog, "R");
-	glUseProgram(0);
+	glUseProgramObjectARB(prog);
+	glUniform1iARB(glGetUniformLocationARB(prog, "prev"), 0);
+	R_loc = glGetUniformLocationARB(prog, "R");
+	glUseProgramObjectARB(0);
 	CHECK_GL_ERR;
 
 	int samp = MIN(MIN(width/2, height/2), 128);
@@ -100,8 +102,8 @@ static void update(struct glmaxsrc_ctx *ctx, const float *audio, int audiolen)
 	
 	GLint src_tex = offscr_start_render(ctx->offscr);
 	
-	glUseProgram(priv->prog);
-	glUniformMatrix3fv(priv->R_loc, 1, 0, Rt);
+	glUseProgramObjectARB(priv->prog);
+	glUniformMatrix3fvARB(priv->R_loc, 1, 0, Rt);
 	glBindTexture(GL_TEXTURE_2D, src_tex);
 	glBegin(GL_TRIANGLE_STRIP);
 		glTexCoord2d(-1,-1); glVertex2d(-1, -1);
@@ -110,7 +112,7 @@ static void update(struct glmaxsrc_ctx *ctx, const float *audio, int audiolen)
 		glTexCoord2d( 1, 1); glVertex2d( 1,  1);
 	glEnd();
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glUseProgram(0);
+	glUseProgramObjectARB(0);
 	DEBUG_CHECK_GL_ERR;
 	
 	render_scope(priv->glscope, R, audio, audiolen);

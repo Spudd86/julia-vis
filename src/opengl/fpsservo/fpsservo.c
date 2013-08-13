@@ -216,7 +216,7 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 	//TODO: figure out why this seems to be insane
 #if 1
 	if(self->msc < msc) {
-		printf("missed %" PRIu64 " swaps by " PRIu64 " slack = %d\n", msc - self->msc, self->slack_diff, self->slack);
+		printf("missed %" PRIu64 " swaps by %" PRIu64 " slack = %d\n", msc - self->msc, self->slack_diff, self->slack);
 		self->msc = msc;
 	}
 #endif

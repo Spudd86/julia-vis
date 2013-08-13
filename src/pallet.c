@@ -145,12 +145,9 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 
 //#include "data/punkie_pal.h"
 
-static uint32_t pallets32[NUM_PALLETS][256] __attribute__((aligned(16)));
-
 /*#undef NUM_PALLETS*/
 /*#define NUM_PALLETS NUM_PUNKIE_PAL*/
 /*#define pallets32 punkie_pals*/
-static const int num_pallets = NUM_PALLETS;
 
 static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, int bswap)
 {
@@ -178,20 +175,30 @@ struct pal_ctx {
 	 * extra element makes pallet blit much simpler (Don't have to check for last element)
 	 */
 	uint32_t active_pal[257] __attribute__((aligned(16)));
+	
+	uint32_t pallets32[NUM_PALLETS][256] __attribute__((aligned(16)));
 };
 
 static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_t *restrict next, const uint8_t *restrict prev);
 
-struct pal_ctx *pal_ctx_new(void)
+struct pal_ctx *pal_ctx_new(int bswap)
 {
 	struct pal_ctx *self = malloc(sizeof(struct pal_ctx));
+	for(int p=0; p < NUM_PALLETS; p++)
+		expand_pallet(static_pallets[p], self->pallets32[p], bswap);
 	self->pallet_changing = 0;
 	self->palpos = 0;
 	self->nextpal = 0;
 	self->curpal = 0;
-	memcpy(self->active_pal, pallets32[0], sizeof(uint32_t)*256);
+	memcpy(self->active_pal, self->pallets32[0], sizeof(uint32_t)*256);
 	self->active_pal[256] = self->active_pal[255];
 	return self;
+}
+
+void pal_ctx_delete(struct pal_ctx *self)
+{
+	memset(self, 0, sizeof(*self));
+	free(self);
 }
 
 const uint32_t *pal_ctx_get_active(struct pal_ctx *self) { return self->active_pal; }
@@ -213,45 +220,21 @@ int pal_ctx_step(struct pal_ctx *self, uint8_t step) {
 	if(self->palpos >=256) {
 		self->pallet_changing = self->palpos = 0;
 		self->curpal = self->nextpal;
-		memcpy(self->active_pal, pallets32[self->nextpal], 256);
+		memcpy(self->active_pal, self->pallets32[self->nextpal], 256);
 	} else
-		do_pallet_step(self->palpos, self->active_pal, (uint8_t *restrict)pallets32[self->nextpal], (uint8_t *restrict)pallets32[self->curpal]);
+		do_pallet_step(self->palpos, 
+		               self->active_pal, 
+		               (uint8_t *restrict)self->pallets32[self->nextpal],
+		               (uint8_t *restrict)self->pallets32[self->curpal]);
 
 	self->active_pal[256] = self->active_pal[255];
 	return 1;
 }
-
-// stuff for global things down here
-static struct pal_ctx glbl_ctx;
-
-void pallet_init(int bswap) {
-	for(int p=0; p < num_pallets; p++)
-		expand_pallet(static_pallets[p], pallets32[p], bswap);
-	glbl_ctx.pallet_changing = 0;
-	glbl_ctx.palpos = 0;
-	glbl_ctx.nextpal = 0;
-	glbl_ctx.curpal = 0;
-	memcpy(glbl_ctx.active_pal, pallets32[0], sizeof(uint32_t)*256);
-	glbl_ctx.active_pal[256] = glbl_ctx.active_pal[255];
-}
-
-const uint32_t *get_active_pal(void) { return glbl_ctx.active_pal; }
-//const uint32_t *get_active_pal(void) { return pallets32[0]; }
-//const uint32_t *get_active_pal(void) { return punkie_pals[FIRE]; }
-
-int get_pallet_changing(void) { return glbl_ctx.pallet_changing; }
-void pallet_start_switch(int next) { pal_ctx_start_switch(&glbl_ctx, next); }
-int pallet_step(int step) { return pal_ctx_step(&glbl_ctx, step); }
-
-int pallet_num_pal(void) { return num_pallets; }
-uint32_t *pallet_get_pal(int pal) { if(pal >= 0 && pal < num_pallets) return pallets32[pal]; else return NULL; }
-float pallet_get_pos(void) { return pal_ctx_get_pos(&glbl_ctx); } 
-int pallet_get_curpal(void) { return glbl_ctx.curpal; }
-int pallet_get_nextpal(void) { return glbl_ctx.nextpal; }
 
 static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_t *restrict next, const uint8_t *restrict prev) {
 	uint8_t *restrict d = (uint8_t *restrict)active_pal;
 	for(int i=0; i<256*4; i++)
 		d[i] = (uint8_t)((next[i]*pos + prev[i]*(255-pos))>>8);
 }
+
 

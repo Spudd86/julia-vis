@@ -307,13 +307,11 @@ static void pallet_blit8(uint8_t * restrict dest, unsigned int dst_stride,
 }
 #endif
 
-void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h)
+void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal)
 {
 	const int src_stride = w;
 	w = IMIN(w, dst->w);
 	h = IMIN(h, dst->h);
-
-	const void *pal = get_active_pal();
 
 	if(dst->bpp == 32) pallet_blit32(dst->data, dst->pitch, src, src_stride, w, h, pal);
 	else if(dst->bpp == 16) pallet_blit565(dst->data, dst->pitch, src, src_stride, w, h, pal);
@@ -328,13 +326,11 @@ void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h)
 
 #ifdef USE_SDL
 #include <SDL.h>
-void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int h)
+void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal)
 {
 	const int src_stride = w;
 	w = IMIN(w, dst->w);
 	h = IMIN(h, dst->h);
-
-	const void *pal = get_active_pal();
 
 	if((SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) || w < 0 || h < 0) return;
 	if(dst->format->BitsPerPixel == 32) pallet_blit32(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
@@ -348,32 +344,6 @@ void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int 
 	_mm_empty();
 #endif
 	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
-}
-#endif
-
-#ifdef USE_DIRECTFB
-#include <directfb.h>
-void pallet_blit_DFB(IDirectFBSurface *dst, const uint16_t * restrict src, int w, int h)
-{
-	const int src_stride = w;
-	DFBSurfacePixelFormat dst_format;
-	void *dst_pixels = NULL;
-	int dst_pitch, dst_w, dst_h;
-	const void *pal = get_active_pal();
-
-	dst->GetSize(dst, &dst_w, &dst_h);
-	dst->GetPixelFormat(dst, &dst_format);
-
-	w = IMIN(w, dst_w);
-	h = IMIN(h, dst_h);
-	dst->Lock(dst, DSLF_WRITE, &dst_pixels, &dst_pitch); // TODO: error check
-	if(dst_format == DSPF_RGB32) pallet_blit32(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
-	else if(dst_format == DSPF_RGB16) pallet_blit565(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
-	else if(dst_format == DSPF_RGB555) pallet_blit555(dst_pixels, dst_pitch, src, src_stride, w, h, pal);
-#ifdef __MMX__
-	_mm_empty();
-#endif
-	dst->Unlock(dst);
 }
 #endif
 

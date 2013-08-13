@@ -12,11 +12,6 @@
 #include "glpallet.h"
 #include "glfract.h"
 
-/* TODO:
- *  - rewrite pallet handling so that in GLSL mode we can just let it look
- *     after switching/position and skip the mixing work and active pallet 
- */
-
 void init_mandel();
 void render_mandel(struct point_data *pd);
 
@@ -47,8 +42,8 @@ static struct glpal_ctx *glpal = NULL;
 
 bool check_res(int w, int h) {
 	GLint width = 0;
-	glTexImage2D(GL_PROXY_TEXTURE_2D_EXT, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-	glGetTexLevelParameteriv(GL_PROXY_TEXTURE_2D_EXT, 0, GL_TEXTURE_WIDTH, &width);
+	glTexImage2D(GL_PROXY_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glGetTexLevelParameteriv(GL_PROXY_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
 	CHECK_GL_ERR; return width != 0;
 }
 
@@ -67,20 +62,49 @@ void draw_tex_quad(float sc, float xo, float yo)
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 }
 
-/*static void APIENTRY gl_debug_callback(enum source,*/
-/*                                              enum type,*/
-/*                                              uint id,*/
-/*                                              enum severity,*/
-/*                                              sizei length,*/
-/*                                              const char* message,*/
-/*                                              const void* userParam)*/
-/*{*/
-/*	fprintf(stderr, "%s: In function '%s':\n%s:%d: Warning: %s\n",*/
-/*	        __FILE__, __func__, __FILE__, __LINE__, gluErrorString(id));*/
-/*}*/
+static const char *gl_debug_msg_source[] = {
+	"OpenGL", "WinSys", "Shader Compiler", "Third Party", "Application", "Other"
+};
+static const char *gl_debug_msg_type[] = {
+	"Error", "Deprecated behavior", "Undefined behavior", "Portability", "Performance", "Other"
+};
+static const char *gl_debug_msg_severity[] = {
+	"High", "Medium", "Low"
+};
+
+static void GLAPIENTRY gl_debug_callback(GLenum source,
+                                         GLenum type,
+                                         GLuint id,
+                                         GLenum severity,
+                                         GLsizei length,
+                                         const GLchar* message,
+                                         GLvoid* parm)
+{(void)length;(void)parm;
+	fprintf(stderr,
+	        "Source:%s\tType:%s\tID:%d\tSeverity:%s\tMessage:%s\n", 
+	        gl_debug_msg_source[source - GL_DEBUG_SOURCE_API_ARB],
+	        gl_debug_msg_type[type - GL_DEBUG_TYPE_ERROR_ARB],
+	        id,
+	        gl_debug_msg_severity[severity - GL_DEBUG_SEVERITY_HIGH_ARB],
+	        message);
+#if DEBUG
+	print_backtrace_stderr();
+#endif
+	fprintf(stderr, "\n");
+}
 
 void init_gl(const opt_data *opt_data, int width, int height)
-{ CHECK_GL_ERR;
+{
+	if(!ogl_LoadFunctions()) {
+		fprintf(stderr, "ERROR: Failed to load GL extensions\n");
+		exit(EXIT_FAILURE);
+	}
+	CHECK_GL_ERR;
+	if(!(ogl_GetMajorVersion() > 1 || ogl_GetMinorVersion() >= 4)) {
+		fprintf(stderr, "ERROR: Your OpenGL Implementation is too old\n");
+		exit(EXIT_FAILURE);
+	}
+
 	opts = opt_data;
 	GLboolean force_fixed = opts->gl_opts != NULL && strstr(opts->gl_opts, "fixed") != NULL;
 	GLboolean res_boost = opts->gl_opts != NULL && strstr(opts->gl_opts, "rboost") != NULL;
@@ -98,8 +122,6 @@ void init_gl(const opt_data *opt_data, int width, int height)
 
 	CHECK_GL_ERR;
 	setup_viewport(scr_w, scr_h); CHECK_GL_ERR;
-	//glHint(GL_CLIP_VOLUME_CLIPPING_HINT_EXT, GL_FASTEST); CHECK_GL_ERR;
-	glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST); CHECK_GL_ERR;
 	//glEnable(GL_LINE_SMOOTH); CHECK_GL_ERR;
 
 	glClear(GL_COLOR_BUFFER_BIT); CHECK_GL_ERR;
@@ -109,15 +131,42 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	printf("GL_VENDOR: %s\n", glGetString(GL_VENDOR));
 	printf("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
 	printf("GL_VERSION: %s\n", glGetString(GL_VERSION));
-	if(GLEE_ARB_shading_language_100) printf("GL_SL_VERSION: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+	if(ogl_ext_ARB_shading_language_100) printf("GL_SL_VERSION: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION_ARB));
 	printf("GL_EXTENSIONS: %s\n", glGetString(GL_EXTENSIONS));
 	printf("\n\n");
-	
-/*	if(GLEE_ARB_debug_output) {*/
-/*		glDebugMessageCallbackARB(gl_debug_callback, NULL);*/
-/*		glEnable(GL_DEBUG_OUTPUT);*/
-/*		printf("Have ARB_debug_output: registered callback\n");*/
-/*	} */
+
+/*
+        void DebugMessageControlARB(enum source,
+                                    enum type,
+                                    enum severity,
+                                    sizei count,
+                                    const uint* ids,
+                                    boolean enabled);
+ */	
+	if(ogl_ext_ARB_debug_output) {
+		glDebugMessageCallbackARB((GLDEBUGPROCARB)gl_debug_callback, NULL);
+#if DEBUG
+		glDebugMessageControlARB(GL_DONT_CARE, 
+		                         GL_DONT_CARE,
+		                         GL_DONT_CARE, 
+		                         0, NULL, 
+		                         GL_TRUE);
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
+#else
+		glDebugMessageControlARB(GL_DONT_CARE, 
+		                         GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB,
+		                         GL_DONT_CARE, 
+		                         0, NULL, 
+		                         GL_TRUE);
+		glDebugMessageControlARB(GL_DONT_CARE, 
+		                         GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB,
+		                         GL_DONT_CARE, 
+		                         0, NULL, 
+		                         GL_TRUE);
+#endif
+		printf("Have ARB_debug_output: registered callback\n");
+	}
+	CHECK_GL_ERR;
 
 	// for ES we need:
 	//    EXT_blend_minmax
@@ -127,20 +176,21 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	//    EXT_texture_rg + OES_texture_float/OES_texture_half_float
 	//    OES_mapbuffer
 
-	if(!GLEE_EXT_blend_minmax) { // can stop checking for this, it's in OpenGL 1.5
-		printf("missing required gl extension EXT_blend_minmax!\n");
-		exit(1);
-	}
-	if(!GLEE_EXT_framebuffer_object && !GLEE_ARB_framebuffer_object) {
+/*	if(!ogl_ext_EXT_blend_minmax) { // can stop checking for this, it's in OpenGL 1.4*/
+/*		printf("missing required gl extension EXT_blend_minmax!\n");*/
+/*		exit(1);*/
+/*	}*/
+	if(!ogl_ext_EXT_framebuffer_object && !ogl_ext_ARB_framebuffer_object) {
 		printf("missing required gl extension EXT_framebuffer_object!\n");
 		exit(1);
 	}
 
-	if(!GLEE_ARB_shading_language_100)
-		printf("No GLSL using all fixed function! (might be slow)\n");
-
-	if(!GLEE_ARB_shading_language_100 && !GLEE_ARB_pixel_buffer_object)
-		printf("Missing GLSL and no pixel buffer objects, WILL be slow!\n");
+	if(!ogl_ext_ARB_shading_language_100 && !(ogl_ext_ARB_fragment_shader && ogl_ext_ARB_vertex_shader && ogl_ext_ARB_shader_objects)) {
+		if(!ogl_ext_ARB_pixel_buffer_object) 
+			printf("Missing GLSL and no pixel buffer objects, WILL be slow!\n");
+		else
+			printf("No GLSL using all fixed function! (might be slow)\n");
+	}	
 
 	if(force_fixed) {
 		printf("Fixed function code forced\n");
@@ -158,9 +208,8 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	if(!glfract) glfract = fractal_fixed_init(opts, im_w, im_h);
 	CHECK_GL_ERR;
 	
-	//gl_maxsrc_init(IMAX(im_w>>res_boost, 128), IMAX(im_h>>res_boost, 128), packed_intesity_pixels, force_fixed); CHECK_GL_ERR;
-	if(!force_fixed) glmaxsrc = maxsrc_new_glsl(im_w, im_h, packed_intesity_pixels); 
-	if(!glmaxsrc) glmaxsrc = maxsrc_new_fixed(im_w, im_h);
+	if(!force_fixed) glmaxsrc = maxsrc_new_glsl(IMAX(im_w>>res_boost, 256), IMAX(im_h>>res_boost, 256), packed_intesity_pixels); 
+	if(!glmaxsrc) glmaxsrc = maxsrc_new_fixed(IMAX(im_w>>res_boost, 256), IMAX(im_h>>res_boost, 256));
 	CHECK_GL_ERR;
 	
 	if(!force_fixed) glpal = pal_init_glsl(packed_intesity_pixels);

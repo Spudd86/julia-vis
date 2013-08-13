@@ -1,6 +1,5 @@
 #include "common.h"
 #include <getopt.h>
-
 #ifdef HAVE_ORC
 #include <orc/orc.h>
 #endif
@@ -43,16 +42,16 @@ static const char *helpstr =
 
 "\t-i <driver>[:opts] select audio input driver\n"
 "\t\tdrivers:\n"
+#ifdef HAVE_PORTAUDIO
 "\t\t  portaudio: optionally specify a device number (they are listed at startup)\n"
+#endif
 #ifdef HAVE_JACK
 "\t\t  jack: optionally specify a pattern of ports to connect to\n"
 #endif
 #ifdef HAVE_PULSE
 "\t\t  pulse: use pulseaudio, takes a source name\n"
 #endif
-
 ;
-//TODO: change audio input selection to be something like -i <driver>:<driver_opts>
 
 //TODO: use getopt_long
 void optproc(int argc, char **argv, opt_data *res)
@@ -62,7 +61,7 @@ void optproc(int argc, char **argv, opt_data *res)
 #endif
 
 	int opt;
-
+	
 	res->w = res->h = -1;
 	res->fullscreen = 0;
 	res->draw_rate = 60;
@@ -80,10 +79,11 @@ void optproc(int argc, char **argv, opt_data *res)
 #endif
 	res->audio_opts = NULL;
 	res->gl_opts = NULL;
+	res->backend_opts = NULL;
 
 	res->map_name = "default";
 
-	while((opt = getopt(argc, argv, "w:h:s:a:i:q:g:m:rftpd")) != -1) {
+	while((opt = getopt(argc, argv, "w:h:s:a:i:q:g:m:b:rftpd")) != -1) {
 		switch(opt) {
 			case 'w':
 				res->w = atoi(optarg);
@@ -115,6 +115,9 @@ void optproc(int argc, char **argv, opt_data *res)
 			case 'p':
 				res->hw_pallet = 1;
 				break;
+			case 'b':
+				res->backend_opts = strdup(optarg);
+				break;
 #ifdef USE_GL
 			case 'g':
 				res->gl_opts = strdup(optarg);
@@ -126,7 +129,10 @@ void optproc(int argc, char **argv, opt_data *res)
 				if(drvopt != NULL) { *drvopt = '\0'; drvopt++;}
 //				printf("driver = '%s'\n", drvstr);
 				res->audio_opts = drvopt;
-				if(!strcmp(drvstr, "portaudio")) res->audio_driver = AUDIO_PORTAUDIO;
+				if(0) ;
+#ifdef HAVE_PORTAUDIO
+				else if(!strcmp(drvstr, "portaudio")) res->audio_driver = AUDIO_PORTAUDIO;
+#endif
 #ifdef HAVE_PULSE
 				else if(!strcmp(drvstr, "pulse")) res->audio_driver = AUDIO_PULSE;
 #endif

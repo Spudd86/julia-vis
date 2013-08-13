@@ -163,8 +163,11 @@ void render_scope(struct glscope_ctx *ctx, float R[3][3], const float *data, int
 	}
 	
 	//TODO: save/restore GL state
+	GLboolean blend_was_enabled = glIsEnabled(GL_BLEND);
+	GLint old_blend_eq; glGetIntegerv(GL_BLEND_EQUATION, &old_blend_eq);
+	
 	glEnable(GL_BLEND);
-	glBlendEquation(GL_MAX_EXT);
+	glBlendEquation(GL_MAX);
 	if(ctx->shader_prog) glUseProgramObjectARB(ctx->shader_prog);
 	if(ctx->pnt_tex) glBindTexture(GL_TEXTURE_2D, ctx->pnt_tex);
 	
@@ -178,6 +181,10 @@ void render_scope(struct glscope_ctx *ctx, float R[3][3], const float *data, int
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 	
 	if(ctx->shader_prog) glUseProgramObjectARB(0);
+	
+	glBlendEquation(old_blend_eq);
+	if(!blend_was_enabled) glDisable(GL_BLEND);
+	
 	CHECK_GL_ERR;
 }
 

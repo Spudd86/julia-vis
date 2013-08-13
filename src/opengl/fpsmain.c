@@ -12,8 +12,7 @@
 #include <X11/keysym.h>
 
 #include "glmisc.h"
-#include <GL/glx.h>
-#include <GL/glxext.h>
+#include "glx_gen.h"
 
 #include "audio/audio.h"
 #include "fpsservo/fpsservo.h"
@@ -35,10 +34,6 @@
 #  define GLX_BUFFER_SWAP_COMPLETE_INTEL_MASK 0x04000000
 # endif
 
-#define _NET_WM_STATE_REMOVE        0
-#define _NET_WM_STATE_ADD           1
-#define _NET_WM_STATE_TOGGLE        2
-
 typedef struct {
 	int event_type;	      /* GLX_EXCHANGE_COMPLETE_INTEL,
 				 GLX_COPY_COMPLETE, GLX_FLIP_COMPLETE */
@@ -51,6 +46,10 @@ typedef struct {
 	uint64_t sbc;           /* SBC from when the swap occurred */
 } GLXBufferSwapEventINTEL;
 #endif /* GLX_INTEL_swap_event */
+
+#define _NET_WM_STATE_REMOVE        0
+#define _NET_WM_STATE_ADD           1
+#define _NET_WM_STATE_TOGGLE        2
 
 static struct fps_data *fps_data = NULL;
 
@@ -255,13 +254,18 @@ int main(int argc, char **argv)
 	
 	dpy = XOpenDisplay( NULL );
 	if(dpy == NULL) {
-        printf("Error: couldn't open display %s\n", getenv("DISPLAY"));
+        fprintf(stderr, "Error: couldn't open display %s\n", getenv("DISPLAY"));
         exit(EXIT_FAILURE);
+    }
+    
+    if(!glx_LoadFunctions(dpy, DefaultScreen(dpy))) {
+    	fprintf(stderr, "Failed to load GLX extensions, exiting\n");
+    	exit(EXIT_FAILURE);
     }
     
     int glx_major, glx_minor;
     if(!glXQueryVersion(dpy, &glx_major, &glx_minor)) {
-    	printf("GLX extension missing!\n");
+    	fprintf(stderr, "GLX extension missing!\n");
     	XCloseDisplay(dpy);
     	exit(EXIT_FAILURE); 
     }
@@ -373,12 +377,6 @@ int main(int argc, char **argv)
 	
 	const GLubyte *glx_ext_str = glXQueryExtensionsString(dpy, 0);
 	
-	if(strstr(glx_ext_str, "GLX_MESA_swap_control")) {
-		PFNGLXSWAPINTERVALMESAPROC swap_interval = glXGetProcAddressARB("glXSwapIntervalMESA");
-		printf("INTERVAL SET\n");
-		opts.draw_rate = 300;
-		//swap_interval(1);
-	}
 #if USE_GLX_INTEL_swap_event
 	if(strstr(glx_ext_str, "GLX_INTEL_swap_event")) {
     	glXSelectEvent(dpy, glxWin, GLX_BUFFER_SWAP_COMPLETE_INTEL_MASK);

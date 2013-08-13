@@ -4,7 +4,7 @@
 
 #ifdef HAVE_ORC
 #include <orc/orc.h>
-void maxblend(void *restrict dest, void *restrict src, int w, int h)
+void maxblend(void *restrict dest, const void *restrict src, int w, int h)
 {
 	static OrcProgram *p = NULL;
 	if (p == NULL) {
@@ -28,7 +28,7 @@ void maxblend(void *restrict dest, void *restrict src, int w, int h)
 #warning Doing sse2 Compiled program will NOT work on system without it!
 
 // requires w%16 == 0
-void maxblend(void *restrict dest, void *restrict src, int w, int h)
+void maxblend(void *restrict dest, const void *restrict src, int w, int h)
 {
 	__m128i * restrict mbdst = dest; const __m128i * restrict mbsrc = src;
 	const __m128i off = _mm_set1_epi16(0x8000);
@@ -52,7 +52,7 @@ void maxblend(void *restrict dest, void *restrict src, int w, int h)
 }
 #elif defined(__SSE__) || defined(__3dNOW__)
 #include "mymm.h"
-void maxblend(void *restrict dest, void *restrict src, int w, int h)
+void maxblend(void *restrict dest, const void *restrict src, int w, int h)
 {
 	__m64 *mbdst = dest, *mbsrc = src;
 	const __m64 off = _mm_set1_pi16(0x8000);
@@ -88,7 +88,7 @@ void maxblend(void *restrict dest, void *restrict src, int w, int h)
 	_mm_empty();
 }
 #else
-void maxblend(void *restrict dest, void *restrict src, int w, int h)
+void maxblend(void *restrict dest, const void *restrict src, int w, int h)
 {
 	const int n = w*h;
 	uint16_t *restrict d=dest, *restrict s=src;

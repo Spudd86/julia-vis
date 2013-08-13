@@ -3,3 +3,36 @@ A Music Visualizer
 
 A beat reactive visualizer that's based around the 
 Julia set fractal.
+
+Note:
+
+src/opengl/glx_gen.{c,h}
+was generated with glGenLoad like this:
+	lua  LoadGen.lua gen -style pointer_c -spec=glX -ext OML_sync_control -ext ARB_create_context
+
+
+src/opengl/glx_gen.{c,h}
+was generated with glGenLoad like this:
+	lua  LoadGen.lua 14 -style pointer_c -spec=gl -version 1.4 -extfile <filename>
+
+where <filename> names a file with these contents:
+ARB_vertex_buffer_object
+ARB_debug_output
+EXT_framebuffer_object
+ARB_framebuffer_object
+ARB_shading_language_100
+ARB_shader_objects
+ARB_vertex_shader
+ARB_vertex_program
+ARB_fragment_shader
+ARB_pixel_buffer_object
+ARB_texture_rg
+
+for opengl 1.3 we would need these extenions
+ARB_texture_mirrored_repeat
+ARB_window_pos
+EXT_blend_color
+EXT_blend_minmax
+EXT_blend_subtract
+
+glBlendEquation went in in 1.1

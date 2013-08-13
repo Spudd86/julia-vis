@@ -2,7 +2,7 @@
 #include "common.h"
 #include "audio/audio.h"
 #include "tribuf.h"
-#include "pixmisc.h"
+#include "maxsrc.h"
 #include "getsamp.h"
 #include <mm_malloc.h>
 
@@ -10,6 +10,108 @@ typedef struct {
 	uint16_t *restrict data;
 	uint16_t w,h;
 } MxSurf;
+
+static void point_init(MxSurf *res, int w, int h);
+static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, float R[3][3]);
+static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, float px, float py);
+
+struct maxsrc {
+	void *buf;
+	uint16_t *prev_src;
+	uint16_t *next_src;
+	int iw, ih;
+	int samp;
+	float tx, ty, tz;
+
+	MxSurf pnt_src;
+};
+
+struct maxsrc *maxsrc_new(int w, int h)
+{
+	struct maxsrc *self = calloc(sizeof(*self), 1);
+	
+	self->iw = w; self->ih = h;
+	self->samp = IMIN(IMAX(w,h), 1023);
+	printf("maxsrc using %i points\n", self->samp);
+	
+	point_init(&self->pnt_src, IMAX(w/24, 8), IMAX(h/24, 8));
+	
+#ifdef HAVE_MMAP
+	// use mmap here since it'll give us a nice page aligned chunk (malloc will probably be using it anyway...)
+	self->prev_src = self->buf = mmap(NULL, 2 * w * h * sizeof(uint16_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, 0, 0);
+#else
+	self->prev_src = self->buf = _mm_malloc(2 * w * h * sizeof(uint16_t), 32);
+#endif
+	memset(self->prev_src, 0, 2*w*h*sizeof(uint16_t));
+	self->next_src = self->prev_src + w*h;
+	
+	return self;
+}
+
+void maxsrc_delete(struct maxsrc *self)
+{
+#ifdef HAVE_MMAP
+	munmap(self->buf, 2 * self->iw * self->ih * sizeof(uint16_t));
+#else
+	_mm_free(self->buf);
+#endif
+	free((void*)self->pnt_src.data);
+	self->next_src = self->prev_src = self->buf = NULL;
+	self->iw = self->ih = self->samp = 0;
+	free(self);
+}
+
+const uint16_t *maxsrc_get(struct maxsrc *self) {
+	return self->prev_src;
+}
+
+// MUST NOT be called < frame of consumer apart (only uses double buffering)
+// if it's called too soon consumer may be using the frame we are modifying
+// we don't use triple buffering because this really doesn't need to run very
+// often, even below 12 times a second still looks ok, and double buffering means
+// we take up less cache and fewer pages and that means fewer falts, and since almost
+// everything we do either runs fast enough or bottleneeks on memory double
+// buffering here seems like a good idea
+void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
+{
+	uint16_t *dst = self->next_src;
+	int samp = self->samp;
+	int iw = self->iw, ih = self->ih;
+
+	float cx=cosf(self->tx), cy=cosf(self->ty), cz=cosf(self->tz);
+	float sx=sinf(self->tx), sy=sinf(self->ty), sz=sinf(self->tz);
+
+	float R[][3] = {
+		{cz*cy-sz*sx*sy, -sz*cx, -sy*cz-cy*sz*sx},
+		{sz*cy+cz*sx*sy,  cz*cx, -sy*sz+cy*cz*sx},
+		{cx*sy         ,    -sx,  cy*cx}
+	};
+
+	zoom(dst, self->prev_src, iw, ih, R);
+
+	for(int i=0; i<samp; i++) {
+		float s = getsamp(audio, audiolen, i*audiolen/(samp-1), audiolen/96);
+
+		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
+
+		float xt = (i - (samp-1)/2.0f)*(1.0f/(samp-1));
+		float yt = 0.2f*s;
+		float zt = 0.0f;
+
+		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
+		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
+		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
+		float zvd = 0.75f/(z+2);
+
+		float xi = x*zvd*iw+(iw - self->pnt_src.w)/2.0f;
+		float yi = y*zvd*ih+(ih - self->pnt_src.h)/2.0f;
+		draw_point(dst, self->iw, self->ih, &self->pnt_src, xi, yi);
+	}
+	self->next_src = self->prev_src;
+	self->prev_src = dst;
+
+	self->tx+=0.02; self->ty+=0.01; self->tz-=0.003;
+}
 
 static void point_init(MxSurf *res, int w, int h)
 {
@@ -27,50 +129,11 @@ static void point_init(MxSurf *res, int w, int h)
 	res->data = buf;
 }
 
-static void *buf = NULL;
-static uint16_t *prev_src;
-static uint16_t *next_src;
-static int iw, ih;
-static int samp = 0;
-
-static MxSurf _pnt_src_;
-static MxSurf *pnt_src = &_pnt_src_;
-
-void maxsrc_setup(int w, int h)
-{
-	iw = w; ih = h;
-	samp = IMIN(IMAX(iw,ih), 1023);
-	printf("maxsrc using %i points\n", samp);
-
-	point_init(pnt_src, IMAX(w/24, 8), IMAX(h/24, 8));
-
-#ifdef HAVE_MMAP
-	// use mmap here since it'll give us a nice page aligned chunk (malloc will probably be using it anyway...)
-	prev_src = buf = mmap(NULL, 2 * w * h * sizeof(uint16_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, 0, 0);
-#else
-	prev_src = buf = _mm_malloc(2 * w * h * sizeof(uint16_t), 32);
-#endif
-	memset(prev_src, 0, 2*w*h*sizeof(uint16_t));
-	next_src = prev_src + w*h;
-}
-
-void maxsrc_shutdown(void)
-{
-#ifdef HAVE_MMAP
-	munmap(buf, 2 * iw * ih * sizeof(uint16_t));
-#else
-	_mm_free(buf);
-#endif
-	free((void*)pnt_src->data); free(pnt_src); pnt_src = NULL;
-	next_src = prev_src = buf = NULL;
-	iw = ih = samp = 0;
-}
-
 #define COORD_S (8)
 #define COORD_R (256)
 #define COORD_M (COORD_R-1)
 
-static void draw_point(void *restrict dest, const MxSurf *pnt_src, float px, float py)
+static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, float px, float py)
 {
 	const int ipx = lrintf(px*256), ipy = lrintf(py*256);
 	//const int ipx = (int)truncf(px*256), ipy = (int)truncf(py*256); // want to round towards zero
@@ -185,60 +248,5 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 		}
 		v0=v1;
 	}
-}
-
-static float tx=0, ty=0, tz=0;
-
-// MUST NOT be called < frame of consumer apart (only uses double buffering)
-// if it's called too soon consumer may be using the frame we are modifying
-// we don't use triple buffering because this really doesn't need to run very
-// often, even below 12 times a second still looks ok, and double buffering means
-// we take up less cache and fewer pages and that means fewer falts, and since almost
-// everything we do either runs fast enough or bottleneeks on memory double
-// buffering here seems like a good idea
-void maxsrc_update(void)
-{
-	uint16_t *dst = next_src;
-//	samp = 4;
-	float cx=cosf(tx), cy=cosf(ty), cz=cosf(tz);
-	float sx=sinf(tx), sy=sinf(ty), sz=sinf(tz);
-
-	float R[][3] = {
-		{cz*cy-sz*sx*sy, -sz*cx, -sy*cz-cy*sz*sx},
-		{sz*cy+cz*sx*sy,  cz*cx, -sy*sz+cy*cz*sx},
-		{cx*sy         ,    -sx,  cy*cx}
-	};
-
-	zoom(dst, prev_src, iw, ih, R);
-
-	audio_data ad; audio_get_samples(&ad);
-	for(int i=0; i<samp; i++) {
-		float s = getsamp(ad.data, ad.len, i*ad.len/(samp-1), ad.len/96);
-
-		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
-
-		float xt = (i - (samp-1)/2.0f)*(1.0f/(samp-1));
-		float yt = 0.2f*s;
-		float zt = 0.0f;
-
-		float x = R[0][0]*xt + R[1][0]*yt + R[2][0]*zt;
-		float y = R[0][1]*xt + R[1][1]*yt + R[2][1]*zt;
-		float z = R[0][2]*xt + R[1][2]*yt + R[2][2]*zt;
-		float zvd = 0.75f/(z+2);
-
-		float xi = x*zvd*iw+(iw - pnt_src->w)/2.0f;
-		float yi = y*zvd*ih+(ih - pnt_src->h)/2.0f;
-		draw_point(dst, pnt_src, xi, yi);
-	}
-	audio_finish_samples();
-	next_src = prev_src;
-	prev_src = dst;
-
-	tx+=0.02; ty+=0.01; tz-=0.003;
-}
-
-
-uint16_t *maxsrc_get(void) {
-	return prev_src;
 }
 

@@ -221,9 +221,9 @@ static void render_glsl(struct glfract_ctx *ctx, const struct point_data *pd, GL
 	
 	GLint src_tex = offscr_start_render(ctx->offscr);
 	glPushAttrib(GL_TEXTURE_BIT);
-	glUseProgram(priv->prog);
-	if(!priv->rational_julia) glUniform2f(priv->c_loc, (pd->p[0]-0.5f)*0.25f + 0.5f, pd->p[1]*0.25f + 0.5f);
-	else glUniform4f(priv->c_loc, pd->p[0], pd->p[1], pd->p[2], pd->p[3]);
+	glUseProgramObjectARB(priv->prog);
+	if(!priv->rational_julia) glUniform2fARB(priv->c_loc, (pd->p[0]-0.5f)*0.25f + 0.5f, pd->p[1]*0.25f + 0.5f);
+	else glUniform4fARB(priv->c_loc, pd->p[0], pd->p[1], pd->p[2], pd->p[3]);
 
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, src_tex);
@@ -235,7 +235,7 @@ static void render_glsl(struct glfract_ctx *ctx, const struct point_data *pd, GL
 		glTexCoord2d( 0, 1); glVertex2d(-1,  1);
 		glTexCoord2d( 1, 1); glVertex2d( 1,  1);
 	glEnd();
-	glUseProgram(0);
+	glUseProgramObjectARB(0);
 	glPopAttrib();
 	offscr_finish_render(ctx->offscr);
 }
@@ -258,13 +258,13 @@ struct glfract_ctx *fractal_glsl_init(const opt_data *opts, int width, int heigh
 		ctx->prog = compile_program_defs(map_defs, vtx_shader, map_frag_shader);
 
 	if(ctx->prog) {
-		glUseProgram(ctx->prog);
-		ctx->c_loc = glGetUniformLocation(ctx->prog, "c");
-		ctx->prev_loc = glGetUniformLocation(ctx->prog, "prev");
-		ctx->maxsrc_loc = glGetUniformLocation(ctx->prog, "maxsrc");
-		glUniform1i(ctx->maxsrc_loc, 0);
-		glUniform1i(ctx->prev_loc, 1);
-		glUseProgram(0);
+		glUseProgramObjectARB(ctx->prog);
+		ctx->c_loc = glGetUniformLocationARB(ctx->prog, "c");
+		ctx->prev_loc = glGetUniformLocationARB(ctx->prog, "prev");
+		ctx->maxsrc_loc = glGetUniformLocationARB(ctx->prog, "maxsrc");
+		glUniform1iARB(ctx->maxsrc_loc, 0);
+		glUniform1iARB(ctx->prev_loc, 1);
+		glUseProgramObjectARB(0);
 		printf("Map shader compiled\n");
 	} else {
 		free(ctx);

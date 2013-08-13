@@ -35,17 +35,24 @@ static int worktimes[FPS_HIST_LEN];
 static uint64_t tick0 = 0;
 
 static struct glfract_ctx *glfract = NULL;
+static struct glmaxsrc_ctx *glmaxsrc = NULL;
 static struct glpal_ctx *glpal = NULL;
 
 bool check_res(int w, int h) {
 	GLint width = 0;
-	glTexImage2D(GL_PROXY_TEXTURE_2D_EXT, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-	glGetTexLevelParameteriv(GL_PROXY_TEXTURE_2D_EXT, 0, GL_TEXTURE_WIDTH, &width);
+	glTexImage2D(GL_PROXY_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glGetTexLevelParameteriv(GL_PROXY_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
 	CHECK_GL_ERR; return width != 0;
 }
 
 void init_gl(const opt_data *opt_data, int width, int height)
-{ CHECK_GL_ERR;
+{
+	if(!ogl_LoadFunctions()) {
+		fprintf(stderr, "ERROR: Failed to load GL extensions\n");
+		exit(EXIT_FAILURE);
+	}
+	CHECK_GL_ERR;
+
 	opts = opt_data;
 	GLboolean res_boost = opts->gl_opts != NULL && strstr(opts->gl_opts, "rboost") != NULL;
 	scr_w = width; scr_h = height;
@@ -73,16 +80,12 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	printf("GL_EXTENSIONS: %s\n", glGetString(GL_EXTENSIONS));
 	printf("\n\n");
 
-	if(!GLEE_EXT_blend_minmax) {
-		printf("missing required gl extension EXT_blend_minmax!\n");
-		exit(1);
-	}
-	if(!GLEE_EXT_framebuffer_object && !GLEE_ARB_framebuffer_object) {
+	if(!ogl_ext_EXT_framebuffer_object && !ogl_ext_ARB_framebuffer_object) {
 		printf("missing required gl extension EXT_framebuffer_object!\n");
 		exit(1);
 	}
 
-	if(!GLEE_ARB_pixel_buffer_object)
+	if(!ogl_ext_ARB_pixel_buffer_object)
 		printf("no pixel buffer objects, WILL be slow!\n");
 	CHECK_GL_ERR;
 
@@ -91,7 +94,7 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	init_mandel(); CHECK_GL_ERR;
 
 	glfract = fractal_fixed_init(opts, im_w, im_h); CHECK_GL_ERR;
-	gl_maxsrc_init(IMAX(im_w>>res_boost, 128), IMAX(im_h>>res_boost, 128), false, true); CHECK_GL_ERR;
+	glmaxsrc = maxsrc_new_fixed(IMAX(im_w>>res_boost, 256), IMAX(im_h>>res_boost, 256)); CHECK_GL_ERR;
 	glpal = pal_init_fixed(im_w, im_h); CHECK_GL_ERR;
 	pd = new_point_data(opts->rational_julia?4:2);
 
@@ -120,12 +123,12 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	if((tick0-now)*opts->maxsrc_rate + (maxfrms*INT64_C(1000000)) > INT64_C(1000000) ) {
 //			|| (totframetime + 10*FPS_HIST_LEN > FPS_HIST_LEN*1000/opts->maxsrc_rate ) ) {
 		audio_data ad; audio_get_samples(&ad);
-		gl_maxsrc_update(ad.data, ad.len);
+		maxsrc_update(glmaxsrc, ad.data, ad.len);
 		audio_finish_samples();
 		maxfrms++;
 	}
 
-	render_fractal(glfract, pd);
+	render_fractal(glfract, pd, maxsrc_get_tex(glmaxsrc));
 
 	if(!debug_pal || !debug_maxsrc || !show_mandel) {
 		gl_pal_render(glpal, fract_get_tex(glfract));
@@ -150,7 +153,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 		glEnd();
 	}
 	if(debug_maxsrc) {
-		glBindTexture(GL_TEXTURE_2D, gl_maxsrc_get());
+		glBindTexture(GL_TEXTURE_2D, maxsrc_get_tex(glmaxsrc));
 		glBegin(GL_TRIANGLE_STRIP);
 			glTexCoord2d(0,0); glVertex2d(-1,  0);
 			glTexCoord2d(1,0); glVertex2d( 0,  0);

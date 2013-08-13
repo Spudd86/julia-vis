@@ -56,9 +56,9 @@ void dump_shader_src(const char *defs, const char *shad)
 //TODO: add stuff to allow a second set of code for functions
 GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, const char *frag_shader)
 {
-	GLhandleARB vert=0, frag=0;
+	if(!ogl_ext_ARB_shading_language_100 && !(ogl_ext_ARB_fragment_shader && ogl_ext_ARB_vertex_shader && ogl_ext_ARB_shader_objects)) return 0;
 
-	if(!GLEE_ARB_shading_language_100) return 0;
+	GLuint vert=0, frag=0;
 
 	if(vert_shader != NULL) {
 		vert = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
@@ -118,23 +118,6 @@ static void check_gl_obj_msg(GLhandleARB obj) {
 	free(pInfoLog);
 }
 
-
-void pixbuf_to_texture(Pixbuf *src, GLuint *tex, GLint clamp_mode, int rgb) {
-	glPushAttrib(GL_TEXTURE_BIT);
-	glGenTextures(1, tex);
-	glBindTexture(GL_TEXTURE_2D, *tex);
-	//TODO: handle different bpp
-	if(rgb) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, src->w, src->h, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, src->data);
-	else glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, src->w, src->h, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, src->data);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  clamp_mode);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  clamp_mode);
-	static float foo[] = {0.0, 0.0, 0.0 };
-	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, foo);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glPopAttrib();
-}
-
 void setup_viewport(int width, int height) {
 	glViewport(0, 0, width, height);
 	glMatrixMode(GL_PROJECTION);
@@ -163,15 +146,12 @@ void draw_hist_array_xlate(int off, float scl, float xlate, const int *array, in
 		pnts[i*2+1][0] = ((float)(i+1))/(len-1);
 		pnts[i*2+1][1] = scl*array[idx]+xlate;
 	}
-	//glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
-	//glEnable(GL_BLEND);
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glVertexPointer(2, GL_FLOAT, 0, pnts);
 	glDrawArrays(GL_LINES, 0, (len - 1)*2);
 	glPopClientAttrib();
-	//glPopAttrib();
-	CHECK_GL_ERR;
+	DEBUG_CHECK_GL_ERR;
 #else	
 	glBegin(GL_LINES);
 	for(int i=0; i<len-1; i++) {
@@ -181,6 +161,7 @@ void draw_hist_array_xlate(int off, float scl, float xlate, const int *array, in
 		glVertex2f(((float)(i+1))/(len-1), scl*array[idx]+xlate);
 	}
 	glEnd();
+	DEBUG_CHECK_GL_ERR;
 #endif
 }
 
@@ -218,7 +199,6 @@ void draw_string(const char *str)
 				}
 			}
 		}
-		glPushAttrib(GL_TEXTURE_BIT);
 		glGenTextures(1, &txt_texture);
 		glBindTexture(GL_TEXTURE_2D, txt_texture);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 128, 256, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
@@ -226,7 +206,8 @@ void draw_string(const char *str)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glPopAttrib();
+		glBindTexture(GL_TEXTURE_2D, 0);
+		CHECK_GL_ERR;
 		free(data);
 	}
 	
@@ -270,6 +251,7 @@ void draw_string(const char *str)
 	glPopAttrib();
 	
 	glWindowPos2fv(pos);
+	DEBUG_CHECK_GL_ERR;
 }
 
 #else

@@ -22,7 +22,7 @@ struct oscr_ctx *offscr_new(int width, int height, GLboolean force_fixed, GLbool
 	for(int i=0; i<NUM_FBO_TEX; i++) {
 		glBindTexture(GL_TEXTURE_2D, ctx->tex[i]);
 		
-		if(GLEE_ARB_texture_rg && redonly) { //TODO: use RG8 if we're doing float pack stuff
+		if(ogl_ext_ARB_texture_rg && redonly) { //TODO: use RG8 if we're doing float pack stuff
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16, ctx->w, ctx->h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 			printf("using R16 textures\n");
 		} else {

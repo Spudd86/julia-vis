@@ -8,6 +8,7 @@
 #include "pallet.h"
 #include "pixmisc.h"
 #include "audio/audio.h"
+#include "maxsrc.h"
 
 #define MAP soft_map_interp
 
@@ -31,27 +32,25 @@ int main(int argc, char **argv)
 	int im_w = screen->w - screen->w%16, im_h = screen->h - screen->h%16;
 	printf("running with %dx%d bufs\n", im_w, im_h);
 
-	maxsrc_setup(im_w, im_h);
-	pallet_init(screen->format->BitsPerPixel == 8);
-
 	uint16_t *map_surf[2];
 	map_surf[0] = _mm_malloc(2 * im_w * im_h * sizeof(uint16_t), 32);
-	//map_surf[0] = valloc(2 * im_w * im_h * sizeof(uint16_t));
 	memset(map_surf[0], 0, 2 * im_w * im_h * sizeof(uint16_t));
 	map_surf[1] = map_surf[0] + im_w * im_h;
 
 	int m = 0, cnt = 0;
 
+	struct maxsrc *maxsrc = maxsrc_new(im_w, im_h);
+	struct pal_ctx *pal_ctx = pal_ctx_new(screen->format->BitsPerPixel == 8);
 	struct point_data *pd = new_point_data(opts.rational_julia?4:2);
 
 	Uint32 tick0, fps_oldtime;
 	fps_oldtime = tick0 = SDL_GetTicks();
 	float frametime = 100;
 	int beats = beat_get_count();
-	Uint32 last_beat_time = tick0;
-	Uint32 lastpalstep = tick0;
-	Uint32 now = tick0;
-	Uint32  maxfrms = 0;
+	uint32_t last_beat_time = tick0;
+	uint32_t lastpalstep = tick0;
+	uint32_t now = tick0;
+	uint32_t maxfrms = 0;
 
 	SDL_Event	event;
 	while(SDL_PollEvent(&event) >= 0) {
@@ -61,19 +60,19 @@ int main(int argc, char **argv)
 
 		if(!opts.rational_julia) {
 			map_func(map_surf[m], map_surf[(m+1)&0x1], im_w, im_h, pd);
-			maxblend(map_surf[m], maxsrc_get(), im_w, im_h);
+			maxblend(map_surf[m], maxsrc_get(maxsrc), im_w, im_h);
 		}
 
 		if(opts.rational_julia) {
-			maxblend(map_surf[(m+1)&0x1], maxsrc_get(), im_w, im_h);
+			maxblend(map_surf[(m+1)&0x1], maxsrc_get(maxsrc), im_w, im_h);
 			map_func(map_surf[m], map_surf[(m+1)&0x1], im_w, im_h,  pd);
 		}
 
 		if((now - lastpalstep)*256/1024 >= 1) { // want pallet switch to take ~2 seconds
-			pallet_step(IMIN((now - lastpalstep)*256/1024, 32));
+			pal_ctx_step(pal_ctx, IMIN((now - lastpalstep)*256/1024, 32));
 			lastpalstep = now;
 		}
-		pallet_blit_SDL(screen, map_surf[m], im_w, im_h);
+		pallet_blit_SDL(screen, map_surf[m], im_w, im_h, pal_ctx_get_active(pal_ctx));
 
 		char buf[32];
 		sprintf(buf,"%6.1f FPS", 1000.0f / frametime);
@@ -82,9 +81,8 @@ int main(int argc, char **argv)
 
 		now = SDL_GetTicks();
 		int newbeat = beat_get_count();
-		if(newbeat != beats && !get_pallet_changing()) {
-			pallet_start_switch(newbeat);
-		}
+		if(newbeat != beats) pal_ctx_start_switch(pal_ctx, newbeat);
+		
 		if(newbeat != beats && now - last_beat_time > 1000) {
 			last_beat_time = now;
 			update_points(pd, (now - tick0), 1);
@@ -92,7 +90,9 @@ int main(int argc, char **argv)
 		beats = newbeat;
 
 		if((tick0+(maxfrms*1000)/opts.maxsrc_rate) - now > 1000/opts.maxsrc_rate) {
-			maxsrc_update();
+			audio_data ad; audio_get_samples(&ad);
+			maxsrc_update(maxsrc, ad.data, ad.len);
+			audio_finish_samples();
 			maxfrms++;
 		}
 
@@ -102,8 +102,11 @@ int main(int argc, char **argv)
 		fps_oldtime = SDL_GetTicks();
 		cnt++;
 	}
-
+	
+	pal_ctx_delete(pal_ctx);
+	maxsrc_delete(maxsrc);
 	audio_shutdown();
 	SDL_Quit();
     return 0;
 }
+

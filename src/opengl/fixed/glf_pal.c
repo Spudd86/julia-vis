@@ -27,15 +27,15 @@ static void render(struct glpal_ctx *ctx, GLuint draw_tex);
 
 struct glpal_ctx * pal_init_fixed(int width, int height) //FIXME
 {CHECK_GL_ERR;
-	pallet_init(0);
-	struct priv_ctx *priv = malloc(sizeof(*priv));
+	struct priv_ctx *priv = calloc(sizeof(*priv), 1);
 	priv->pubctx.render = render;
-	priv->pubctx.pal = pal_ctx_new();
+	priv->pubctx.pal = pal_ctx_new(0);
 	
 	priv->fxddstbuf = priv->fxdsrcbuf = NULL;
 	priv->im_w = width, priv->im_h = height;
 	priv->buf_w = priv->buf_h = 0;
 	priv->frm = 0;
+	priv->use_pbo = GL_FALSE;
 
 	glPushAttrib(GL_ALL_ATTRIB_BITS);
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
@@ -55,7 +55,7 @@ struct glpal_ctx * pal_init_fixed(int width, int height) //FIXME
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	//TODO: remove requirment for NPOT textures... (easy but broken on my laptop's mesa)
-	if(GLEE_ARB_pixel_buffer_object) {
+	if(ogl_ext_ARB_pixel_buffer_object) {
 	//if(0) {
 		priv->use_pbo = GL_TRUE;
 		glGenBuffersARB(2, priv->dstpbos);
@@ -94,6 +94,7 @@ static void render(struct glpal_ctx *ctx, GLuint srctex) //FIXME
 	const int frm = priv->frm;
 
 	DEBUG_CHECK_GL_ERR;
+	// VBOs are part of opengl 1.5 so we could drop the ARB suffix on glBindBuffer and glBufferData
 	
 	if(priv->use_pbo && priv->buf_w != vp_w && priv->buf_h != vp_h) {
 		priv->buf_w = vp_w; priv->buf_h = vp_h;
@@ -218,6 +219,7 @@ static void draw_palleted_NV(GLuint draw_tex)
 }
 
 //TODO: write code to do this using these extensions:
-//		ATI_fragment_shader (http://www.opengl.org/registry/specs/ATI/fragment_shader.txt)
+//      NV_fragment_shader     (http://www.opengl.org/registry/specs/NV/fragment_shader.txt)
+//		ATI_fragment_shader    (http://www.opengl.org/registry/specs/ATI/fragment_shader.txt)
 #endif
 

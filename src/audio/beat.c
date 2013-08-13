@@ -1,5 +1,6 @@
 #include "common.h"
 #include "beat.h"
+#include "getsamp.h"
 
 #define BANDS (64)
 // about a seconds worth
@@ -37,16 +38,6 @@ void beat_ctx_get_data(beat_ctx *ctx, beat_data *ad) {
 
 
 static inline float sqr(float x) { return x*x; }
-
-static inline float getsamp(const float *restrict data, int len, int i, int w) {
-	float res = 0;
-	int l = IMAX(i-w, 1); // skip sample 0 it's average for energy for entire interval
-	int u = IMIN(i+w, len);
-	for(int i = l; i < u; i++) {
-		res += data[i];
-	}
-	return res / (u-l);
-}
 
 /**
  * take 1024 frames of audio and do update beat detection

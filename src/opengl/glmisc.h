@@ -6,13 +6,12 @@
 #ifndef GLMISC_H_
 #define GLMISC_H_
 
-//#include <GL/glew.h>
-#ifndef USE_SYSTEM_GLEE
-#include "GLee/GLee.h"
-#else
-#include <GL/glee.h>
-#endif
+#include "gl_14.h"
+#if HAVE_GL_GLU_H
 #include <GL/glu.h>
+#else
+#include <OpenGL/glu.h>
+#endif
 
 //FBO management
 struct oscr_ctx;
@@ -36,39 +35,8 @@ void render_debug_overlay(void);
 void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_mandel, GLboolean show_fps_hist);
 void init_gl(const opt_data *opt_data, int width, int height);
 
-typedef struct {
-	float x, y;
-} __attribute__((__packed__)) vec2f;
-
-typedef struct {
-	float x, y, z;
-}vec3f;
-
-typedef struct {
-	float x, y, z, w;
-}vec4f;
-
-typedef struct Map_s Map;
-typedef void (*map_texco_cb)(int grid_size, vec2f *restrict txco_buf, const void *cb_data);
-typedef void (*map_texco_vxt_func)(float u, float v, vec2f *restrict txco, const void *cb_data);
-
-Map *map_new(int grid_size, map_texco_cb callback);
-void map_destroy(Map *self);
-void map_render(Map *self, const void *cb_data);
-
-#define GEN_MAP_CB(map_cb, vtx_func) \
-		static void map_cb(int grid_size, vec2f *restrict txco_buf, const void *cb_data) {\
-			const float step = 2.0f/(grid_size);\
-			for(int yd=0; yd<=grid_size; yd++) {\
-				vec2f *row = txco_buf + yd*(grid_size+1);\
-				for(int xd=0; xd<=grid_size; xd++)\
-					vtx_func(xd*step - 1.0f, yd*step - 1.0f, row + xd, cb_data);\
-			}\
-		}
-
 GLhandleARB compile_program(const char *vert_shader, const char *frag_shader);
 GLhandleARB compile_program_defs(const char *defs, const char *vert_shader, const char *frag_shader);
-void pixbuf_to_texture(Pixbuf *src, GLuint *tex, GLint clamp_mode, int rgb);
 
 void setup_viewport(int width, int height);
 void draw_string(const char *str);
@@ -77,7 +45,7 @@ void draw_string(const char *str);
 	fprintf(stderr, "%s: In function '%s':\n%s:%d: Warning: %s\n", \
 		__FILE__, __func__, __FILE__, __LINE__, gluErrorString(glerr)); \
 		glerr = glGetError();\
-		exit(1); }\
+		}\
 	} while(0)
 
 #ifdef NDEBUG

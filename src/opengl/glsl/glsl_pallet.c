@@ -189,31 +189,32 @@ static void render(struct glpal_ctx *ctx, GLuint draw_tex)
 	};
 	struct priv_ctx *priv = (struct priv_ctx *)ctx;
 
-	glUseProgram(priv->prog);
+	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+	glUseProgramObjectARB(priv->prog);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, draw_tex);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_1D, priv->texture);
 	
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(float)*4, verts);
+	glEnableVertexAttribArrayARB(0);
+	glVertexAttribPointerARB(0, 4, GL_FLOAT, GL_FALSE, sizeof(float)*4, verts);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	
 	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, pal_ctx_get_active(ctx->pal));
 	
-	glUseProgram(0);
-	glDisableVertexAttribArray(0);
+	glUseProgramObjectARB(0);
+	glDisableVertexAttribArrayARB(0);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_1D, 0);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
+	glPopClientAttrib();
 
 	DEBUG_CHECK_GL_ERR;
 }
 
 struct glpal_ctx *pal_init_glsl(GLboolean float_packed_pixels)
 {CHECK_GL_ERR;
-	pallet_init(0);
 	printf("Compiling pallet shader:\n");
 	GLint prog = 0;
 	if(!float_packed_pixels)
@@ -223,16 +224,16 @@ struct glpal_ctx *pal_init_glsl(GLboolean float_packed_pixels)
 
 	if(!prog) return NULL;
 
-	glUseProgram(prog);
-	glUniform1i(glGetUniformLocation(prog, "src"), 0);
-	glUniform1i(glGetUniformLocation(prog, "pal"), 1);
-	glBindAttribLocation(prog, 0, "vertex");
-	glUseProgram(0);
+	glUseProgramObjectARB(prog);
+	glUniform1iARB(glGetUniformLocationARB(prog, "src"), 0);
+	glUniform1iARB(glGetUniformLocationARB(prog, "pal"), 1);
+	glBindAttribLocationARB(prog, 0, "vertex");
+	glUseProgramObjectARB(0);
 	printf("Pallet shader compiled\n");
 	
 	struct priv_ctx *priv = malloc(sizeof(*priv));
 	priv->pubctx.render = render;
-	priv->pubctx.pal = pal_ctx_new();
+	priv->pubctx.pal = pal_ctx_new(0);
 	priv->prog = prog;
 
 	glGenTextures(1, &priv->texture);

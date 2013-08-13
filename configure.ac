@@ -6,6 +6,9 @@ AC_INIT([julia-opengl], [0.1], [BUG-REPORT-ADDRESS])
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_SRCDIR([src/optproc.c])
 
+m4_include([m4/ax_check_gl.m4])
+m4_include([m4/ax_check_glu.m4])
+
 AC_USE_SYSTEM_EXTENSIONS
 USE_LANGUAGES=gnu99
 
@@ -67,29 +70,16 @@ AC_SUBST(JACK_LIBS)
 AC_SUBST(enable_jack)
 
 AC_ARG_ENABLE([pulseaudio], AS_HELP_STRING([--enable-pulseaudio], [enable using pulseaudio for audio input (default: disabled)]))
-if test "x$enable_pulseaudio" != xno; then
-	PKG_CHECK_MODULES([PULSE], [libpulse],[have_pulse=yes], [have_pulse=no])
-#		[AC_DEFINE([HAVE_PULSE], [1], [Define if pulseaudio is enabled])
-#		enable_pulseaudio=yes
-#		],
-#		[
-#		if test "x$enable_pulseaudio" = xyes; then
-#			AC_MSG_FAILURE([--enable-pulseaudio was given, but test for pulseaudio failed])
-#		fi
-#		enable_pulseaudio=no
-#		]
-#	)
-fi
-
-if test "x$have_pulse" = xyes; then
+AS_IF([ test "x$enable_pulseaudio" != xno ], [
+	PKG_CHECK_MODULES([PULSE], [libpulse], [have_pulse=yes], [have_pulse=no])
+])
+AS_IF([ test "x$enable_pulseaudio" = xyes && test "x$have_pulse" = xno ], [
+	AC_MSG_FAILURE([--enable-pulseaudio was given, but test for pulseaudio failed])
+])
+AS_IF([ test "x$have_pulse" = xyes], [
 	AC_DEFINE([HAVE_PULSE], [1], [Define if pulseaudio is enabled])
 	enable_pulseaudio=yes
-else
-	if test "x$enable_pulseaudio" = xyes; then
-		AC_MSG_FAILURE([--enable-pulseaudio was given, but test for pulseaudio failed])
-	fi
-	enable_pulseaudio=no
-fi
+])
 AC_SUBST(PULSE_CFLAGS)
 AC_SUBST(PULSE_LIBS)
 AC_SUBST(enable_pulseaudio)
@@ -97,16 +87,32 @@ AC_SUBST(enable_pulseaudio)
 AC_ARG_ENABLE([opengl], AS_HELP_STRING([--disable-opengl], [enable opengl based versions (default: enabled)]))
 #TODO: make work on windows
 AS_IF([ test "x$enable_opengl" != xno], [
-	PKG_CHECK_MODULES([GL], [glu],[found_opengl=yes],[found_opengl=no])
+	#PKG_CHECK_MODULES([GL], [gl glu],[no_gl=no],[no_gl=yes])
+	#AS_IF([ test "x$no_gl" = xyes ], [
+	#	AX_CHECK_GL
+	#	AX_CHECK_GLU
+	#	AS_IF([ test "x$no_gl" = xyes ], [ no_gl=yes ])
+	#])
+	AC_PATH_X
+	AX_CHECK_GL
+	AX_CHECK_GLU
+	echo no_gl = $no_gl no_glu = $no_glu
+	AS_IF([ test "x$no_glu" = xyes ], [ no_gl=yes ])
 	#TODO: test windows GL here if we haven't found it yet
-    AS_IF([ test "x$found_opengl" = xno && test "x$enable_opengl" = xyes ], [AC_MSG_FAILURE([--enable-gl was given, but test for gl failed (old gl?)])],
-          [ test "x$found_opengl" = xyes ], [AC_DEFINE([HAVE_GL], [1], [Define if we have gl])
-                                             enable_opengl=yes],
-          [ test "x$found_opengl" = xno ], [ enable_opengl=no ])
+    AS_IF([ test "x$no_gl" = xyes && test "x$enable_opengl" = xyes ], [
+    	AC_MSG_FAILURE([--enable-gl was given, but test for gl failed (old gl?)])
+    ])
 ])
+AS_IF([ test "x$no_gl" != xyes ], [
+	AC_DEFINE([HAVE_GL], [1], [Define if we have gl])
+	enable_opengl=yes
+])
+AS_IF([ test "x$no_gl" = xyes ], [ enable_opengl=no ])
 AC_SUBST(enable_opengl)
 AC_SUBST(GL_CFLAGS)
 AC_SUBST(GL_LIBS)
+AC_SUBST(GLU_CFLAGS)
+AC_SUBST(GLU_LIBS)
 
 AC_ARG_ENABLE([kms], AS_HELP_STRING([--disable-kms], [enable kms/dri opengl based version (default: disabled)]))
 if test "x$enable_kms" != xyes; then
@@ -139,11 +145,11 @@ AC_SUBST(GBM_LIBS)
 AC_SUBST(DRM_CFLAGS)
 AC_SUBST(DRM_LIBS)
 
-AC_ARG_ENABLE([systemglee], AS_HELP_STRING([--enable-system-glee], [enable system copy of glee (default: disabled)]))
-if test "x$enable_systemglee" = xyes; then
-	AC_DEFINE([USE_SYSTEM_GLEE], [1], [Define if we should use system GLee])
+AC_ARG_ENABLE([systemglew], AS_HELP_STRING([--enable-system-glew], [enable system copy of glew (default: disabled)]))
+if test "x$enable_systemglew" = xyes; then
+	AC_DEFINE([USE_SYSTEM_GLEW], [1], [Define if we should use system GLEW])
 fi
-AC_SUBST(enable_systemglee)
+AC_SUBST(enable_systemglew)
 
 AC_ARG_ENABLE([orc], AS_HELP_STRING([--enable-orc], [enable using orc (default: disabled)]))
 if test "x$enable_orc" = xyes; then

@@ -11,6 +11,7 @@
 #include "sdl-misc.h"
 #include "map.h"
 #include "audio/audio.h"
+#include "maxsrc.h"
 
 #define IM_SIZE (512)
 
@@ -18,7 +19,9 @@ static opt_data opts;
 static int im_w = 0, im_h = 0;
 static int running = 1;
 static float map_fps=0;
+uint32_t maxfrms = 0;
 
+static struct maxsrc *maxsrc = NULL;
 static soft_map_func map_func = soft_map_interp;
 
 static int run_map_thread(tribuf *tb)
@@ -27,7 +30,6 @@ static int run_map_thread(tribuf *tb)
 	unsigned int beats = beat_get_count();
 	unsigned int tick0, fps_oldtime, frmcnt=0, last_beat_time = 0;
 	tick0 = fps_oldtime = SDL_GetTicks();
-	//uint32_t maxfrms = 0;
 
 	unsigned int fpstimes[40]; for(int i=0; i<40; i++) fpstimes[i] = 0;
 
@@ -35,14 +37,16 @@ static int run_map_thread(tribuf *tb)
     while(running) {
 		frmcnt++;
 
-//		if((tick0-SDL_GetTicks())*opts.maxsrc_rate + (maxfrms*1000) > 1000) {
-//			maxsrc_update();
-//			maxfrms++;
-//		}
+		if((tick0-SDL_GetTicks())*opts.maxsrc_rate + (maxfrms*1000) > 1000) {
+			audio_data ad; audio_get_samples(&ad);
+			maxsrc_update(maxsrc, ad.data, ad.len);
+			audio_finish_samples();
+			maxfrms++;
+		}
 
 		uint16_t *map_dest = tribuf_get_write(tb);
 		map_func(map_dest, map_src, im_w, im_h, pd);
-		maxblend(map_dest, maxsrc_get(), im_w, im_h);
+		maxblend(map_dest, maxsrc_get(maxsrc), im_w, im_h);
 
 		tribuf_finish_write(tb);
 		map_src=map_dest;
@@ -88,8 +92,8 @@ int main(int argc, char **argv)
 	}
 	else if(opts.quality >= 1)  map_func = soft_map;
 
-	maxsrc_setup(im_w, im_h);
-	pallet_init(screen->format->BitsPerPixel == 8);
+	maxsrc = maxsrc_new(im_w, im_h);
+	struct pal_ctx *pal_ctx = pal_ctx_new(screen->format->BitsPerPixel == 8);
 
 	uint16_t *map_surf[3];
 #ifdef HAVE_MMAP
@@ -105,12 +109,9 @@ int main(int argc, char **argv)
 
 	tribuf *map_tb = tribuf_new((void **)map_surf, 1);
 
-	maxsrc_update();
-
 	int beats = 0;
 	int frmcnt = 0;
 	int lastdrawn=0;
-	int maxfrms = 0;
 //	Uint32 fpstimes[opts.draw_rate]; for(int i=0; i<opts.draw_rate; i++) fpstimes[i] = tick0;
 //	float scr_fps = 0;
 
@@ -132,11 +133,11 @@ int main(int argc, char **argv)
 			lastdrawn = nextfrm;
 			Uint32 now = SDL_GetTicks();
 			if(now - lastpalstep >= 2048/256) { // want pallet switch to take ~2 seconds
-				pallet_step(IMIN((now - lastpalstep)*256/2048, 64));
+				pal_ctx_step(pal_ctx, IMIN((now - lastpalstep)*256/2048, 64));
 				lastpalstep = now;
 			}
-			//pallet_blit_SDL(screen, maxsrc_get(), im_w, im_h);
-			pallet_blit_SDL(screen, tribuf_get_read(map_tb), im_w, im_h);
+			
+			pallet_blit_SDL(screen, tribuf_get_read(map_tb), im_w, im_h, pal_ctx_get_active(pal_ctx));
 			tribuf_finish_read(map_tb);
 
 			char buf[64];
@@ -146,15 +147,17 @@ int main(int argc, char **argv)
 			SDL_Flip(screen);
 
 			int newbeat = beat_get_count();
-			if(newbeat != beats) pallet_start_switch(newbeat);
+			if(newbeat != beats) pal_ctx_start_switch(pal_ctx, newbeat);
 			beats = newbeat;
 
 			now = SDL_GetTicks();
-			if((tick0-now)*opts.maxsrc_rate + (maxfrms*1000) > 1000) {
-				maxsrc_update();
-				maxfrms++;
-				now = SDL_GetTicks();
-			}
+/*			if((tick0-now)*opts.maxsrc_rate + (maxfrms*1000) > 1000) {*/
+/*				audio_data ad; audio_get_samples(&ad);*/
+/*				maxsrc_update(maxsrc, ad.data, ad.len);*/
+/*				audio_finish_samples();*/
+/*				maxfrms++;*/
+/*				now = SDL_GetTicks();*/
+/*			}*/
 
 			int delay =  (tick0 + frmcnt*1000/opts.draw_rate) - now;
 			if(delay > 0) SDL_Delay(delay);

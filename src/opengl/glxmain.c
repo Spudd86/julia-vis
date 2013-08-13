@@ -7,12 +7,12 @@
 #include <X11/keysym.h>
 
 #include "glmisc.h"
-#include <GL/glx.h>
-#include <GL/glxext.h>
+#include "glx_gen.h"
 
+// for some reason this is in glx.h but not glxew.h
+//#define GLX_BufferSwapComplete	1
 
 #include "audio/audio.h"
-
 
 #ifndef GLX_INTEL_swap_event
 # define GLX_INTEL_swap_event 1
@@ -28,9 +28,7 @@
 # ifndef GLX_BUFFER_SWAP_COMPLETE_INTEL_MASK
 #  define GLX_BUFFER_SWAP_COMPLETE_INTEL_MASK 0x04000000
 # endif
-#endif /* GLX_INTEL_swap_event */
-
-typedef GLXContext (*glXCreateContextAttribsARBProc)(Display*, GLXFBConfig, GLXContext, Bool, const int*);
+#endif
 
 static Display *dpy = NULL;
 static GLXWindow glxWin;
@@ -172,9 +170,12 @@ int main(int argc, char **argv)
 
 	int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
 	
-	render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
+	if(have_intel_swap_event)
+		render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
 	
 	while(1) {
+		if(!have_intel_swap_event) render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
+		
 		int clear_key = 1;
 		while (XPending(dpy) > 0) 
 		{
@@ -240,6 +241,7 @@ void render_debug_overlay(void) {
 
 void swap_buffers(void) {
 	glXSwapBuffers( dpy, glxWin );
+	//glXSwapBuffersMscOML(dpy, glxWin, 0, 0, 0);
 }
 
 

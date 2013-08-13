@@ -2,6 +2,7 @@
 #include "points.h"
 #include "opengl/glmisc.h"
 #include "opengl/glfract.h"
+#include "glmap.h"
 
 static void map_vtx(float u, float v, vec2f *txco, const void *cb_data) {
 	const struct point_data *pd = cb_data;
@@ -43,13 +44,13 @@ static void render(struct glfract_ctx *ctx, const struct point_data *pd, GLuint 
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_CONSTANT_ALPHA, GL_ONE);
-	glBlendEquationEXT(GL_FUNC_SUBTRACT_EXT);
+	glBlendEquation(GL_FUNC_SUBTRACT);
 	glBlendColor(0, 0, 0, 63.0f/64);
 	glBindTexture(GL_TEXTURE_2D, src_tex);
 	map_render(priv->map, pd);
 
-	glActiveTextureARB(GL_TEXTURE0_ARB);
-	glBlendEquationEXT(GL_MAX_EXT);
+	glBlendEquation(GL_MAX);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, maxsrc_tex);
 	glBegin(GL_TRIANGLE_STRIP);
 		glTexCoord2d( 0, 0); glVertex2d(-1, -1);
