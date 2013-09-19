@@ -8,9 +8,8 @@
 #include <stdbool.h>
 #include <malloc.h>
 
-#define TB_DEBUG 1
+//#define TB_DEBUG 1
 //#define TB_DEBUG_USER 1
-//#define TRIBBUF_PROFILE 1
 //#define TB_NO_ATOMIC 1
 
 // defining TB_DEBUG_USER to 1 will cause the implementation to take locks in
@@ -57,37 +56,56 @@
 			       memory_order_relaxed)
 #	define tb_atomic_inc(x) do { atomic_fetch_add_explicit(a, 1, memory_order_relaxed); } while(0)
 #elif defined(__GNUC__)
-	typedef enum {
-		memory_order_relaxed,
-		memory_order_consume,
-		memory_order_acquire,
-		memory_order_release,
-		memory_order_acq_rel,
-		memory_order_seq_cst
-	} memory_order;
-	typedef uint_fast16_t atomic_uint_fast16_t;
-	typedef uint_fast32_t atomic_uint_fast32_t;
+#	if __GNUC__ >= 4 && __GNUC_MINOR__ >= 7
+		// use the gcc built in equivelents of stdatomic funcs since we have them
+		typedef int memory_order;
+		typedef uint_fast16_t atomic_uint_fast16_t;
+		typedef uint_fast32_t atomic_uint_fast32_t;
+#		define memory_order_relaxed __ATOMIC_RELAXED
+#		define memory_order_consume __ATOMIC_CONSUME
+#		define memory_order_acquire __ATOMIC_ACQUIRE
+#		define memory_order_release __ATOMIC_RELEASE
+#		define memory_order_acq_rel __ATOMIC_ACQ_REL
+#		define memory_order_seq_cst __ATOMIC_SEQ_CST
+#		define atomic_init(obj, v) __atomic_store_n(obj, v, __ATOMIC_SEQ_CST)
+#		define atomic_load(v) __atomic_load_n(v, __ATOMIC_SEQ_CST)
+#		define atomic_load_explicit(v, o) __atomic_load_n(v, o)
+#		define tb_comp_xchng(a, e, n, order) \
+			__atomic_compare_exchange_n(a, e, n, 1, order, __ATOMIC_RELAXED)
+#		define tb_atomic_inc(x) __atomic_fetch_add(x, 1, __ATOMIC_RELAXED)
+#	else
+		typedef enum {
+			memory_order_relaxed,
+			memory_order_consume,
+			memory_order_acquire,
+			memory_order_release,
+			memory_order_acq_rel,
+			memory_order_seq_cst
+		} memory_order;
+		typedef uint_fast16_t atomic_uint_fast16_t;
+		typedef uint_fast32_t atomic_uint_fast32_t;
 
-	//TODO: something that works off x86
-#	define ATOMIC_VAR_INIT(v) (v)
-#	define atomic_init(obj, v) do { *obj = v; } while(0)
-#	define atomic_load(v) (*(v))
-#	define atomic_load_explicit(v, o) (*(v))
-	//#	define tb_comp_xchng(a, e, n, o) __sync_bool_compare_and_swap(a, *e, n)
-	static inline bool tb_comp_xchng(uint_fast16_t *a, uint_fast16_t *e, uint_fast16_t n, memory_order o)
-	{
-		(void)o;
-	//	return __sync_bool_compare_and_swap(a, *e, n);
-		uint_fast16_t t = __sync_val_compare_and_swap(a, *e, n);
-		if(t != *e) {
-			*e = t;
-			return 0;
+		//TODO: something that works off x86
+#		define atomic_init(obj, v) do { *obj = v; } while(0)
+#		define atomic_load(v) (*(v))
+#		define atomic_load_explicit(v, o) (*(v))
+		//#	define tb_comp_xchng(a, e, n, o) __sync_bool_compare_and_swap(a, *e, n)
+		static inline bool tb_comp_xchng(uint_fast16_t *a, uint_fast16_t *e, uint_fast16_t n, memory_order o)
+		{
+			(void)o;
+		//	return __sync_bool_compare_and_swap(a, *e, n);
+			uint_fast16_t t = __sync_val_compare_and_swap(a, *e, n);
+			if(t != *e) {
+				*e = t;
+				return 0;
+			}
+			return 1;
 		}
-		return 1;
-	}
-#	define tb_atomic_inc(x) do { __sync_add_and_fetch(x, 1); } while(0)
-#	warning "Using gcc __sync_* builtins for atomic ops"
+#		define tb_atomic_inc(x) do { __sync_add_and_fetch(x, 1); } while(0)
+#		warning "Using gcc __sync_* builtins for atomic ops"
+#	endif
 #else
+#	define atomic_init(obj, v) do { *obj = v; } while(0)
 #	warning "NO ATOMICS, using threads and locks"
 #	define TB_NO_ATOMIC 1
 #endif
@@ -168,19 +186,9 @@
 		if((c)) tribuf_error((m));\
 	} while(0)
 #define tb_check_invariants(state) do {\
-		frms t; t.v = (state).v;\
-		if((int)(bool)t.arf + (int)(bool)t.nwf + (int)(bool)t.nrf != 1) tribuf_error("tribuf bad fresh bits!\n");\
-		if(   t.ar == t.aw || t.ar == t.nr || t.ar == t.nw \
-		   || t.aw == t.nr || t.aw == t.nw \
-		   || t.nr == t.nw) \
-			tribuf_error("tribuf duplicate buffer!\n");\
-		if(t.arf && t.ar < 0) tribuf_error("bad fresh bit!\n"); \
-		if(t.nrf && t.nr < 0) tribuf_error("bad fresh bit!\n"); \
-		if(t.nwf && t.nw < 0) tribuf_error("bad fresh bit!\n"); \
-		if(t.ar > 2 || t.ar < -1 ) tribuf_error("bad buffer index (ar)!\n"); \
-		if(t.nr > 2 || t.nr < -1 ) tribuf_error("bad buffer index (nr)!\n"); \
-		if(t.nw > 2 || t.nw < -1 ) tribuf_error("bad buffer index (nw)!\n"); \
-		if(t.aw > 2 || t.aw <  0 ) tribuf_error("bad buffer index (aw)!\n"); \
+		frms t; t.v = (state).v; \
+		if(t.ar == t.aw || t.ar == t.id || t.aw == t.id) \
+			tribuf_error("tribuf duplicate buffer!\n"); \
 	} while(0)
 // note aw is special, it should always have an actual buffer in it (not -1)
 #else
@@ -188,74 +196,17 @@
 #define tb_check_invariants(f) do { } while(0)
 #endif
 
-#if defined(TRIBBUF_PROFILE) && (defined(TB_STDATOMIC) || defined(__GNUC__))
-static atomic_uint_fast32_t finish_writes = ATOMIC_VAR_INIT(0);
-static atomic_uint_fast32_t finish_write_trys = ATOMIC_VAR_INIT(0);
-static atomic_uint_fast32_t finish_reads = ATOMIC_VAR_INIT(0);
-static atomic_uint_fast32_t finish_read_trys = ATOMIC_VAR_INIT(0);
-static atomic_uint_fast32_t get_reads = ATOMIC_VAR_INIT(0);
-static atomic_uint_fast32_t get_read_trys = ATOMIC_VAR_INIT(0);
-#define tb_count_fw tb_atomic_inc(&finish_writes)
-#define tb_count_fw_try tb_atomic_inc(&finish_write_trys)
-#define tb_count_fr tb_atomic_inc(&finish_reads)
-#define tb_count_fr_try tb_atomic_inc(&finish_read_trys)
-#define tb_count_gr tb_atomic_inc(&get_reads)
-#define tb_count_gr_try tb_atomic_inc(&get_read_trys)
-static void  tb_lock_prof_print(void) {
-	printf("tribuf stats:\n\tcat        ups        trys\n"); //TODO: use correct format specifier
-	printf("\twrts: %9i %9i\n", (int)atomic_load(&finish_writes), (int)atomic_load(&finish_write_trys));
-	printf("\tfrs:  %9i %9i\n", (int)atomic_load(&finish_reads), (int)atomic_load(&finish_read_trys));
-	printf("\tgrs:  %9i %9i\n", (int)atomic_load(&get_reads), (int)atomic_load(&get_read_trys));
-}
-static void __attribute__((constructor)) tb_lock_prof_init(void) {
-	atexit(tb_lock_prof_print);
-}
-#else
-#define tb_count_fw do { } while(0)
-#define tb_count_fw_try do { } while(0)
-#define tb_count_fr do { } while(0)
-#define tb_count_fr_try do { } while(0)
-#define tb_count_gr do { } while(0)
-#define tb_count_gr_try do { } while(0)
-#endif
-
 // only write thread will ever change aw, and only read thread will ever change ar
 // when either thread wants a to put a new buffer into it's 'active' slot
-// it can choose either nw or nr, (whichever is NOT -1)
-
-// the choice between nr and nw when both are not -1 is based on the 'fresh' bits
-// there is a bit for each of ar, nw, and nr that indicates it is 'fresh'
-// only the buffer most recently written to (post finish_write()) has it's fresh
-// bit set, so on the write it side it really doesn't matter which we pick since
-// we are about to set the fresh bit anyway, while on the read side we always take
-// whichever one has it's fresh bit set. When moving a buffer to/from ar we move
-// the fresh bit with it, this way if have a read side running faster than the
-// write side the read side will still always get the freshest data, that is if
-// we have sequence numbers in the tb and the read side does:
-// b1 = get_read()
-// finish_read()
-// b2 = get_read()
-// then b1 <= b2 always (provided the sequence numbers don't overflow)
-
-// The names of the 'available' buffer fields in this struct are stupid now, but 
-// they used to mean something and I can't think of better names for now
-// so they keep the ones they have (They used to mean 'next write' and 'next read'
-// and when both were non-negative we picked a specific one in an attempt to always
-// get the 'freshest' data... it didn't work)
+// it takes the idle buffer
 
 typedef union frms {
 	uint_fast16_t v;
 	struct {
-		// invariant exactly one of these is 1, the other two are 0
-		int arf : 1;
-		int nwf : 1;
-		int nrf : 1;
-		
-		// invariant exactly one of these is always -1, likewise for 0, 1, 2
-		int aw : 3; // never allowed to be -1 contains the number of the buffer we are currently writing to
-		int nw : 3; // these two are 'available'
-		int nr : 3;
-		int ar : 3; // contains buffer we are reading from on other side
+		unsigned int idf: 1; ///< 1 if the idle buffer is newer than the read buffer
+		unsigned int aw : 2; ///< current write buffer
+		unsigned int id : 2; ///< current idle buffer
+		unsigned int ar : 2; ///< current read buffer 
 	};
 }frms;
 
@@ -274,7 +225,7 @@ struct tribuf_s {
 
 	void **data;
 
-	atomic_uint_fast32_t frame; //< holds a count of the number of frames finished
+	//atomic_uint_fast32_t frame; //< holds a count of the number of frames finished
 	atomic_uint_fast16_t active; //< hold the current state of buffer assignment
 };
 
@@ -286,14 +237,13 @@ tribuf* tribuf_new(void **data, int locking)
 	if(tb == NULL) abort();
 
 	tb->data = data;
-	atomic_init(&tb->frame, 0);
+	//atomic_init(&tb->frame, 0);
 	frms tmp;
 	tmp.v = 0;
-	tmp.nrf = 1;
+	tmp.idf = 0;
 	tmp.aw =  0;
-	tmp.nw =  1;
-	tmp.nr =  2;
-	tmp.ar = -1;
+	tmp.id =  1;
+	tmp.ar =  2;
 	atomic_init(&tb->active, tmp.v);
 
 #ifdef TB_DEBUG_USER
@@ -324,96 +274,45 @@ void tribuf_destroy(tribuf *tb)
 
 // *********************** logic and management *****************************
 
-static frms do_get_write(frms active)
-{
-	tb_sanity_check(active.aw < 0, "tribuf state inconsistent!");
-	tb_check_invariants(active);
-	return active;
-}
-
 static frms do_finish_write(frms active)
-{
-	tb_sanity_check(active.aw < 0, "tribuf state inconsistent!");
-	tb_sanity_check(active.nw < 0 && (active.nr < 0 || active.ar < 0), "tribuf state inconsistent!");
-	tb_check_invariants(active);
-	
+{	
 	frms f;
-	f.v = 0;	
-	f.nrf = 1;
-	f.nr = active.aw;
+	f.v = 0;
+	f.idf = 1;
+	f.aw = active.id;
+	f.id = active.aw;
 	f.ar = active.ar;
 
-	if(active.nw < 0) {
-		f.aw = active.nr;
-		f.nw = active.nw;
-	} else {
-		f.nw = active.nr;
-		f.aw = active.nw;
-	}
-	tb_sanity_check(f.aw < 0, "tribuf state inconsistent!");
+	tb_check_invariants(active);
 	tb_check_invariants(f);
 	return f;
 }
 
 static frms do_get_read(frms active)
-{
-	tb_sanity_check(active.ar >= 0, "tribuf_get_read without finish_read!\n");
-	tb_sanity_check(active.nw < 0 || active.nr < 0 || active.aw < 0, "tribuf state inconsistent!");
-	tb_check_invariants(active);
-	
+{	
 	frms f;
 	f.v = 0;
-	f.arf = 1;
+	f.idf = 0;
 	f.aw = active.aw;
 	
-	if(active.nrf) {
-		f.nw = active.nw;
-		f.ar = active.nr; // swap nr and ar
-		f.nr = active.ar;
+	// check the fresh bit to see if we've got a new buffer, 
+	// if not just return the same one as last time because it's still the
+	// most recent one
+	if(active.idf) { 
+		f.id = active.ar;
+		f.ar = active.id;
 	} else {
-		tb_sanity_check(active.nwf, "Bad fresh bits");
-		f.ar = active.nw;
-		f.nr = active.nr; // swap nw and ar
-		f.nw = active.ar;
+		f.id = active.id;
+		f.ar = active.ar;
 	}
-	tb_sanity_check(f.ar < 0, "tribuf state inconsistent!");
-	tb_check_invariants(f);
-	return f;
-}
-
-static frms do_finish_read(frms active)
-{
-	tb_sanity_check(active.ar < 0, "tribuf_finish_read without tribuf_get_read!");
-	tb_sanity_check(active.nw < 0 && active.nr < 0, "tribuf state inconsistent!");
-	tb_sanity_check(active.nw >= 0 && active.nr >= 0, "tribuf state inconsistent!");
+	
 	tb_check_invariants(active);
-	
-	frms f;
-	f.v = 0;
-	f.aw = active.aw;
-	f.ar = -1;
-	if(active.nw < 0) {
-		f.nwf = active.arf;
-		f.nrf = active.nrf;
-		f.nw = active.ar;
-		f.nr = active.nr;
-	} else {
-		f.nwf = active.nwf;
-		f.nrf = active.arf;
-		f.nw = active.nw;
-		f.nr = active.ar;
-	}
-	tb_sanity_check(f.ar >= 0, "tribuf state inconsistent!");
 	tb_check_invariants(f);
 	return f;
 }
 
 static int do_get_read_nolock(frms active) {
-	//tb_check_invariants(active);
-	//return (active.nr<0)?active.ar:active.nr;
-	if(active.nrf) return active.nr;
-	else if(active.arf) return active.ar;
-	else return active.nw;
+	return active.ar;
 }
 
 
@@ -422,15 +321,13 @@ static int do_get_read_nolock(frms active) {
 // here we have the functions that are actually visible, they handle syncronization
 // there are two different implementations, one using locks and one using atomics
 
+//TODO: double check ordering stuff
 #ifndef TB_NO_ATOMIC
 
 void* tribuf_get_write(tribuf *tb)
 {
-	frms f, active;
-	active.v = atomic_load_explicit(&tb->active, memory_order_relaxed);
-	
-	f = do_get_write(active); (void)f;
-	// If we were looping here I think it could use memory_order_relaxed on the xcng
+	frms active;
+	active.v = atomic_load_explicit(&tb->active, memory_order_consume);
 	
 	user_debug_lock(tb, write);
 	
@@ -441,73 +338,51 @@ void tribuf_finish_write(tribuf *tb)
 {
 	user_debug_unlock(tb, write);
 	frms f, active;
-	tb_count_fw;
 	
-	active.v = atomic_load_explicit(&tb->active, memory_order_relaxed);
+	active.v = atomic_load_explicit(&tb->active, memory_order_consume);
 	do {
-		tb_count_fw_try;
 		f = do_finish_write(active);
 	} while(!tb_comp_xchng(&tb->active, &active.v, f.v, memory_order_release));
-	//TODO: double check ordering stuff
-	
-	//TODO: work out weather or not we really need this to be atomic
-	tb_atomic_inc(&tb->frame);
-	// if we make the inc of tb->frame non-atomic it needs to go before 
-	// the loop so it gets included in the release fence for the successful CAS
 }
 
 void* tribuf_get_read(tribuf *tb)
 {
 	frms f, active;
-	tb_count_gr;
-	
-	active.v = atomic_load_explicit(&tb->active, memory_order_relaxed);
+	active.v = atomic_load_explicit(&tb->active, memory_order_consume);
 	do {
-		tb_count_gr_try;
 		f = do_get_read(active);
 	} while(!tb_comp_xchng(&tb->active, &active.v, f.v, memory_order_acquire));
-	//TODO: double check ordering stuff, can we use consume here?
 
 	user_debug_lock(tb, read);
 
 	return tb->data[f.ar];
 }
 
-void tribuf_finish_read(tribuf *tb)
+void tribuf_finish_read(tribuf *tb) // NOOP with debugging off
 {
 	user_debug_unlock(tb, read);
-
-	frms f, active;
-	tb_count_fr;
-	
-	active.v = atomic_load_explicit(&tb->active, memory_order_relaxed);
-	do {
-		tb_count_fr_try;
-		f = do_finish_read(active);
-	} while(!tb_comp_xchng(&tb->active, &active.v, f.v, memory_order_relaxed));
-	//TODO: double check ordering stuff
 }
 
 void* tribuf_get_read_nolock(tribuf *tb) { // should only be used by write side to start up
 	frms active;
-	active.v = atomic_load_explicit(&tb->active, memory_order_relaxed);
+	active.v = atomic_load_explicit(&tb->active, memory_order_acquire);
 	return tb->data[do_get_read_nolock(active)];
 }
 
-int tribuf_get_frmnum(tribuf *tb) {
-	//TODO: do we really want relaxed here?
-	//return atomic_load_explicit(&tb->frame, memory_order_consume);
-	return atomic_load_explicit(&tb->frame, memory_order_relaxed);
+int tribuf_check_fresh(tribuf *tb) 
+{
+	frms active;
+	active.v = atomic_load_explicit(&tb->active, memory_order_consume); //TODO: can this be memory_order_relaxed?
+	return active.idf;
 }
 
 #else // TB_NO_ATOMIC defined
+/************************************* LOCK BASED SYNC *************************/
 
 void* tribuf_get_write(tribuf *tb)
 {
 	tb_lock(&tb->lock);
-	frms f = do_get_write((frms)tb->active);
-	tb->active = f.v;
-	int r = f.aw;
+	int r = ((frms)tb->active).aw;
 	tb_unlock(&tb->lock);
 	user_debug_lock(tb, write);
 	return tb->data[r];
@@ -518,7 +393,6 @@ void tribuf_finish_write(tribuf *tb)
 	user_debug_unlock(tb, write);
 	tb_lock(&tb->lock);
 	tb->active = do_finish_write((frms)tb->active).v;
-	tb->frame++;
 	tb_unlock(&tb->lock);
 }
 
@@ -526,18 +400,15 @@ void* tribuf_get_read(tribuf *tb)
 {
 	tb_lock(&tb->lock);
 	frms f = do_get_read((frms)tb->active);
-	int r = f.ar;
+	tb->active = f.v;
 	tb_unlock(&tb->lock);
 	user_debug_lock(tb, read);
-	return tb->data[r];
+	return tb->data[f.ar];
 }
 
-void tribuf_finish_read(tribuf *tb)
+void tribuf_finish_read(tribuf *tb) // NOOP with debugging off
 {
 	user_debug_unlock(tb, read);
-	tb_lock(&tb->lock);
-	tb->active = do_finish_read((frms)tb->active).v;
-	tb_unlock(&tb->lock);
 }
 
 void* tribuf_get_read_nolock(tribuf *tb)
@@ -548,10 +419,10 @@ void* tribuf_get_read_nolock(tribuf *tb)
 	return tb->data[r];
 }
 
-int tribuf_get_frmnum(tribuf *tb)
+int tribuf_check_fresh(tribuf *tb)
 {
 	tb_lock(&tb->lock);
-	int res = tb->frame;
+	int res = ((frms)tb->active).idf;
 	tb_unlock(&tb->lock);
 	return res;
 }

@@ -27,7 +27,6 @@ INSTALL = @INSTALL@
 ENABLE_JACK=@enable_jack@
 ENABLE_PULSE=@enable_pulseaudio@
 ENABLE_PORTAUDIO=@enable_portaudio@
-ENABLE_DIRECTFB=@enable_directfb@
 ENABLE_GL=@enable_opengl@
 ENABLE_EGL=@enable_egl@
 
@@ -110,25 +109,13 @@ endif
 
 AUDIO_OBJS = $(AUDIO_SRCS:.c=.o)
 
-ifeq ($(ENABLE_DIRECTFB),yes)
-ALL_BINS += bin/dfb-test$(EXEEXT)
-endif
-
-ifeq ($(USE_OLD_TRIBUF),yes)
-TRIBUF_SRCS = atomic_tribuf.c
-CFLAGS += -DTRIBUF_LOCKING
-else
 TRIBUF_SRCS = src/tribuf.c
-endif
 
 ifeq (@disable_atomics@,yes)
 CFLAGS += -DTB_NO_ATOMIC
 endif
 
 all: $(ALL_BINS)
-
-dfb-run: bin/dfb-test
-	bin/dfb-test
 
 run: bin/sdlthread-test
 	bin/sdlthread-test

@@ -112,8 +112,6 @@ int main(int argc, char **argv)
 	int beats = 0;
 	int frmcnt = 0;
 	int lastdrawn=0;
-//	Uint32 fpstimes[opts.draw_rate]; for(int i=0; i<opts.draw_rate; i++) fpstimes[i] = tick0;
-//	float scr_fps = 0;
 
 	SDL_Thread *map_thread = SDL_CreateThread((void *)&run_map_thread, map_tb);
 	SDL_Delay(100);
@@ -126,11 +124,9 @@ int main(int argc, char **argv)
 	SDL_Event event;
 	while(SDL_PollEvent(&event) >= 0)
 	{
-		int nextfrm = tribuf_get_frmnum(map_tb);
 		if(event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) {
 			break;
-		} else if(lastdrawn < nextfrm) {
-			lastdrawn = nextfrm;
+		} else if(tribuf_check_fresh(map_tb)) {
 			Uint32 now = SDL_GetTicks();
 			if(now - lastpalstep >= 2048/256) { // want pallet switch to take ~2 seconds
 				pal_ctx_step(pal_ctx, IMIN((now - lastpalstep)*256/2048, 64));
@@ -141,7 +137,6 @@ int main(int argc, char **argv)
 			tribuf_finish_read(map_tb);
 
 			char buf[64];
-//			sprintf(buf,"%6.1f FPS %6.1f UPS %6.1f", map_fps, scr_fps, maxfrms*1000.0f/(now-tick0));
 			sprintf(buf,"%6.1f FPS %6.1f UPS %6.1f", map_fps, FPS_HIST_LEN*1000.0f/totframetime, maxfrms*1000.0f/(now-tick0));
 			DrawText(screen, buf);
 			SDL_Flip(screen);
@@ -151,30 +146,16 @@ int main(int argc, char **argv)
 			beats = newbeat;
 
 			now = SDL_GetTicks();
-/*			if((tick0-now)*opts.maxsrc_rate + (maxfrms*1000) > 1000) {*/
-/*				audio_data ad; audio_get_samples(&ad);*/
-/*				maxsrc_update(maxsrc, ad.data, ad.len);*/
-/*				audio_finish_samples();*/
-/*				maxfrms++;*/
-/*				now = SDL_GetTicks();*/
-/*			}*/
-
 			int delay =  (tick0 + frmcnt*1000/opts.draw_rate) - now;
 			if(delay > 0) SDL_Delay(delay);
-			now = SDL_GetTicks();
-//			float fpsd = now - fpstimes[frmcnt%opts.draw_rate];
-//			fpstimes[frmcnt%opts.draw_rate] = now;
-//			scr_fps = opts.draw_rate * 1000.0f/ fpsd;
 
 			totframetime -= frametimes[frmcnt%FPS_HIST_LEN];
 			totframetime += (frametimes[frmcnt%FPS_HIST_LEN] = now - fps_oldtime);
 			fps_oldtime = now;
 			frmcnt++;
-		} else  {
-			SDL_Delay(700/map_fps); // hope we gete a new frame
+		} else {
+			SDL_Delay(1000/opts.draw_rate/2); // wait half a frame and hope we get a new buffer
 		}
-
-
 	}
 	running = 0;
 

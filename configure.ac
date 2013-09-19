@@ -145,12 +145,6 @@ AC_SUBST(GBM_LIBS)
 AC_SUBST(DRM_CFLAGS)
 AC_SUBST(DRM_LIBS)
 
-AC_ARG_ENABLE([systemglew], AS_HELP_STRING([--enable-system-glew], [enable system copy of glew (default: disabled)]))
-if test "x$enable_systemglew" = xyes; then
-	AC_DEFINE([USE_SYSTEM_GLEW], [1], [Define if we should use system GLEW])
-fi
-AC_SUBST(enable_systemglew)
-
 AC_ARG_ENABLE([orc], AS_HELP_STRING([--enable-orc], [enable using orc (default: disabled)]))
 if test "x$enable_orc" = xyes; then
 	PKG_CHECK_MODULES([ORC], [orc-0.4], 
