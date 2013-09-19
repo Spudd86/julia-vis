@@ -69,7 +69,22 @@ AC_SUBST(JACK_CFLAGS)
 AC_SUBST(JACK_LIBS)
 AC_SUBST(enable_jack)
 
-AC_ARG_ENABLE([pulseaudio], AS_HELP_STRING([--enable-pulseaudio], [enable using pulseaudio for audio input (default: disabled)]))
+AC_ARG_ENABLE([sndfile], AS_HELP_STRING([--enable-libsndfile], [enable using libsndfile for audio input (default: enabled)]))
+AS_IF([ test "x$enable_sndfile" != xno ], [
+	PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0.2, have_sndfile=yes, have_sndfile=no)
+])
+AS_IF([ test "x$enable_sndfile" = xyes && test "x$have_sndfile" = xno ], [
+	AC_MSG_FAILURE([--enable-libsndfile was given, but test for libsndfile failed])
+])
+AS_IF([ test "x$have_sndfile" = xyes], [
+	AC_DEFINE([HAVE_SNDFILE], [1], [Define if libsndfile is enabled])
+	enable_sndfile=yes
+])
+AC_SUBST(SNDFILE_CFLAGS)
+AC_SUBST(SNDFILE_LIBS)
+AC_SUBST(enable_sndfile)
+
+AC_ARG_ENABLE([pulseaudio], AS_HELP_STRING([--enable-pulseaudio], [enable using pulseaudio for audio input (default: enabled)]))
 AS_IF([ test "x$enable_pulseaudio" != xno ], [
 	PKG_CHECK_MODULES([PULSE], [libpulse], [have_pulse=yes], [have_pulse=no])
 ])

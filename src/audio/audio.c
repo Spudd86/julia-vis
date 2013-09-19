@@ -6,10 +6,28 @@
 #include "audio-private.h"
 #include "beat.h"
 
-#ifdef FFT_TRIBUF
-#undef FFT_TRIBUF
-#define FFT_RINGBUF 1
-#endif
+/*TODO: split this into a backend that does driver init and partial buffer management
+ * (ie: makes sure we always get data in chunks that we exepct), and a second part
+ * that has the callback that does the fft/triplebuffering management
+ * preferably even more split up than that so we can run the audio test app
+ * with just a ring buffer in the audio driver callback and re-use the 
+ * fft setup/windowing/calculation code and call to beat detection, but avoid 
+ * tying that to the triple buffer updates
+ *
+ * also need to convert to a context thing and stop using global variables
+ *
+ * want all that stuff so we can drive a software render at fixed framerate
+ * from the audio clock in a gstreamer pipeline or something like that.
+ *
+ * Also want to avoid having to do #if FFT_RINGBUF so that we can
+ * actually use make properly, basically want audio-test to be able to
+ * set things up so that it just gets audio samples from a ringbuffer and does
+ * all it's fft and beat detection in the main thread, but all the other code
+ * can continue the way it is now with the fft/beat detection happening in
+ * the audio thread, all while also supporting the use case of the gst pipeline too
+ *
+ * basically we need to overhaul the structure of this code completely
+ */
 
 int buf_count = 0;
 static int nr_samp = 0;
@@ -96,31 +114,6 @@ void audio_update(const float * __attribute__ ((aligned (16))) in, int n)
 	float *samps = NULL;
 	int remain = 0;
 
-#if 0
-	if(bufp == 0 && n == nr_samp) {
-		samps  = tribuf_get_write(samp_tb);
-		memcpy(samps, in, sizeof(float)*nr_samp);
-		tribuf_finish_write(samp_tb);
-	} else {
-		if(bufp == 0) cur_buf = tribuf_get_write(samp_tb);
-
-		samps = cur_buf;
-	
-		int cpy = MIN(n, nr_samp-bufp);
-		memcpy(samps+bufp, in, sizeof(float)*cpy);
-		remain = n - cpy;
-		in += cpy;
-		bufp = (bufp + cpy)%nr_samp;
-		if(bufp == 0) {
-			cur_buf = NULL;
-			tribuf_finish_write(samp_tb);
-		} else return;
-	}
-	
-	//TODO: lapped transform?
-	buf_count++;
-	beat_ctx_update(gbl_beat_ctx, do_fft(samps, samps+nr_samp/2), nr_samp/2);
-#else
 	if(bufp == 0 && n == nr_samp/2) {
 		samps  = tribuf_get_write(samp_tb);
 		memcpy(samps, in, sizeof(float)*nr_samp/2);
@@ -144,8 +137,6 @@ void audio_update(const float * __attribute__ ((aligned (16))) in, int n)
 	buf_count++;
 	beat_ctx_update(gbl_beat_ctx, do_fft(samps, prev_buf), nr_samp/2);
 	prev_buf = samps;
-	
-#endif
 
 	if(remain > 0) audio_update(in, remain);
 }
@@ -231,6 +222,12 @@ int audio_init(const opt_data *od)
 		case AUDIO_PORTAUDIO:
 			rc = audio_setup_pa(od);
 			audio_drv_shutdown = audio_stop_pa;
+			break;
+	#endif
+	#ifdef HAVE_SNDFILE
+		case AUDIO_SNDFILE:
+			rc = filedecode_setup(od);
+			audio_drv_shutdown = filedecode_shutdown;
 			break;
 	#endif
 		default:

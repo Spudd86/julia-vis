@@ -51,6 +51,9 @@ static const char *helpstr =
 #ifdef HAVE_PULSE
 "\t\t  pulse: use pulseaudio, takes a source name\n"
 #endif
+#ifdef HAVE_SNDFILE
+"\t\t  file: use libsndfile, takes file name to read from\n"
+#endif
 ;
 
 //TODO: use getopt_long
@@ -72,10 +75,12 @@ void optproc(int argc, char **argv, opt_data *res)
 
 	res->quality = 0;
 
-#ifdef HAVE_PULSE
+#if HAVE_PULSE
 	res->audio_driver = AUDIO_PULSE;
-#else
+#elif HAVE_PORTAUDIO
 	res->audio_driver = AUDIO_PORTAUDIO;
+#else
+	res->audio_driver = AUDIO_NONE
 #endif
 	res->audio_opts = NULL;
 	res->gl_opts = NULL;
@@ -127,7 +132,6 @@ void optproc(int argc, char **argv, opt_data *res)
 				char *drvstr = strdup(optarg);
 				char *drvopt = strchr(drvstr, ':');
 				if(drvopt != NULL) { *drvopt = '\0'; drvopt++;}
-//				printf("driver = '%s'\n", drvstr);
 				res->audio_opts = drvopt;
 				if(0) ;
 #ifdef HAVE_PORTAUDIO
@@ -139,7 +143,13 @@ void optproc(int argc, char **argv, opt_data *res)
 #ifdef HAVE_JACK
 				else if(!strcmp(drvstr, "jack")) res->audio_driver = AUDIO_JACK;
 #endif
-				else fprintf(stderr, "Bad audio driver name %s, using default\n", drvstr);
+#ifdef HAVE_SNDFILE
+				else if(!strcmp(drvstr, "file")) res->audio_driver = AUDIO_SNDFILE;
+#endif
+				else {
+					res->audio_opts = NULL;
+					fprintf(stderr, "Bad audio driver name %s, using default\n", drvstr);
+				}
 			} break;
 			case 's':
 				res->draw_rate = atoi(optarg);

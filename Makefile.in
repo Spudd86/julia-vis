@@ -27,6 +27,7 @@ INSTALL = @INSTALL@
 ENABLE_JACK=@enable_jack@
 ENABLE_PULSE=@enable_pulseaudio@
 ENABLE_PORTAUDIO=@enable_portaudio@
+ENABLE_SNDFILE=@enable_sndfile@
 ENABLE_GL=@enable_opengl@
 ENABLE_EGL=@enable_egl@
 
@@ -34,7 +35,7 @@ ENABLE_EGL=@enable_egl@
 
 CFLAGS += -Wall -Wextra -fno-strict-aliasing -fsingle-precision-constant 
 #-Wunsafe-loop-optimizations 
-CFLAGS += -I "./src" 
+CFLAGS += -I "./src" -I "./tinycthread"
 
 #TODO: split orc flags out like everyting else
 ifeq (@enable_orc@,yes)
@@ -70,6 +71,7 @@ CFLAGS += -Wl,--as-needed
 PA_FLAGS = @PORTAUDIO_CFLAGS@ @PORTAUDIO_LIBS@ @FFTW_CFLAGS@ @FFTW_LIBS@
 JACK_FLAGS = @JACK_CFLAGS@ @JACK_LIBS@
 PULSE_FLAGS = @PULSE_CFLAGS@ @PULSE_LIBS@
+SNDFILE_FLAGS = @SNDFILE_CFLAGS@ @SNDFILE_LIBS@
 AUDIO_FLAGS = $(PA_FLAGS) $(JACK_FLAGS) $(PULSE_FLAGS)
 SDL_FLAGS = @SDL_CFLAGS@ @SDL_LIBS@
 GL_CFLAGS = @GL_CFLAGS@ @GLU_CFLAGS@
@@ -105,6 +107,9 @@ AUDIO_SRCS += src/audio/pulseaudio.c
 endif
 ifeq ($(ENABLE_PORTAUDIO),yes)
 AUDIO_SRCS += src/audio/portaudio.c
+endif
+ifeq ($(ENABLE_SNDFILE),yes)
+AUDIO_SRCS += src/audio/filedecode.c tinycthread/tinycthread.c
 endif
 
 AUDIO_OBJS = $(AUDIO_SRCS:.c=.o)
@@ -192,11 +197,14 @@ bin/sdlthread-test$(EXEEXT): src/software/sdl-thread.c src/sdl-misc.c $(COMMON_S
 	$(SDL_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
 bin/audio-test$(EXEEXT): $(AUDIO_SRCS) src/audio/test.c src/sdl-misc.c src/terminusIBM.c src/optproc.c $(TRIBUF_SRCS) src/audio/rb.c src/software/line.c
-	$(CC) $(CFLAGS) -DFFT_TRIBUF -DUSE_SDL \
+	$(CC) $(CFLAGS) -DFFT_RINGBUF -DUSE_SDL \
 	$(AUDIO_SRCS) src/audio/test.c src/sdl-misc.c src/terminusIBM.c src/optproc.c $(TRIBUF_SRCS) src/audio/rb.c src/software/line.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
 -include $(DEPS)
+
+tinycthread/%.o: tinycthread/%.c Makefile config.mk
+	$(CC) @CFLAGS@ @CPPFLAGS@ -c $< -o $@
 
 src/audio/%.o: src/audio/%.c Makefile config.mk
 	$(CC) $(CFLAGS) $(AUDIO_FLAGS) -c $< -o $@

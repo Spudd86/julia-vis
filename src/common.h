@@ -93,7 +93,7 @@ typedef bool _Bool
 			__FILE__, __func__, __FILE__, __LINE__, type); \
 		fprintf(stderr, msg, ## __VA_ARGS__); } while (0)
 
-typedef enum { AUDIO_PORTAUDIO, AUDIO_PULSE, AUDIO_JACK } opt_audio_drv;
+typedef enum { AUDIO_NONE, AUDIO_PORTAUDIO, AUDIO_PULSE, AUDIO_JACK, AUDIO_SNDFILE } opt_audio_drv;
 
 typedef struct opt_data {
 	int w, h;

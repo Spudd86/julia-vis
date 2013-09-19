@@ -20,6 +20,8 @@ void pulse_shutdown(void) {
 //TODO: listen for when the default sink changes and try to grab it's
 // monitor instead of the one we already have
 
+//TODO: clean this up to deal with errors better
+
 
 static void stream_read_callback(pa_stream *s, size_t length, void *userdata)
 { (void)userdata;

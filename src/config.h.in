@@ -48,6 +48,9 @@
 /* Define if pulseaudio is enabled */
 #undef HAVE_PULSE
 
+/* Define if libsndfile is enabled */
+#undef HAVE_SNDFILE
+
 /* Define to 1 if stdbool.h conforms to C99. */
 #undef HAVE_STDBOOL_H
 

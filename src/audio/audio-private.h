@@ -12,6 +12,8 @@ int jack_setup(const opt_data *);
 void jack_shutdown(void);
 int pulse_setup(const opt_data *);
 void pulse_shutdown(void);
+int filedecode_setup(const opt_data *od);
+void filedecode_shutdown(void);
 
 /**
  * set up interal audio stuff, should be called by driver
