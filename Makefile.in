@@ -33,7 +33,14 @@ ENABLE_EGL=@enable_egl@
 
 -include config.mk
 
-CFLAGS += -Wall -Wextra -fno-strict-aliasing -fsingle-precision-constant 
+CFLAGS += -Wall -Wextra -Wdouble-promotion \
+	-Wnested-externs -Wpointer-arith \
+	-Wsign-compare -Wchar-subscripts \
+	-Wstrict-prototypes -Wshadow \
+	-Wformat-security -Wtype-limits \
+	-Wcast-qual -Wwrite-strings -Wconversion -Wlogical-op -Waggregate-return \
+	-Wstrict-prototypes -Wunsuffixed-float-constants \
+	-fno-strict-aliasing 
 #-Wunsafe-loop-optimizations 
 CFLAGS += -I "./src" -I "./tinycthread"
 
@@ -68,7 +75,7 @@ CFLAGS += -Wl,--as-needed
 
 #CFLAGS := $(shell ./gcc-optioncheck $(CFLAGS))
 
-PA_FLAGS = @PORTAUDIO_CFLAGS@ @PORTAUDIO_LIBS@ @FFTW_CFLAGS@ @FFTW_LIBS@
+PA_FLAGS = @PORTAUDIO_CFLAGS@ @PORTAUDIO_LIBS@
 JACK_FLAGS = @JACK_CFLAGS@ @JACK_LIBS@
 PULSE_FLAGS = @PULSE_CFLAGS@ @PULSE_LIBS@
 SNDFILE_FLAGS = @SNDFILE_CFLAGS@ @SNDFILE_LIBS@
@@ -91,7 +98,7 @@ ifeq ($(ENABLE_EGL),yes)
 	ALL_BINS += bin/egl-test$(EXEEXT)
 endif
 
-AUDIO_SRCS = src/audio/audio.c src/audio/beat.c
+AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/fft.c
 
 COMMON_SRCS = src/terminusIBM.c src/isaac/isaac.c src/pallet.c src/optproc.c src/points.c
 

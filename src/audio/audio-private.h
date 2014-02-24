@@ -21,4 +21,6 @@ void filedecode_shutdown(void);
  */
 int audio_setup(int sr);
 
+void audio_update(const float *in, int n);
+
 #endif /* include guard */

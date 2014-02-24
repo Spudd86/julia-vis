@@ -2,7 +2,10 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.61])
-AC_INIT([julia-opengl], [0.1], [BUG-REPORT-ADDRESS])
+AC_INIT([julia-vis], [0.1], [BUG-REPORT-ADDRESS], [julia-vis], [http://github.com/Spudd86/julia-vis])
+AC_PROG_CC_C99
+AC_USE_SYSTEM_EXTENSIONS
+AC_SYS_LARGEFILE
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_SRCDIR([src/optproc.c])
 
@@ -30,8 +33,6 @@ if test "x$enable_3dnow" = xyes; then
 fi
 
 # Checks for programs.
-AC_PROG_CC
-AC_PROG_CC_C99
 
 AC_C_CONST
 AC_TYPE_SIZE_T
@@ -41,10 +42,6 @@ AC_CHECK_LIB([m], [sqrt]) #see if libm exists, if it does we probably need it
 PKG_CHECK_MODULES([SDL], [sdl])
 AC_SUBST(SDL_CFLAGS)
 AC_SUBST(SDL_LIBS)
-
-PKG_CHECK_MODULES([FFTW], [fftw3f])
-AC_SUBST(FFTW_CFLAGS)
-AC_SUBST(FFTW_LIBS)
 
 #TODO: default to enabled on windows
 AC_ARG_ENABLE([portaudio], AS_HELP_STRING([--enable-portaudio], [enable using portaudio for audio input (default: disabled)]))
@@ -199,3 +196,20 @@ AC_FUNC_MMAP
 AC_CONFIG_FILES(Makefile, echo timestamp > stamp-h)
 
 AC_OUTPUT
+AC_MSG_RESULT([
+        $PACKAGE $VERSION
+        =====
+
+        prefix:                 ${prefix}
+        sysconfdir:             ${sysconfdir}
+        libdir:                 ${libdir}
+        includedir:             ${includedir}
+
+        compiler:               ${CC}
+        cflags:                 ${CFLAGS}
+        ldflags:                ${LDFLAGS}
+
+        logging:                ${enable_logging}
+        debug:                  ${enable_debug}
+])
+#TODO: add outputs about enabled features and discovered libs

@@ -101,22 +101,28 @@ int main(int argc, char **argv)
 	beat_ctx *beat_ctx = beat_new();
 	int beat_nbands = beat_ctx_bands(beat_ctx);
 
+	Uint32 now = SDL_GetTicks();
+	audio_data d;
 	while(SDL_PollEvent(&event) >= 0)
 	{
 		if(event.type == SDL_QUIT
 			|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE))
 			break;
 		
+		//int delay =  (tick0 + frmcnt*10000/982) - now;
+		int delay =  (tick0 + frmcnt*10000/491) - now;
+		if(delay > 0) SDL_Delay(delay);
+		
 		//TODO: when we get new buffers make sure we process all of them before we attempt
 		// to actually update the front buffer, so that if we're running slow we don't
 		// waste time drawing frames that won't be seen
 
 		int avpx = audio_get_buf_count() % im_w;
-		while(ovpx == avpx) { //SDL_Delay(0);
-			avpx = audio_get_buf_count() % im_w;
-		}
-		int vpx = 0, beat_count = 0;
-		audio_data d;
+		//if(ovpx == avpx) continue;
+		//while(ovpx == avpx) { //SDL_Delay(0);
+		//	avpx = audio_get_buf_count() % im_w;
+		//}
+		int vpx = ovpx;
 		
 		while (ovpx != avpx) {
 			vpx = (ovpx+1) % im_w;
@@ -127,7 +133,7 @@ int main(int argc, char **argv)
 			audio_get_fft(&d);
 		
 			beat_ctx_update(beat_ctx, d.data, d.len);
-			beat_count = beat_ctx_count(beat_ctx);
+			int beat_count = beat_ctx_count(beat_ctx);
 		
 			for(int b=0; b < 16; b++) {
 				float samp = getsamp(d.data, d.len, b*d.len/(beat_nbands*2), d.len/(beat_nbands*4));
@@ -207,19 +213,15 @@ int main(int argc, char **argv)
 		if(SDL_MUSTLOCK(screen)) SDL_UnlockSurface(screen);
 
 		char buf[128];
-		sprintf(buf,"%6.1f FPS %4i beats %6.1f", 1000.0f / frametime, beat_count, beat_throb);
+		sprintf(buf,"%6.1f FPS %6.1f", 1000.0f / frametime, beat_throb);
 		DrawText(screen, buf);
 
 		SDL_Flip(screen);
 
 		frmcnt++;
-		Uint32 now = SDL_GetTicks();
+		now = SDL_GetTicks();
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		fps_oldtime = now;
-		
-		//int delay =  (tick0 + frmcnt*10000/982) - now;
-		int delay =  (tick0 + frmcnt*10000/491) - now;
-		if(delay > 0) SDL_Delay(delay);
 	}
 
 	SDL_FreeSurface(voice_print);

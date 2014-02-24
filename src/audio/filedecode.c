@@ -4,10 +4,17 @@
 #include "audio-private.h"
 
 #if __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_THREADS__)
+// assume that if we have threads.h we also have timespec_get() since there's
+// no way to test for that here... though we could test for it with autoconf
 #	include <time.h>
 #	include <threads.h>
 #else
 #	include "tinycthread.h"
+// timespec_get doesn't seem to be defined by glibc yet
+// so we must use clock_gettime
+// overall we would prefer using CLOCK_MONOTONIC anyway... but that's not portably
+// an option
+#	define timespec_get(tsptr, clk) clock_gettime(clk, tsptr)
 #endif
 
 #include <sndfile.h>
@@ -59,12 +66,6 @@ void filedecode_shutdown(void)
 
 //TODO: check if we are on Linux and use CLOCK_MONOTONIC if we are
 
-// timespec_get doesn't seem to be defined by glibc yet
-// so we must use clock_gettime
-// overall we would prefer using CLOCK_MONOTONIC anyway... but that's not portably
-// an option
-#define timespec_get(tsptr, clk) clock_gettime(clk, tsptr)
-
 //TODO: more complex buffering?
 static int decode_thread(void *parm)
 {
@@ -75,8 +76,7 @@ static int decode_thread(void *parm)
 	while(running) {
 		sf_count_t readcount = sf_readf_float(infile, data, BUFFER_LEN);
 		if(readcount == 0) {
-			//TODO: loop
-			return 1;
+			if(sf_seek(infile, 0, SEEK_SET) < 0) return 1;
 		}
 		
 		frms_sent += readcount;
