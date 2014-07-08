@@ -31,18 +31,18 @@ ENABLE_SNDFILE=@enable_sndfile@
 ENABLE_GL=@enable_opengl@
 ENABLE_EGL=@enable_egl@
 
--include config.mk
-
 CFLAGS += -Wall -Wextra -Wdouble-promotion \
 	-Wnested-externs -Wpointer-arith \
 	-Wsign-compare -Wchar-subscripts \
 	-Wstrict-prototypes -Wshadow \
 	-Wformat-security -Wtype-limits \
-	-Wcast-qual -Wwrite-strings -Wconversion -Wlogical-op -Waggregate-return \
-	-Wstrict-prototypes -Wunsuffixed-float-constants \
+	-Wcast-qual -Wwrite-strings -Wlogical-op -Waggregate-return \
+	-Wunsuffixed-float-constants \
 	-fno-strict-aliasing 
-#-Wunsafe-loop-optimizations 
+#-Wunsafe-loop-optimizations -Wconversion -Wstrict-prototypes 
 CFLAGS += -I "./src" -I "./tinycthread"
+
+-include config.mk
 
 #TODO: split orc flags out like everyting else
 ifeq (@enable_orc@,yes)
@@ -55,7 +55,8 @@ else
 	CFLAGS += -DNDEBUG
 	CFLAGS += -g -O2 -finline-functions -maccumulate-outgoing-args -fdelete-null-pointer-checks 
 	CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller
-	CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear -funsafe-loop-optimizations 
+	#CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear 
+	CFLAGS += -funsafe-loop-optimizations 
 	CFLAGS += -fgcse-las -fgcse-sm -fmodulo-sched 
 	CFLAGS += -fmerge-all-constants
 

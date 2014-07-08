@@ -45,23 +45,23 @@ AC_SUBST(SDL_LIBS)
 
 #TODO: default to enabled on windows
 AC_ARG_ENABLE([portaudio], AS_HELP_STRING([--enable-portaudio], [enable using portaudio for audio input (default: disabled)]))
-if test "x$enable_portaudio" = xyes; then
+AS_IF([ test "x$enable_portaudio" = xyes ], [
 PKG_CHECK_MODULES([PORTAUDIO], [portaudio-2.0],
 		[AC_DEFINE([HAVE_PORTAUDIO], [1], [Define if portaudio is enabled])],
 		[AC_MSG_FAILURE([--enable-portaudio was given, but test for portaudio failed])]
 	)
-fi
+])
 AC_SUBST(PORTAUDIO_CFLAGS)
 AC_SUBST(PORTAUDIO_LIBS)
 AC_SUBST(enable_portaudio)
 
 AC_ARG_ENABLE([jack], AS_HELP_STRING([--enable-jack], [enable using jack for audio input (default: disabled)]))
-if test "x$enable_jack" = xyes; then
+AS_IF([ test "x$enable_jack" = xyes ], [
 	PKG_CHECK_MODULES([JACK], [jack],
 		[AC_DEFINE([HAVE_JACK], [1], [Define if jack is enabled])],
 		[AC_MSG_FAILURE([--enable-jack was given, but test for jack failed])]
 	)
-fi
+])
 AC_SUBST(JACK_CFLAGS)
 AC_SUBST(JACK_LIBS)
 AC_SUBST(enable_jack)
@@ -133,36 +133,37 @@ fi
 AC_SUBST(enable_kms)
 
 AS_IF([ test "x$enable_opengl" = xyes], [
-	AC_ARG_ENABLE([egl], AS_HELP_STRING([--disable-egl], [enable egl based versions (default: enabled)]))
-	if test "x$enable_egl" != xno; then
+	AC_ARG_ENABLE([egl], AS_HELP_STRING([--enabled-egl], [enable egl based versions (default: automatic)]))
+	AS_IF([ test "x$enable_egl" != xno], [
+		PKG_CHECK_MODULES([EGL], [egl], [have_egl=yes], [have_egl=no])
+	])
+	AS_IF([ test "x$enable_egl" = xyes && test "x$have_egl" = xno ], [
+		AC_MSG_FAILURE([--enable-egl was given, but test for egl failed])
+	])
+	AS_IF([ test "x$have_egl" = xyes], [
+		AC_DEFINE([HAVE_EGL], [1], [Define if we have egl])
 		enable_egl=yes
-	fi
+	])
 	AC_SUBST(enable_egl)
-	
-	if test "x$enable_egl" = xyes; then
-		PKG_CHECK_MODULES([EGL], [egl],
-		    [AC_DEFINE([HAVE_EGL], [1], [Define if we have egl])],
-		    [AC_MSG_FAILURE([--enable-egl was given, but test for egl failed (old egl?)])])
-	fi
 	AC_SUBST(EGL_CFLAGS)
 	AC_SUBST(EGL_LIBS)
 ])
 
-if test "x$enable_kms" = xyes; then
+AS_IF([ test "x$enable_kms" = xyes ], [
 	PKG_CHECK_MODULES(GBM, [gbm], [gbm_enabled=yes], [gbm_enabled=no])
 	PKG_CHECK_MODULES(DRM, [libdrm], [drm_enabled=yes], [drm_enabled=no])
-fi
+])
 AC_SUBST(GBM_CFLAGS)
 AC_SUBST(GBM_LIBS)
 AC_SUBST(DRM_CFLAGS)
 AC_SUBST(DRM_LIBS)
 
 AC_ARG_ENABLE([orc], AS_HELP_STRING([--enable-orc], [enable using orc (default: disabled)]))
-if test "x$enable_orc" = xyes; then
+AS_IF([ test "x$enable_orc" = xyes ], [
 	PKG_CHECK_MODULES([ORC], [orc-0.4], 
 		[AC_DEFINE([HAVE_ORC], [1], [Define if we have orc])],
 		[AC_MSG_FAILURE([--enable-orc was given, but test for orc failed])])
-fi
+])
 AC_SUBST(ORC_CFLAGS)
 AC_SUBST(ORC_LIBS)
 AC_SUBST(enable_orc)
