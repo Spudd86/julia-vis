@@ -8,6 +8,7 @@ autom4te.cache/*
 config.log
 config.status
 configure
+aclocal.m4
 stamp-h
 stamp-h.in
 src/config.h
