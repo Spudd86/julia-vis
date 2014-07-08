@@ -222,9 +222,9 @@ int audio_setup(int sr)
 	fft_tmp = malloc(sizeof(float) * nr_samp); // do xform in place
 	if(!fft_tmp) abort();
 
-	samp_data[0] = samp_bufs;
-	samp_data[1] = samp_data[0] + MAX_SAMP;
-	samp_data[2] = samp_data[1] + MAX_SAMP;
+	samp_data[0] = samp_bufs + MAX_SAMP*0;
+	samp_data[1] = samp_bufs + MAX_SAMP*1;
+	samp_data[2] = samp_bufs + MAX_SAMP*2;
 	memset(samp_data[0], 0, sizeof(float) * MAX_SAMP * 3);
 	samp_tb = tribuf_new(samp_data, 0);
 
