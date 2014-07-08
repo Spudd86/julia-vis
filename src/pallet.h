@@ -22,6 +22,6 @@ struct pal_lst {
 	int numpals;
 	uint32_t pallets[][256];
 };
-struct pal_lst * pallet_get_palettes();
+struct pal_lst * pallet_get_palettes(void);
 
 #endif /* include guard */

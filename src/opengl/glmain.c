@@ -12,7 +12,7 @@
 #include "glpallet.h"
 #include "glfract.h"
 
-void init_mandel();
+void init_mandel(void);
 void render_mandel(struct point_data *pd);
 
 static int make_pow2(int x) {
@@ -72,13 +72,13 @@ static const char *gl_debug_msg_severity[] = {
 	"High", "Medium", "Low"
 };
 
-static void GLAPIENTRY gl_debug_callback(GLenum source,
-                                         GLenum type,
-                                         GLuint id,
-                                         GLenum severity,
-                                         GLsizei length,
-                                         const GLchar* message,
-                                         GLvoid* parm)
+static void gl_debug_callback(GLenum source,
+                              GLenum type,
+                              GLuint id,
+                              GLenum severity,
+                              GLsizei length,
+                              const GLchar* message,
+                              GLvoid* parm)
 {(void)length;(void)parm;
 	fprintf(stderr,
 	        "Source:%s\tType:%s\tID:%d\tSeverity:%s\tMessage:%s\n", 
@@ -275,12 +275,12 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	
 	if(show_fps_hist) { DEBUG_CHECK_GL_ERR;
 		glPushMatrix();
-		glScalef(0.5, 0.25, 1);
+		glScalef(0.5f, 0.25f, 1);
 		glTranslatef(-2, 3, 0);
 		draw_hist_array(cnt, FPS_HIST_LEN/(8.0f*totframetime), frametimes, FPS_HIST_LEN);
 		glPopMatrix();
 		glPushMatrix();
-		glScalef(0.5, 0.25, 1);
+		glScalef(0.5f, 0.25f, 1);
 		glTranslatef(1, 3, 0);
 		draw_hist_array(cnt, FPS_HIST_LEN/(8.0f*totworktime), worktimes, FPS_HIST_LEN);
 		glPopMatrix();
@@ -289,11 +289,11 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 		glRasterPos2f(-1,1 - 20.0f/(scr_h*0.5f));
 		sprintf(buf,"%6.1f FPS %6.1f", FPS_HIST_LEN*1000000.0f/totframetime, maxfrms*1000000.0f/(now-tick0));
 		draw_string(buf); DEBUG_CHECK_GL_ERR;
-		glRasterPos2f(-1,0.75-20.0f/(scr_h*0.5f));
+		glRasterPos2f(-1,0.75f-20.0f/(scr_h*0.5f));
 		sprintf(buf,"%7.1fns frametime\n%7.1fns worktime\n", totframetime/((float)FPS_HIST_LEN), totworktime/((float)FPS_HIST_LEN));
 		draw_string(buf); DEBUG_CHECK_GL_ERR;
 	} else {
-		glRasterPos2f(-1,0.75-20.0f/(scr_h*0.5f));
+		glRasterPos2f(-1,0.75f-20.0f/(scr_h*0.5f));
 	}
 
 	render_debug_overlay();

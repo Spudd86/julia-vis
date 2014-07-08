@@ -359,7 +359,7 @@ void* tribuf_get_read(tribuf *tb)
 }
 
 void tribuf_finish_read(tribuf *tb) // NOOP with debugging off
-{
+{(void)tb;
 	user_debug_unlock(tb, read);
 }
 

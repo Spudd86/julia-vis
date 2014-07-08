@@ -25,8 +25,8 @@ static inline float mycosf(float x)
 	float y = ((2.443315711809948E-005f * z 
 	           - 1.388731625493765E-003f) * z
 	           + 4.166664568298827E-002f) * z * z;
-	y -= 0.5 * z;
-	y += 1.0;
+	y -= 0.5f * z;
+	y += 1.0f;
 	return y;
 }
 

@@ -94,7 +94,7 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
-		float xt = (i - (samp-1)/2.0f)*(1.0f/(samp-1));
+		float xt = (float)i/(float)(2*(samp - 1)) - 0.5f; // (i - (samp-1)/2.0f)*(1.0f/(samp-1));
 		float yt = 0.2f*s;
 		float zt = 0.0f;
 
@@ -137,11 +137,11 @@ static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_sr
 {
 	const int ipx = lrintf(px*256), ipy = lrintf(py*256);
 	//const int ipx = (int)truncf(px*256), ipy = (int)truncf(py*256); // want to round towards zero
-	uint yf = ipy&0xff, xf = ipx&0xff;
-	uint a00 = (yf*xf);
-	uint a01 = (yf*(256-xf));
-	uint a10 = ((256-yf)*xf);
-	uint a11 = ((256-yf)*(256-xf));
+	unsigned int yf = ipy&0xff, xf = ipx&0xff;
+	unsigned int a00 = (yf*xf);
+	unsigned int a01 = (yf*(256-xf));
+	unsigned int a10 = ((256-yf)*xf);
+	unsigned int a11 = ((256-yf)*(256-xf));
 
 	unsigned int off = (ipy/256)*iw + ipx/256;
 

@@ -14,7 +14,7 @@ static GLuint mandel_tex;
 
 
 static inline __attribute__((always_inline)) double sqrd(double x) {return x*x;}
-void init_mandel()
+void init_mandel(void)
 {
 	mandel_surf = malloc(sizeof(Pixbuf));
 	mandel_surf->w = mandel_surf->h = 1024;
@@ -53,19 +53,19 @@ void render_mandel(struct point_data *pd)
 {
 	glBindTexture(GL_TEXTURE_2D, mandel_tex);
 	glBegin(GL_TRIANGLE_STRIP);
-		glTexCoord2d(0.0,1.0); glVertex2f(0.0f,  1.0f);
-		glTexCoord2d(1.0,1.0); glVertex2f(1.0f,  1.0f);
-		glTexCoord2d(0.0,0.0); glVertex2f(0.0f,  0.0f);
-		glTexCoord2d(1.0,0.0); glVertex2f(1.0f,  0.0f);
+		glTexCoord2d(0.0f, 1.0f); glVertex2f(0.0f,  1.0f);
+		glTexCoord2d(1.0f, 1.0f); glVertex2f(1.0f,  1.0f);
+		glTexCoord2d(0.0f, 0.0f); glVertex2f(0.0f,  0.0f);
+		glTexCoord2d(1.0f, 0.0f); glVertex2f(1.0f,  0.0f);
 	glEnd();
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glPointSize(2);
 	glBegin(GL_POINTS);
 		glColor3f(0.0f, 1.0f, 0.0f);
-		glVertex2d((pd->p[0]+1.0)*0.5, 1-(pd->p[1]+1)*0.5);
+		glVertex2d((pd->p[0]+1.0f)*0.5f, 1-(pd->p[1]+1)*0.5f);
 		glColor3f(1.0f, 0.0f, 0.0f);
-		glVertex2d((pd->t[0]+1.0)*0.5, 1-(pd->t[1]+1)*0.5);
+		glVertex2d((pd->t[0]+1.0f)*0.5f, 1-(pd->t[1]+1)*0.5f);
 	glEnd();
 	glColor3f(1.0f, 1.0f, 1.0f);
 }

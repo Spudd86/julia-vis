@@ -5,8 +5,8 @@ static inline float getsamp(const float *data, int len, int i, int w) {
 	float sum = 0, err = 0;
 	int l = IMAX(i-w, 0);
 	int u = IMIN(i+w, len);
-	for(int i = l; i < u; i++) { // TODO: disable fast math
-		float y = data[i] + err;
+	for(int j = l; j < u; j++) { // TODO: disable fast math
+		float y = data[j] + err;
 		float t = sum + y;
 		err = (t - sum) - y;
 		sum = t;

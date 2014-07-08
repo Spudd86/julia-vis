@@ -240,8 +240,8 @@ static void pallet_blit565(uint8_t * restrict dest, unsigned int dst_stride,
 					unsigned int w, unsigned int h,
 					const uint32_t *restrict pal)
 {
-	for(int y = 0; y < h; y++) {
-		for(int x = 0; x < w; x++) {
+	for(unsigned int y = 0; y < h; y++) {
+		for(unsigned int x = 0; x < w; x++) {
 			uint32_t cl = pal[src[y*src_stride + x]>>8];
 			uint16_t px = (cl>>3)&0x1f;
 			px = px | (((cl>>10)&0x3f)<<5);
@@ -255,8 +255,8 @@ static void pallet_blit555(uint8_t * restrict dest, unsigned int dst_stride,
 					unsigned int w, unsigned int h,
 					const uint32_t *restrict pal)
 {
-	for(int y = 0; y < h; y++) {
-		for(int x = 0; x < w; x++) {
+	for(unsigned int y = 0; y < h; y++) {
+		for(unsigned int x = 0; x < w; x++) {
 			uint32_t cl = pal[src[y*src_stride + x]>>8];
 			uint16_t px = (cl>>3)&0x1f;
 			px = px | (((cl>>11)&0x1f)<<5);
@@ -301,15 +301,15 @@ static void pallet_blit8(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h)
 {
-	for(int y = 0; y < h; y++)
-		for(int x = 0; x < w; x++)
+	for(unsigned int y = 0; y < h; y++)
+		for(unsigned int x = 0; x < w; x++)
 			*(dest + y*dst_stride + x*4) = src[y*src_stride + x]>>8;
 }
 #endif
 
 void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal)
 {
-	const int src_stride = w;
+	const unsigned  int src_stride = w;
 	w = IMIN(w, dst->w);
 	h = IMIN(h, dst->h);
 
@@ -328,7 +328,7 @@ void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h,
 #include <SDL.h>
 void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal)
 {
-	const int src_stride = w;
+	const unsigned int src_stride = w;
 	w = IMIN(w, dst->w);
 	h = IMIN(h, dst->h);
 

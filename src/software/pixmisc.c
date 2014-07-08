@@ -91,7 +91,7 @@ void maxblend(void *restrict dest, const void *restrict src, int w, int h)
 void maxblend(void *restrict dest, const void *restrict src, int w, int h)
 {
 	const int n = w*h;
-	uint16_t *restrict d=dest, *restrict s=src;
+	uint16_t *restrict d=dest; const uint16_t *restrict s=src;
 	for(int i=0; i<n; i++) 
 		d[i] = MAX(d[i], s[i]);
 }

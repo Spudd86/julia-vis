@@ -18,7 +18,7 @@ struct beat_ctx {
 	float E[BANDS];
 };
 
-beat_ctx *beat_new() {
+beat_ctx *beat_new(void) {
 	beat_ctx *self = malloc(sizeof(beat_ctx));
 	memset(self, 0, sizeof(beat_ctx));
 	return self;
@@ -58,9 +58,9 @@ void beat_ctx_update(beat_ctx *self, const float *restrict fft, int fft_len)
 
 		
 
-		//float C = -0.0025714*V[b]+1.5142857;
-		//float C = -0.0025714*V[b]+1.5142857*2;
-		float C = -0.00025714*V[b]+1.5142857*2.5;
+		//float C = -0.0025714f*V[b]+1.5142857f;
+		//float C = -0.0025714f*V[b]+1.5142857f*2;
+		float C = -0.00025714f*V[b]+1.5142857f*2.5f;
 		if(tmp > C*E[b] && E[b]>0.002f) {
 			if(self->count - self->lastbeat > 10) {
 				__sync_add_and_fetch(&self->beat_count, 1);

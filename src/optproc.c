@@ -80,7 +80,7 @@ void optproc(int argc, char **argv, opt_data *res)
 #elif HAVE_PORTAUDIO
 	res->audio_driver = AUDIO_PORTAUDIO;
 #else
-	res->audio_driver = AUDIO_NONE
+	res->audio_driver = AUDIO_NONE;
 #endif
 	res->audio_opts = NULL;
 	res->gl_opts = NULL;

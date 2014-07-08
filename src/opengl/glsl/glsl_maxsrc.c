@@ -119,7 +119,7 @@ static void update(struct glmaxsrc_ctx *ctx, const float *audio, int audiolen)
 	DEBUG_CHECK_GL_ERR;
 	offscr_finish_render(ctx->offscr);
 	
-	priv->tx+=0.02*dt; priv->ty+=0.01*dt; priv->tz-=0.003*dt;
+	priv->tx+=0.02f*dt; priv->ty+=0.01f*dt; priv->tz-=0.003f*dt;
 
 	DEBUG_CHECK_GL_ERR;
 }
