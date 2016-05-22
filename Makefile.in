@@ -53,20 +53,21 @@ ifdef DEBUG
 	CFLAGS += -ggdb -O0 
 else
 	CFLAGS += -DNDEBUG
-	CFLAGS += -g -O2 -finline-functions -maccumulate-outgoing-args -fdelete-null-pointer-checks 
-	CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller
+	CFLAGS += -g -O2 
+	#CFLAGS += -finline-functions -maccumulate-outgoing-args -fdelete-null-pointer-checks 
+	#CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller
 	#CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear 
-	CFLAGS += -funsafe-loop-optimizations 
-	CFLAGS += -fgcse-las -fgcse-sm -fmodulo-sched 
-	CFLAGS += -fmerge-all-constants
+	#CFLAGS += -funsafe-loop-optimizations 
+	#CFLAGS += -fgcse-las -fgcse-sm -fmodulo-sched 
+	#CFLAGS += -fmerge-all-constants
 
 # on gcc 4.3 set precsicion of FPU to 32 bits (can get speed up for floats)
 # do this since everywhere inside our code we use only floats
 # -mrecip = let gcc generate the RCPSS and RSQRTSS instructions (fast recipricol)
-	CFLAGS += -mpc32 -mrecip
+	#CFLAGS += -mpc32 -mrecip
 
-	CFLAGS += -fmodulo-sched-allow-regmoves -fgcse-after-reload -fsee -fipa-cp
-	CFLAGS += -fsched-stalled-insns=2 -fsched-stalled-insns-dep=2 -fvect-cost-model -ftracer
+	#CFLAGS += -fmodulo-sched-allow-regmoves -fgcse-after-reload -fsee -fipa-cp
+	#CFLAGS += -fsched-stalled-insns=2 -fsched-stalled-insns-dep=2 -fvect-cost-model -ftracer
 	CFLAGS += -ffast-math  -fassociative-math -freciprocal-math -fno-signed-zeros
 	
 	CFLAGS += -Wl,-O1,--sort-common
@@ -80,7 +81,7 @@ PA_FLAGS = @PORTAUDIO_CFLAGS@ @PORTAUDIO_LIBS@
 JACK_FLAGS = @JACK_CFLAGS@ @JACK_LIBS@
 PULSE_FLAGS = @PULSE_CFLAGS@ @PULSE_LIBS@
 SNDFILE_FLAGS = @SNDFILE_CFLAGS@ @SNDFILE_LIBS@
-AUDIO_FLAGS = $(PA_FLAGS) $(JACK_FLAGS) $(PULSE_FLAGS)
+AUDIO_FLAGS = $(PA_FLAGS) $(JACK_FLAGS) $(PULSE_FLAGS) $(SNDFILE_FLAGS)
 SDL_FLAGS = @SDL_CFLAGS@ @SDL_LIBS@
 GL_CFLAGS = @GL_CFLAGS@ @GLU_CFLAGS@
 GL_LIBS = @GL_LIBS@ @GLU_LIBS@
@@ -134,11 +135,11 @@ run: bin/sdlthread-test
 	bin/sdlthread-test
 
 clean:
-	rm -f src/*.o
-	rm -f bin/dfb-test bin/audio-test bin/sdl-test bin/sdlthread-test bin/gl-test
+	-rm -f src/*.o
+	-rm -f $(ALL_BINS)
 
 distclean: clean
-	rm -f Makefile config.h config.status config.cache config.log configure stamp-h
+	-rm -f Makefile config.h config.status config.cache config.log configure stamp-h
 
 .PHONY: all dfb dfb-run run clean
 

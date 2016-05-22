@@ -3,7 +3,7 @@
 
 AC_PREREQ([2.61])
 AC_INIT([julia-vis], [0.1], [BUG-REPORT-ADDRESS], [julia-vis], [http://github.com/Spudd86/julia-vis])
-AC_PROG_CC_C99
+AC_PROG_CC_STDC
 AC_USE_SYSTEM_EXTENSIONS
 AC_SYS_LARGEFILE
 AC_CONFIG_HEADERS([src/config.h])
@@ -13,7 +13,7 @@ m4_include([m4/ax_check_gl.m4])
 m4_include([m4/ax_check_glu.m4])
 
 AC_USE_SYSTEM_EXTENSIONS
-USE_LANGUAGES=gnu99
+USE_LANGUAGES=gnu11
 
 AC_ARG_ENABLE([mmx], AS_HELP_STRING([--enable-mmx], [enable use of mmx instructions (default: disabled)]))
 if test "x$enable_mmx" = xyes; then
