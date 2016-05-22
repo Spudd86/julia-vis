@@ -29,13 +29,13 @@ struct maxsrc {
 struct maxsrc *maxsrc_new(int w, int h)
 {
 	struct maxsrc *self = calloc(sizeof(*self), 1);
-	
+
 	self->iw = w; self->ih = h;
 	self->samp = IMIN(IMAX(w,h), 1023);
 	printf("maxsrc using %i points\n", self->samp);
-	
+
 	point_init(&self->pnt_src, IMAX(w/24, 8), IMAX(h/24, 8));
-	
+
 #ifdef HAVE_MMAP
 	// use mmap here since it'll give us a nice page aligned chunk (malloc will probably be using it anyway...)
 	self->prev_src = self->buf = mmap(NULL, 2 * w * h * sizeof(uint16_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, 0, 0);
@@ -44,7 +44,7 @@ struct maxsrc *maxsrc_new(int w, int h)
 #endif
 	memset(self->prev_src, 0, 2*w*h*sizeof(uint16_t));
 	self->next_src = self->prev_src + w*h;
-	
+
 	return self;
 }
 
@@ -94,7 +94,7 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
-		float xt = (float)i/(float)(2*(samp - 1)) - 0.5f; // (i - (samp-1)/2.0f)*(1.0f/(samp-1));
+		float xt = (float)i/(float)(samp - 1) - 0.5f; // (i - (samp-1)/2.0f)*(1.0f/(samp-1));
 		float yt = 0.2f*s;
 		float zt = 0.0f;
 
@@ -110,7 +110,7 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 	self->next_src = self->prev_src;
 	self->prev_src = dst;
 
-	self->tx+=0.02; self->ty+=0.01; self->tz-=0.003;
+	self->tx+=0.02f; self->ty+=0.01f; self->tz-=0.003f;
 }
 
 static void point_init(MxSurf *res, int w, int h)
@@ -134,7 +134,7 @@ static void point_init(MxSurf *res, int w, int h)
 #define COORD_M (COORD_R-1)
 
 static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, float px, float py)
-{
+{(void)ih;
 	const int ipx = lrintf(px*256), ipy = lrintf(py*256);
 	//const int ipx = (int)truncf(px*256), ipy = (int)truncf(py*256); // want to round towards zero
 	unsigned int yf = ipy&0xff, xf = ipx&0xff;
@@ -221,26 +221,29 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 				x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
 				y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
 			}
-			const int x1s = (IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256) - x1)/BLOCK_SIZE;
-			const int y1s = (IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256) - y1)/BLOCK_SIZE;
+			const int32_t x1s = (IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256) - x1)/BLOCK_SIZE;
+			const int32_t y1s = (IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256) - y1)/BLOCK_SIZE;
 
-			const int xsts = (x1s - x0s)/BLOCK_SIZE;
-			const int ysts = (y1s - y0s)/BLOCK_SIZE;
-			int xst = (x1 - x0)/BLOCK_SIZE;
-			int yst = (y1 - y0)/BLOCK_SIZE;
+			const int32_t xsts = (x1s - x0s)/BLOCK_SIZE;
+			const int32_t ysts = (y1s - y0s)/BLOCK_SIZE;
+			int32_t xst = (x1 - x0)/BLOCK_SIZE;
+			int32_t yst = (y1 - y0)/BLOCK_SIZE;
 
-			for(int yt=0; yt<BLOCK_SIZE; yt++, x0+=x0s, y0+=y0s, xst += xsts, yst += ysts) {
-				for(int xt=0, x = x0, y = y0; xt<BLOCK_SIZE; xt++, x+=xst, y+=yst) {
-					const int xs=x/256, ys=y/256;
-					const int xf=x&0xFF, yf=y&0xFF;
-					const int xi1 = xs;
-					const int yi1 = ys*w;
-					const int xi2 = IMIN(xi1+1,w-1);
-					const int yi2 = IMIN(yi1+w,(h-1)*w);
+			for(uint32_t yt=0; yt<BLOCK_SIZE; yt++, x0+=x0s, y0+=y0s, xst += xsts, yst += ysts) {
+				for(uint32_t xt=0, x = x0, y = y0; xt<BLOCK_SIZE; xt++, x+=xst, y+=yst) {
+					const uint32_t xs=x/256,  ys=y/256;
+					const uint32_t xf=x&0xFF, yf=y&0xFF;
+					const uint32_t xi1 = xs;
+					const uint32_t yi1 = ys*w;
+					const uint32_t xi2 = IMIN(xi1+1,(unsigned)w-1);
+					const uint32_t yi2 = IMIN(yi1+w, (unsigned)((h-1)*w));
 
-					uint32_t tmp = ((in[yi1 + xi1]*(255 - xf) + in[yi1 + xi2]*xf)*(255-yf) +
-								(in[yi2 + xi1]*(255 - xf) + in[yi2 + xi2]*xf)*yf);
-					out[(yd+yt)*w+xd+xt] = ((255*98/100)*(tmp>>8)) >> 16;
+					// it is critical that this entire calculation be done as uint32s
+					uint32_t tmp = ((in[yi1 + xi1]*(256u - xf) + in[yi1 + xi2]*xf)*(256u-yf) +
+								    (in[yi2 + xi1]*(256u - xf) + in[yi2 + xi2]*xf)*yf) >> 16u;
+
+					tmp = (tmp*((256u*98u)/100u)) >> 8u;
+					out[(yd+yt)*w+xd+xt] = (uint16_t)tmp;
 				}
 			}
 			x0 = x1; y0 = y1;
