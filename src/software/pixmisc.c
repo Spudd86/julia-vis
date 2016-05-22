@@ -12,7 +12,7 @@ void maxblend(void *restrict dest, const void *restrict src, int w, int h)
 		orc_program_append_str(p, "maxuw", "d1", "d1", "s1");
 		orc_program_compile (p);  //TODO: check return value here
 	}
-	
+
 	OrcExecutor _ex;
 	OrcExecutor *ex = &_ex;
 	orc_executor_set_program (ex, p);
@@ -54,7 +54,7 @@ void maxblend(void *restrict dest, const void *restrict src, int w, int h)
 #include "mymm.h"
 void maxblend(void *restrict dest, const void *restrict src, int w, int h)
 {
-	__m64 *mbdst = dest, *mbsrc = src;
+	__m64 *mbdst = dest; const __m64 *mbsrc = src;
 	const __m64 off = _mm_set1_pi16(0x8000);
 	for(unsigned int i=0; i < 2*w*h/sizeof(__m64); i+=4) { // TODO see if the prefeting is helping
 		__builtin_prefetch(&(mbsrc[i+4]), 0, 0); __builtin_prefetch(&(mbdst[i+4]), 1, 0);
@@ -92,7 +92,7 @@ void maxblend(void *restrict dest, const void *restrict src, int w, int h)
 {
 	const int n = w*h;
 	uint16_t *restrict d=dest; const uint16_t *restrict s=src;
-	for(int i=0; i<n; i++) 
+	for(int i=0; i<n; i++)
 		d[i] = MAX(d[i], s[i]);
 }
 #endif

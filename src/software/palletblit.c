@@ -9,11 +9,11 @@
 #include "mymm.h"
 
 
-// pallet must have 257 entries (for easier interpolation on 16 bit indicies)
+// pallet must have 257 entries (for easier interpolation on 16 bit indices)
 // output pix = (pallet[in/256]*(in%256) + pallet[in/256+1]*(255-in%256])/256
 // for each colour component
 
-// the above is not done in 16 bit modes they just do out = pallet[in/256] (and conver the pallet)
+// the above is not done in 16 bit modes they just do out = pallet[in/256] (and convert the pallet)
 
 //TODO: load pallets from files of some sort
 
@@ -30,7 +30,7 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
 			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
 
-			__m64 col1 = *(__m64 *)(pal+(v/256));
+			__m64 col1 = *(const __m64 *)(pal+(v/256));
 			__m64 col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
@@ -47,7 +47,7 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 			__m64 tmp = col1;
 
 			v = src[y*src_stride + x + 1];
-			col1 = *(__m64 *)(pal+(v/256));
+			col1 = *(const __m64 *)(pal+(v/256));
 			col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
@@ -65,7 +65,7 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 			*(__m64 *)(dest + y*dst_stride + x) = tmp;
 
 			v = src[y*src_stride + x + 2];
-			col1 = *(__m64 *)(pal+(v/256));
+			col1 = *(const __m64 *)(pal+(v/256));
 			col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
@@ -81,7 +81,7 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 			tmp = col1;
 
 			v = src[y*src_stride + x + 3];
-			col1 = *(__m64 *)(pal+(v/256));
+			col1 = *(const __m64 *)(pal+(v/256));
 			col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
@@ -103,9 +103,11 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 #else
 static void pallet_blit32(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
 {
-	for(unsigned int y = 0; y < h; y++)
-		for(unsigned int x = 0; x < w; x++)
+	for(unsigned int y = 0; y < h; y++) {
+		for(unsigned int x = 0; x < w; x++) {
 			*(uint32_t *)(dest + y*dst_stride + x*4) = pal[src[y*src_stride + x]>>8];
+		}
+	}
 }
 #endif
 
@@ -278,17 +280,17 @@ static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride,
 
 			__m64 p1, p2;
 
-			p1 = *(__m64 *)(src + y*src_stride + x);
+			p1 = *(const __m64 *)(src + y*src_stride + x);
 			p1  = _mm_srli_pi16(p1, 8);
-			p2 = *(__m64 *)(src + y*src_stride + x+4);
+			p2 = *(const __m64 *)(src + y*src_stride + x+4);
 			p2  = _mm_srli_pi16(p2, 8);
 
 			p1 = _mm_packs_pu16(p1, p2);
 			*(__m64 *)(dest + y*dst_stride + x) = p1;
 
-			p1 = *(__m64 *)(src + y*src_stride + x+8);
+			p1 = *(const __m64 *)(src + y*src_stride + x+8);
 			p1  = _mm_srli_pi16(p1, 8);
-			p2 = *(__m64 *)(src + y*src_stride + x+12);
+			p2 = *(const __m64 *)(src + y*src_stride + x+12);
 			p2  = _mm_srli_pi16(p2, 8);
 
 			p1 = _mm_packs_pu16(p1, p2);
