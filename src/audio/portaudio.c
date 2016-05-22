@@ -36,8 +36,16 @@ int audio_setup_pa(const opt_data *od)
 	printf("Portaudio devices:\n");
 	for(int i=0; i<numdev; i++) {
 		const PaDeviceInfo *di = Pa_GetDeviceInfo(i);
+		const PaHostApiInfo *hapi = Pa_GetHostApiInfo(di->hostApi);
+		PaStreamParameters parms = { i, 1, paFloat32, di->defaultLowInputLatency, NULL};
 		if(i==usedev) printf("*");
 		printf("%i\t%s\n", i, di->name);
+		printf("\t\thost API:     %s\n", hapi->name);
+		printf("\t\tmax channels: %10i\n", di->maxInputChannels);
+		printf("\t\tdefault rate: %8.1f\n", di->defaultSampleRate);
+
+		err = Pa_IsFormatSupported(&parms, NULL, di->defaultSampleRate);
+		printf("\t\tstatus      : %s\n", Pa_GetErrorText(err));
 	}
 
 	const PaDeviceInfo *inf = Pa_GetDeviceInfo(usedev);

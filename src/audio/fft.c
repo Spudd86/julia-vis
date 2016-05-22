@@ -22,7 +22,7 @@ static inline float mysinf(float x)
 static inline float mycosf(float x)
 {
 	float z = x * x;
-	float y = ((2.443315711809948E-005f * z 
+	float y = ((2.443315711809948E-005f * z
 	           - 1.388731625493765E-003f) * z
 	           + 4.166664568298827E-002f) * z * z;
 	y -= 0.5f * z;
@@ -39,7 +39,7 @@ static inline uint32_t revbin(uint32_t v)
 	v = ((v >> 4) & 0x0F0F0F0F) | ((v & 0x0F0F0F0F) << 4);
 	v = ((v >> 8) & 0x00FF00FF) | ((v & 0x00FF00FF) << 8);
 	v = ( v >> 16             ) | ( v               << 16);
-	
+
 	return v;
 }
 
@@ -55,7 +55,7 @@ static inline uint32_t ld(uint32_t v) { // requires v to be a power of two
 static void revbin_permute(float *a, uint32_t n) {
 	const uint32_t nh = n>>1, nm1 = n - 1;
 	uint32_t x = 1, r = 0;
-	
+
 	//const int ldn = 31 - __builtin_clz(n);
 	//const int rev_sft = __builtin_clz(n) + 1;
 	const int rev_sft = 32 - ld(n);
@@ -66,7 +66,7 @@ static void revbin_permute(float *a, uint32_t n) {
 		t = a[x]; a[x] = a[r]; a[r] = t;
 
 		x++;
-		
+
 		r = revbin(x) >> rev_sft;
 		//r = revbin(x) >> (32-ldn);
 		//uint32_t ht=nh; while ( !((r^=ht)&ht) ) ht = ht >> 1; //r = revbin_upd(r, nh);
@@ -144,8 +144,8 @@ void split_radix_real_complex_fft(float *x, uint32_t n)
 
 	                //sumdiff(x[i3], x[i4], t1, t2); // {s, d}  <--| {a+b, a-b}
 	                t1 = x[i3] + x[i4]; t2 = x[i3] - x[i4];
-	                t1 = -t1 * (float)M_SQRT1_2;
-	                t2 *= (float)M_SQRT1_2;
+	                t1 = -t1 * M_SQRT1_2_F;
+	                t2 *= M_SQRT1_2_F;
 
 					// sumdiff(t1, x[i2], x[i4], x[i3]); // {s, d}  <--| {a+b, a-b}
 	                float st1 = x[i2]; x[i4] = t1 + st1; x[i3] = t1 - st1;
@@ -170,7 +170,7 @@ void split_radix_real_complex_fft(float *x, uint32_t n)
             id <<= 2;
         } while(ix < n);
 
-        float e = 2.0f*(float)M_PI/n2;
+        float e = 2.0f*M_PI_F/n2;
         for (uint32_t j=1; j<n8; j++) {
             float a = j * e;
             float cc1, ss1, cc3, ss3;

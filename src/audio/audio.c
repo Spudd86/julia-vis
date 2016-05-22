@@ -11,8 +11,8 @@ void split_radix_real_complex_fft(float *x, uint32_t n);
  * (ie: makes sure we always get data in chunks that we exepct), and a second part
  * that has the callback that does the fft/triplebuffering management
  * preferably even more split up than that so we can run the audio test app
- * with just a ring buffer in the audio driver callback and re-use the 
- * fft setup/windowing/calculation code and call to beat detection, but avoid 
+ * with just a ring buffer in the audio driver callback and re-use the
+ * fft setup/windowing/calculation code and call to beat detection, but avoid
  * tying that to the triple buffer updates
  *
  * also need to convert to a context thing and stop using global variables
@@ -28,7 +28,7 @@ void split_radix_real_complex_fft(float *x, uint32_t n);
  * the audio thread, all while also supporting the use case of the gst pipeline too
  *
  * basically we need to overhaul the structure of this code completely
- * 
+ *
  * perhaps move fft calculation into the beat detector...
  *
  * also need to make grabbing beat counts safer
@@ -116,15 +116,15 @@ static float *do_fft(float *in1, float *in2)
 {
 	for(int i=0; i<nr_samp;i++) { // window samples
 		// Hanning window
-		float w = 0.5f*(1.0f - cosf((2*(float)M_PI*i)/(nr_samp-1)));
-		
+		float w = 0.5f*(1.0f - cosf((2*M_PI_F*i)/(nr_samp-1)));
+
 		// Blackman
-		//float w = (1.0f - 0.16f)/2 - 0.5f*cosf((2*(float)M_PI*i)/(nr_samp-1)) + 0.16f*0.5f*cosf((4*(float)M_PI*i)/(nr_samp-1));
-		
+		//float w = (1.0f - 0.16f)/2 - 0.5f*cosf((2*M_PI_F*i)/(nr_samp-1)) + 0.16f*0.5f*cosf((4*M_PI_F*i)/(nr_samp-1));
+
 		//Lanczos
-		//float t = (2.0f*i/(nr_samp-1) - 1)*(float)M_PI;
+		//float t = (2.0f*i/(nr_samp-1) - 1)*M_PI_F;
 		//float w = sin(t)/t;
-		
+
 		fft_tmp[i] = ((i < nr_samp/2)?in1[i]:in2[i-nr_samp/2])*w;
 	}
 
@@ -146,7 +146,7 @@ void audio_update(const float *in, int n)
 	static int bufp = 0;
 	static float *cur_buf = NULL; //need to preserve the result of tb_get_write across calls
 	static float *prev_buf = NULL;
-	
+
 	if(prev_buf == NULL) prev_buf = tribuf_get_read_nolock(samp_tb);
 
 	float *samps = NULL;
@@ -160,7 +160,7 @@ void audio_update(const float *in, int n)
 		if(bufp == 0) cur_buf = tribuf_get_write(samp_tb);
 
 		samps = cur_buf;
-	
+
 		int cpy = MIN(n, nr_samp/2-bufp);
 		memcpy(samps+bufp, in, sizeof(float)*cpy);
 		remain = n - cpy;
@@ -171,7 +171,7 @@ void audio_update(const float *in, int n)
 			tribuf_finish_write(samp_tb);
 		} else return;
 	}
-	
+
 	buf_count++;
 	float *fft = do_fft(samps, prev_buf);
 	beat_ctx_update(gbl_beat_ctx, fft, nr_samp/2);
@@ -202,7 +202,7 @@ int audio_get_fft(audio_data *d) {
 	d->len = nr_samp/2+1;
 	d->data = fft_data;
 	size_t fft_len = sizeof(float)*(nr_samp/2 + 1);
-	if(rb_read_space(fft_rb) >= fft_len) 
+	if(rb_read_space(fft_rb) >= fft_len)
 		rb_read(fft_rb, (void *)fft_data, fft_len);
 	return 0;
 }

@@ -29,7 +29,7 @@ static thrd_t decode_tid;
 
 // TODO: use an atomic here, this works but the C11 spec says it doesn't have to
 // we can use a relaxed atomic for this though, which should be really cheap
-static int running = 1; 
+static int running = 1;
 
 static int decode_thread(void *parm);
 
@@ -37,20 +37,20 @@ int filedecode_setup(const opt_data *od)
 {
 	const char *filename = od->audio_opts;
 	printf("Using %s for audio input\n", filename);
-	
+
 	if (!(infile = sf_open (filename, SFM_READ, &sfinfo))) {
     	printf ("Unable to open input file %s: %s\n", filename, sf_strerror (NULL)) ;
         return -1;
     }
 	audio_setup(sfinfo.samplerate);
-	
+
 	//TODO: stop using globals for the thread, pass in a struct
 	if(thrd_create(&decode_tid, decode_thread, NULL) != thrd_success) {
 		sf_close(infile);
 		printf ("Failed to start decode thread") ;
 		return -1;
 	}
-	
+
 	return 0;
 }
 
@@ -68,7 +68,7 @@ void filedecode_shutdown(void)
 
 //TODO: more complex buffering?
 static int decode_thread(void *parm)
-{
+{ (void)parm;
 	float data[BUFFER_LEN*sfinfo.channels];
 	struct timespec t0;
 	uint64_t frms_sent = 0;
@@ -78,9 +78,9 @@ static int decode_thread(void *parm)
 		if(readcount == 0) {
 			if(sf_seek(infile, 0, SEEK_SET) < 0) return 1;
 		}
-		
+
 		frms_sent += readcount;
-		
+
 		// downmix to mono if needed
 		if(sfinfo.channels != 1) { //TODO: improve downmix to use channel map when possible
 			for(int j = 1; j < sfinfo.channels; j++) { //TODO: Kahan sum?
@@ -93,17 +93,17 @@ static int decode_thread(void *parm)
 				}
 			}
 		}
-		
-	
+
+
 		//TODO: use a better sleep function on Linux, tinycthread uses usleep so it can't quite get the timing exactly right
 		// not much of a problem since the error won't ever grow
 		uint64_t ns = (frms_sent * 1000000000L / sfinfo.samplerate);
 		struct timespec wake_time = { t0.tv_sec + (time_t)(ns/1000000000L),  t0.tv_nsec + ns%1000000000L};
 		thrd_sleep(&wake_time, NULL); // sleep until it is time to send the data in
-		
+
 		audio_update(data, readcount);
     }
-    
+
     return 0;
 }
 
