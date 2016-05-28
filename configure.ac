@@ -37,7 +37,8 @@ fi
 AC_C_CONST
 AC_TYPE_SIZE_T
 AC_EXEEXT
-AC_CHECK_LIB([m], [sqrt]) #see if libm exists, if it does we probably need it
+#AC_CHECK_LIB([m], [sqrt]) #see if libm exists, if it does we probably need it
+AC_SEARCH_LIBS([sqrt], [m])
 
 PKG_CHECK_MODULES([SDL], [sdl])
 AC_SUBST(SDL_CFLAGS)
