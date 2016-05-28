@@ -3,7 +3,6 @@
 
 #include "points.h"
 
-//#define MAP_FUNC_ATTR __attribute__((sseregparm,fastcall,nothrow))
 #define MAP_FUNC_ATTR
 
 typedef void (*soft_map_func)(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd) MAP_FUNC_ATTR;

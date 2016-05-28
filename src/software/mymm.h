@@ -5,6 +5,9 @@
 #	include <mmintrin.h>
 #	ifdef __SSE__
 #		include <xmmintrin.h>
+#		ifdef __SSE2__
+#			include <emmintrin.h>
+#		endif
 #	elif defined(__3dNOW__)
 // available on athlon (3dnow) but not in the header for it (these are the intel intrinsic function names)
 #		include <mm3dnow.h>

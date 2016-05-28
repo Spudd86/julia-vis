@@ -1,7 +1,5 @@
-/**
- * palletblit.c
- *
- */
+
+#pragma GCC optimize "3,inline-functions,merge-all-constants"
 
 #include "common.h"
 #include "pixmisc.h"
@@ -16,37 +14,130 @@
 // the above is not done in 16 bit modes they just do out = pallet[in/256] (and convert the pallet)
 
 //TODO: load pallets from files of some sort
+#if defined(__SSE2__)
+static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int w, unsigned int h, const uint32_t *restrict pal)
+{
+	//TODO find a way to use _mm_stream_si128() if dest and dst_stride are both suitably aligned 
+	const __m128i zero = _mm_setzero_si128();
+	const __m128i mask = _mm_set1_epi16(0xff);
+	const __m128i sub = _mm_set1_epi16(256);
 
-#ifdef __MMX__
-static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
+	for(size_t y = 0; y < h; y++) {
+		const uint16_t *restrict s = src + y*w;
+		uint32_t *restrict d = (uint32_t *restrict)((char *restrict)dest + y*dst_stride);
+		for(size_t x = 0; x < w; x+=8, s+=8, d+=8) {		
+			__m128i col1, col2, col3, col4, v1, v2, v1s, v2s;
+
+			col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[0]/256)));
+			col2 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[1]/256)));
+			col1 = _mm_unpacklo_epi32(col1, col2);
+			col2 = col1;
+			col1 = _mm_unpacklo_epi8(col1, zero);
+	    	col2 = _mm_unpackhi_epi8(col2, zero);
+
+	    	v1   = _mm_set1_epi32(*(const uint32_t *)(s + 0));
+	    	v1   = _mm_and_si128(v1, mask);
+	    	col2 = _mm_mullo_epi16(col2, v1);
+	    	v1s  = _mm_sub_epi16(sub, v1);
+	    	col1 = _mm_mullo_epi16(col1, v1s);
+	    	col1 = _mm_add_epi16(col1, col2);
+	    	col1 = _mm_srli_epi16(col1, 8);
+
+	    	col1 = _mm_packus_epi16(col1, zero);
+
+
+	    	col3 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[2]/256)));
+			col4 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[3]/256)));
+
+			col3 = _mm_unpacklo_epi32(col3, col4);
+			col4 = col3;
+			col3 = _mm_unpacklo_epi8(col3, zero);
+	    	col4 = _mm_unpackhi_epi8(col4, zero);
+
+	    	v2   = _mm_set1_epi32(*(const uint32_t *)(s + 2));//_mm_set1_epi32(s[2] | (s[3] << 16));
+	    	v2   = _mm_and_si128(v2, mask);
+	    	col4 = _mm_mullo_epi16(col4, v2);
+	    	v2s  = _mm_sub_epi16(sub, v2);
+	    	col3 = _mm_mullo_epi16(col3, v2s);
+	    	col3 = _mm_add_epi16(col3, col4);
+	    	col3 = _mm_srli_epi16(col3, 8);
+
+	    	col3 = _mm_packus_epi16(col3, zero);
+
+	    	//_mm_stream_si128((__m128i *restrict)(d + 0), _mm_unpacklo_epi64(col1, col3)); // can't control alignment of SDL buffers
+	    	_mm_storeu_si128((__m128i *restrict)(d + 0), _mm_unpacklo_epi64(col1, col3));
+
+	    	col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[4]/256)));
+			col2 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[5]/256)));
+			col1 = _mm_unpacklo_epi32(col1, col2);
+			col2 = col1;
+			col1 = _mm_unpacklo_epi8(col1, zero);
+	    	col2 = _mm_unpackhi_epi8(col2, zero);
+
+	    	v1   = _mm_set1_epi32(*(const uint32_t *)(s + 4));
+	    	v1   = _mm_and_si128(v1, mask);
+	    	col2 = _mm_mullo_epi16(col2, v1);
+	    	v1s  = _mm_sub_epi16(sub, v1);
+	    	col1 = _mm_mullo_epi16(col1, v1s);
+	    	col1 = _mm_add_epi16(col1, col2);
+	    	col1 = _mm_srli_epi16(col1, 8);
+
+	    	col1 = _mm_packus_epi16(col1, zero);
+	    	
+
+	    	col3 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[6]/256)));
+			col4 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[7]/256)));
+
+			col3 = _mm_unpacklo_epi32(col3, col4);
+			col4 = col3;
+			col3 = _mm_unpacklo_epi8(col3, zero);
+	    	col4 = _mm_unpackhi_epi8(col4, zero);
+
+	    	v2   = _mm_set1_epi32(*(const uint32_t *)(s + 6));//_mm_set1_epi32(s[2] | (s[3] << 16));
+	    	v2   = _mm_and_si128(v2, mask);
+	    	col4 = _mm_mullo_epi16(col4, v2);
+	    	v2s  = _mm_sub_epi16(sub, v2);
+	    	col3 = _mm_mullo_epi16(col3, v2s);
+	    	col3 = _mm_add_epi16(col3, col4);
+	    	col3 = _mm_srli_epi16(col3, 8);
+
+	    	col3 = _mm_packus_epi16(col3, zero);
+
+	    	//_mm_stream_si128((__m128i *restrict)(d + 4), _mm_unpacklo_epi64(col1, col3)); // can't control alignment of SDL buffers
+	    	_mm_storeu_si128((__m128i *restrict)(d + 4), _mm_unpacklo_epi64(col1, col3)); // can't control alignment of SDL buffers
+	    }
+	}
+}
+#elif defined(__MMX__)
+static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int w, unsigned int h, const uint32_t *restrict pal)
 {
 	const __m64 zero = _mm_cvtsi32_si64(0ll);
 	const __m64 mask = (__m64)(0x00ff00ff00ff);
-	dst_stride /= 4;
+	const __m64 sub = (__m64)(0x010001000100);
 
-	for(unsigned int y = 0; y < h; y++) {
-		for(unsigned int x = 0; x < w; x+=4) {
-			int v = src[y*src_stride + x];
-			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
-			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
+	for(size_t y = 0; y < h; y++) {
+		const uint16_t *restrict s = src + y*w;
+		uint32_t *restrict d = (uint32_t *restrict)((char *restrict)dest + y*dst_stride);
+		for(size_t x = 0; x < w; x+=4, s+=4, d+=4) {
+			int v = s[0];
 
 			__m64 col1 = *(const __m64 *)(pal+(v/256));
 			__m64 col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
     		col2 = _mm_unpackhi_pi8(col2, zero);
 
-		    //col1 = (col2*v + col1*(0xff-v))/256;
+		    //col1 = (col2*v + col1*(256-v))/256;
 			__m64 vt = _mm_set1_pi16(v);
 			vt = _mm_and_si64(vt, mask);
 			col2 = _mm_mullo_pi16(col2, vt);
-			vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
+			vt = _mm_subs_pu16(sub, vt);
 			col1 = _mm_mullo_pi16(col1, vt);
     		col1 = _mm_add_pi16(col1, col2);
     		col1 = _mm_srli_pi16(col1, 8);
 
 			__m64 tmp = col1;
 
-			v = src[y*src_stride + x + 1];
+			v = s[1];
 			col1 = *(const __m64 *)(pal+(v/256));
 			col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
@@ -55,16 +146,19 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 			vt = _mm_set1_pi16(v);
 			vt = _mm_and_si64(vt, mask);
 			col2 = _mm_mullo_pi16(col2, vt);
-			vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
+			vt = _mm_subs_pu16(sub, vt);
 			col1 = _mm_mullo_pi16(col1, vt);
     		col1 = _mm_add_pi16(col1, col2);
     		col1 = _mm_srli_pi16(col1, 8);
 
 			tmp = _mm_packs_pu16(tmp, col1);
-			//_mm_stream_pi((__m64 *)(dest + y*dst_stride + x), tmp);
-			*(__m64 *)(dest + y*dst_stride + x) = tmp;
+#if defined(__SSE__)
+			_mm_stream_pi((__m64 *)(d+0), tmp); // can't control alignment of SDL buffers
+#else
+			*(__m64 *)(d + 0) = tmp;
+#endif
 
-			v = src[y*src_stride + x + 2];
+			v = s[2];
 			col1 = *(const __m64 *)(pal+(v/256));
 			col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
@@ -73,14 +167,14 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 			vt = _mm_set1_pi16(v);
 			vt = _mm_and_si64(vt, mask);
 			col2 = _mm_mullo_pi16(col2, vt);
-			vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
+			vt = _mm_subs_pu16(sub, vt);
 			col1 = _mm_mullo_pi16(col1, vt);
     		col1 = _mm_add_pi16(col1, col2);
     		col1 = _mm_srli_pi16(col1, 8);
 
 			tmp = col1;
 
-			v = src[y*src_stride + x + 3];
+			v = s[3];
 			col1 = *(const __m64 *)(pal+(v/256));
 			col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
@@ -89,23 +183,48 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 			vt = _mm_set1_pi16(v);
 			vt = _mm_and_si64(vt, mask);
 			col2 = _mm_mullo_pi16(col2, vt);
-			vt = _mm_andnot_si64(vt, mask); // vt = 255 - vt
+			vt = _mm_subs_pu16(sub, vt);
 			col1 = _mm_mullo_pi16(col1, vt);
     		col1 = _mm_add_pi16(col1, col2);
     		col1 = _mm_srli_pi16(col1, 8);
 
 			tmp = _mm_packs_pu16(tmp, col1);
-			//_mm_stream_pi((__m64 *)(dest + y*dst_stride + x+2), tmp);
-			*(__m64 *)(dest + y*dst_stride + x + 2) = tmp;
+#if defined(__SSE__)
+			_mm_stream_pi((__m64 *)(d+2), tmp); // can't control alignment of SDL buffers
+#else
+			*(__m64 *)(d + 2) = tmp;
+#endif
 		}
 	}
+
+	_mm_empty();
 }
 #else
-static void pallet_blit32(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
+static void pallet_blit32(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int w, unsigned int h, const uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++) {
-		for(unsigned int x = 0; x < w; x++) {
-			*(uint32_t *)(dest + y*dst_stride + x*4) = pal[src[y*src_stride + x]>>8];
+		uint32_t * restrict d = (uint32_t *restrict)(dest + y*dst_stride);
+		const uint16_t *restrict s = src + y*w;
+		for(unsigned int x = 0; x < w; x+=16) {
+			*(d++) = pal[*(s++)>>8];
+			*(d++) = pal[*(s++)>>8];
+			*(d++) = pal[*(s++)>>8];
+			*(d++) = pal[*(s++)>>8];
+
+			*(d++) = pal[*(s++)>>8];
+			*(d++) = pal[*(s++)>>8];
+			*(d++) = pal[*(s++)>>8];
+			*(d++) = pal[*(s++)>>8];
+
+			*(d++) = pal[*(s++)>>8];
+			*(d++) = pal[*(s++)>>8];
+			*(d++) = pal[*(s++)>>8];
+			*(d++) = pal[*(s++)>>8];
+
+			*(d++) = pal[*(s++)>>8];
+			*(d++) = pal[*(s++)>>8];
+			*(d++) = pal[*(s++)>>8];
+			*(d++) = pal[*(s++)>>8];
 		}
 	}
 }
@@ -113,13 +232,10 @@ static void pallet_blit32(uint8_t *restrict dest, unsigned int dst_stride, const
 
 // needs _mm_shuffle_pi16 no other sse/3dnow stuff used
 #if defined(__SSE__) || defined(__3dNOW__)
-static void pallet_blit565(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
+static void pallet_blit565(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
-			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
-			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
-
 			__m64 r1, r2, g1, g2, b1, b2, c;
 			int v = src[y*src_stride + x];
 			c  = _mm_cvtsi32_si64(pal[v/256]);
@@ -171,14 +287,14 @@ static void pallet_blit565(uint8_t *restrict dest, unsigned int dst_stride, cons
 			*(__m64 *)(dest + y*dst_stride + x*2) = r1;
 		}
 	}
+
+	_mm_empty();
 }
 
-static void pallet_blit555(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
+static void pallet_blit555(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h, const uint32_t *restrict pal)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=4) {
-			__builtin_prefetch(src + y*src_stride + x + 4, 0, 0);
-			__builtin_prefetch(dest + y*dst_stride + x + 4, 1, 0);
 			int v;
 			__m64 r1, r2, g1, g2, b1, b2, c;
 
@@ -232,6 +348,8 @@ static void pallet_blit555(uint8_t *restrict dest, unsigned int dst_stride, cons
 			*(__m64 *)(dest + y*dst_stride + x*2) = r1;
 		}
 	}
+
+	_mm_empty();
 }
 #else //TODO: test these
 #ifdef __MMX__
@@ -271,13 +389,10 @@ static void pallet_blit555(uint8_t * restrict dest, unsigned int dst_stride,
 
 #if defined(__MMX__)
 static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride,
-		const uint16_t *pbattr src, unsigned int src_stride, unsigned int w, unsigned int h)
+		const uint16_t *restrict src, unsigned int src_stride, unsigned int w, unsigned int h)
 {
 	for(unsigned int y = 0; y < h; y++) {
 		for(unsigned int x = 0; x < w; x+=16) {
-			__builtin_prefetch(src + y*src_stride + x + 16, 0, 0);
-			__builtin_prefetch(dest + y*dst_stride + x + 16, 1, 0);
-
 			__m64 p1, p2;
 
 			p1 = *(const __m64 *)(src + y*src_stride + x);
@@ -297,6 +412,8 @@ static void pallet_blit8(uint8_t* restrict dest, unsigned int dst_stride,
 			*(__m64 *)(dest + y*dst_stride + x+ 8) = p1;
 		}
 	}
+
+	_mm_empty();
 }
 #else
 static void pallet_blit8(uint8_t * restrict dest, unsigned int dst_stride,
@@ -315,15 +432,12 @@ void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h,
 	w = IMIN(w, dst->w);
 	h = IMIN(h, dst->h);
 
-	if(dst->bpp == 32) pallet_blit32(dst->data, dst->pitch, src, src_stride, w, h, pal);
+	if(dst->bpp == 32) pallet_blit32(dst->data, dst->pitch, src, w, h, pal);
 	else if(dst->bpp == 16) pallet_blit565(dst->data, dst->pitch, src, src_stride, w, h, pal);
 	else if(dst->bpp == 15) pallet_blit555(dst->data, dst->pitch, src, src_stride, w, h, pal);
 	else if(dst->bpp == 8) { // need to set surface's pallet
 		pallet_blit8(dst->data, dst->pitch, src, src_stride, w, h);
 	}
-#ifdef __MMX__
-	_mm_empty();
-#endif
 }
 
 #ifdef USE_SDL
@@ -335,16 +449,13 @@ void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int 
 	h = IMIN(h, dst->h);
 
 	if((SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) || w < 0 || h < 0) return;
-	if(dst->format->BitsPerPixel == 32) pallet_blit32(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
+	if(dst->format->BitsPerPixel == 32) pallet_blit32(dst->pixels, dst->pitch, src, w, h, pal);
 	else if(dst->format->BitsPerPixel == 16) pallet_blit565(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
 	else if(dst->format->BitsPerPixel == 15) pallet_blit555(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
 	else if(dst->format->BitsPerPixel == 8) { // need to set surface's pallet
 		pallet_blit8(dst->pixels, dst->pitch, src, src_stride, w, h);
 		SDL_SetColors(dst, (void *)pal, 0, 256);
 	}
-#ifdef __MMX__
-	_mm_empty();
-#endif
 	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
 }
 #endif

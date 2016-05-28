@@ -13,6 +13,17 @@
 #include "audio/audio.h"
 #include "maxsrc.h"
 
+#ifdef _WIN32
+#define set_threadname(name)
+#else
+#include <pthread.h>
+void set_threadname(const char *name)
+{
+	pthread_t tid = pthread_self();
+	pthread_setname_np(tid, name);
+}
+#endif
+
 #define IM_SIZE (512)
 
 static opt_data opts;
@@ -26,6 +37,8 @@ static soft_map_func map_func = soft_map_interp;
 
 static int run_map_thread(tribuf *tb)
 {
+	set_threadname("render");
+
 	struct point_data *pd = new_point_data(opts.rational_julia?4:2);
 	unsigned int beats = beat_get_count();
 	unsigned int tick0, fps_oldtime, frmcnt=0, last_beat_time = 0;

@@ -1,6 +1,10 @@
+//#pragma GCC optimize "3,ira-hoist-pressure,inline-functions,merge-all-constants,modulo-sched,modulo-sched-allow-regmoves,aggressive-loop-optimizations,unsafe-loop-optimizations"
+
 #include "common.h"
 #include "mymm.h"
 #include "map.h"
+
+#include "swizzle.h"
 
 #define BLOCK_SIZE 8
 
@@ -12,10 +16,15 @@ static inline uint16_t bilin_samp(uint16_t *restrict in, int w, int h, float x, 
 	int32_t y1 = ys>>8, y2 = y1+1;
 	uint_fast32_t xf = xs&0xFF, yf = ys&0xFF;
 
-	// it is critical that this entire calculation be done as uint32s
-	uint32_t v = ((in[y1*w + x1]*(256u - xf) + in[y1*w + x2]*xf)*(256u-yf) +
-			      (in[y2*w + x1]*(256u - xf) + in[y2*w + x2]*xf)*yf) >> 16u;
+	uint_fast32_t p00 = in[y1*w + x1];
+	uint_fast32_t p01 = in[y1*w + x2];
+	uint_fast32_t p10 = in[y2*w + x1];
+	uint_fast32_t p11 = in[y2*w + x2];
 
+	// it is critical that this entire calculation be done as at least uint32s
+	uint_fast32_t v = ((p00*(256u - xf) + p01*xf)*(256u-yf) +
+			           (p10*(256u - xf) + p11*xf)*yf) >> 16u;
+	v = (v*((256u*97u)/100u)) >> 8u; // now that we have fixed bilinear interp need a fade here
 	return v;
 }
 
@@ -37,18 +46,25 @@ static inline void block_interp_bilin(uint16_t *restrict out, uint16_t *restrict
 		int y = y0;
 		int xst = (x1 - x0)/BLOCK_SIZE;
 		int yst = (y1 - y0)/BLOCK_SIZE;
+		#pragma GCC ivdep
 		for(int xt=0; xt<BLOCK_SIZE; xt++, x+=xst, y+=yst) {
-			int xs=x/256, ys=y/256;
+			uint_fast32_t xs=x/256, ys=y/256;
 			uint_fast32_t xf=x&0xFF, yf=y&0xFF;
 
-			int xi1 = xs;
-			int yi1 = ys*w;
-			int xi2 = IMIN(xi1+1,w-1);
-			int yi2 = IMIN(yi1+w,(h-1)*w);
+			uint_fast32_t xi1 = xs;
+			uint_fast32_t yi1 = ys;
+			uint_fast32_t xi2 = IMIN(xi1+1,(uint_fast32_t)w-1);
+			uint_fast32_t yi2 = IMIN(yi1+1,(uint_fast32_t)h-1);
 
-			out[y_off+xd+xt] = ((in[yi1 + xi1]*(256u - xf) + in[yi1 + xi2]*xf)*(256u-yf) +
-						        (in[yi2 + xi1]*(256u - xf) + in[yi2 + xi2]*xf)*yf) >> 16u;
+			uint_fast32_t p00 = in[yi1*w + xi1];
+			uint_fast32_t p01 = in[yi1*w + xi2];
+			uint_fast32_t p10 = in[yi2*w + xi1];
+			uint_fast32_t p11 = in[yi2*w + xi2];
 
+			uint_fast32_t v = ((p00*(256u - xf) + p01*xf)*(256u-yf) +
+			                   (p10*(256u - xf) + p11*xf)*yf) >> 16u;
+			v = (v*((256u*97u)/100u)) >> 8u; // now that we have fixed bilinear interp need a fade here
+			out[y_off+xd+xt] = v;
 		}
 	}
 }
@@ -86,6 +102,7 @@ MAP_FUNC_ATTR void soft_map(uint16_t *restrict out, uint16_t *restrict in, int w
 	}
 }
 
+__attribute__((hot))
 MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;

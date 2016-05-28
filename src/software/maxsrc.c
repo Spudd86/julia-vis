@@ -1,3 +1,4 @@
+#pragma GCC optimize "3,ira-hoist-pressure,inline-functions,merge-all-constants,modulo-sched,modulo-sched-allow-regmoves"
 
 #include "common.h"
 #include "audio/audio.h"
@@ -6,13 +7,15 @@
 #include "getsamp.h"
 #include <mm_malloc.h>
 
+#include "swizzle.h"
+
 typedef struct {
 	uint16_t *restrict data;
 	uint16_t w,h;
 } MxSurf;
 
 static void point_init(MxSurf *res, int w, int h);
-static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, float R[3][3]);
+static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3]);
 static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, float px, float py);
 
 struct maxsrc {
@@ -81,7 +84,7 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 	float cx=cosf(self->tx), cy=cosf(self->ty), cz=cosf(self->tz);
 	float sx=sinf(self->tx), sy=sinf(self->ty), sz=sinf(self->tz);
 
-	float R[][3] = {
+	const float R[][3] = {
 		{cz*cy-sz*sx*sy, -sz*cx, -sy*cz-cy*sz*sx},
 		{sz*cy+cz*sx*sy,  cz*cx, -sy*sz+cy*cz*sx},
 		{cx*sy         ,    -sx,  cy*cx}
@@ -136,30 +139,33 @@ static void point_init(MxSurf *res, int w, int h)
 static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, float px, float py)
 {(void)ih;
 	const int ipx = lrintf(px*256), ipy = lrintf(py*256);
-	//const int ipx = (int)truncf(px*256), ipy = (int)truncf(py*256); // want to round towards zero
-	unsigned int yf = ipy&0xff, xf = ipx&0xff;
-	unsigned int a00 = (yf*xf);
-	unsigned int a01 = (yf*(256-xf));
-	unsigned int a10 = ((256-yf)*xf);
-	unsigned int a11 = ((256-yf)*(256-xf));
+	uint32_t yf = ipy&0xff, xf = ipx&0xff;
+	uint32_t a00 = (yf*xf);
+	uint32_t a01 = (yf*(256-xf));
+	uint32_t a10 = ((256-yf)*xf);
+	uint32_t a11 = ((256-yf)*(256-xf));
 
-	unsigned int off = (ipy/256)*iw + ipx/256;
+	uint32_t off = (ipy/256)*iw + ipx/256;
 
-	uint16_t *restrict dst = dest;
-	const uint16_t *restrict src = pnt_src->data;
-	const int pnt_w = pnt_src->w;
+	const int pnt_stride = pnt_src->w+1;
+	const uint16_t *s0 = pnt_src->data;
+	const uint16_t *s1 = pnt_src->data + pnt_stride;
 	for(int y=0; y < pnt_src->h; y++) {
-		for(int x=0; x < pnt_w; x++) {
-			uint16_t res = (src[(pnt_w+1)*y+x]*a00 + src[(pnt_w+1)*y+x+1]*a01
-					+ src[(pnt_w+1)*(y+1)+x]*a10   + src[(pnt_w+1)*(y+1)+x+1]*a11)>>16;
-			dst[off+iw*y+x] = IMAX(res, dst[off+iw*y+x]);
+		uint16_t *restrict dst_line = (uint16_t *restrict)dest + off + iw*y;
+		for(int x=0; x < pnt_src->w; x++) {
+			uint16_t res = (s0[x]*a00 + s0[x+1]*a01
+			              + s1[x]*a10 + s1[x+1]*a11)>>16;
+			res = IMAX(res, dst_line[x]);
+			dst_line[x] = res;
 		}
+		s0 += pnt_stride;
+		s1 += pnt_stride;
 	}
 }
 
-#define BLOCK_SIZE 8
+#define BLOCK_SIZE 16
 
-static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, float R[3][3])
+static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3])
 {
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
 	float v0 = -1.0f;
@@ -169,7 +175,7 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 		float x, y;
 
 		{	const float u = -1.0f, v = v0;
-			const float d = 0.95f + 0.05f*hypotf(u,v);//sqrtf(u*u + v*v);
+			const float d = 0.95f + 0.053f*hypotf(u,v);
 			const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 				(u*R[0][0] + v*R[0][1]),
 				(u*R[1][0] + v*R[1][1])*d,
@@ -182,7 +188,7 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 		int y0 = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
 
 		{	const float u = -1.0f, v = v1;
-			const float d = 0.95f + 0.05f*hypotf(u,v);//sqrtf(u*u + v*v);
+			const float d = 0.95f + 0.053f*hypotf(u,v);
 			const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 				(u*R[0][0] + v*R[0][1]),
 				(u*R[1][0] + v*R[1][1])*d,
@@ -199,7 +205,7 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 			u1 = u1+ustep;
 
 			{	const float u = u1, v = v0;
-				const float d = 0.95f + 0.05f*hypotf(u,v);//sqrtf(u*u + v*v);
+				const float d = 0.95f + 0.053f*hypotf(u,v);
 				const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 					(u*R[0][0] + v*R[0][1]),
 					(u*R[1][0] + v*R[1][1])*d,
@@ -212,7 +218,7 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 			const int y1 = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
 
 			{	const float u = u1, v = v1;
-				const float d = 0.95f + 0.05f*hypotf(u,v);//sqrtf(u*u + v*v);
+				const float d = 0.95f + 0.053f*hypotf(u,v);
 				const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 					(u*R[0][0] + v*R[0][1]),
 					(u*R[1][0] + v*R[1][1])*d,
@@ -229,21 +235,22 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 			int32_t xst = (x1 - x0)/BLOCK_SIZE;
 			int32_t yst = (y1 - y0)/BLOCK_SIZE;
 
-			for(uint32_t yt=0; yt<BLOCK_SIZE; yt++, x0+=x0s, y0+=y0s, xst += xsts, yst += ysts) {
-				for(uint32_t xt=0, x = x0, y = y0; xt<BLOCK_SIZE; xt++, x+=xst, y+=yst) {
-					const uint32_t xs=x/256,  ys=y/256;
-					const uint32_t xf=x&0xFF, yf=y&0xFF;
+			for(uint32_t yt=0; yt<BLOCK_SIZE; yt++, x0+=x0s, y0+=y0s, xst+=xsts, yst+=ysts) {
+				uint16_t *restrict out_line = out + (yd+yt)*w + xd;
+				for(uint32_t xt=0, u = x0, v = y0; xt<BLOCK_SIZE; xt++, u+=xst, v+=yst) {
+					const uint32_t xs=u>>8,  ys=v>>8;
+					const uint32_t xf=u&0xFF, yf=v&0xFF;
 					const uint32_t xi1 = xs;
 					const uint32_t yi1 = ys*w;
-					const uint32_t xi2 = IMIN(xi1+1,(unsigned)w-1);
-					const uint32_t yi2 = IMIN(yi1+w, (unsigned)((h-1)*w));
+					const uint32_t xi2 = IMIN(xi1+1,(uint32_t)w-1);
+					const uint32_t yi2 = IMIN(yi1+w, (uint32_t)((h-1)*w));
 
 					// it is critical that this entire calculation be done as uint32s
 					uint32_t tmp = ((in[yi1 + xi1]*(256u - xf) + in[yi1 + xi2]*xf)*(256u-yf) +
 								    (in[yi2 + xi1]*(256u - xf) + in[yi2 + xi2]*xf)*yf) >> 16u;
 
-					tmp = (tmp*((256u*98u)/100u)) >> 8u;
-					out[(yd+yt)*w+xd+xt] = (uint16_t)tmp;
+					tmp = (tmp*((256u*97u)/100u)) >> 8u;
+					out_line[xt] = (uint16_t)tmp;
 				}
 			}
 			x0 = x1; y0 = y1;

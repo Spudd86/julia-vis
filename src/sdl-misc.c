@@ -27,7 +27,7 @@ SDL_Surface *sdl_setup_gl(opt_data *opts, int im_size) {
 static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl)
 {
 	printf("Initializing SDL.\n");
-	putenv("SDL_NOMOUSE=1");
+	putenv(strdup("SDL_NOMOUSE=1")); // because SUSv2 says it can't be const...
 
     if((SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER)==-1)) {
         printf("Could not initialize SDL: %s.\n", SDL_GetError());
