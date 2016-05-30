@@ -6,6 +6,16 @@
 #include "pallet.h"
 #include "mymm.h"
 
+//#undef NDEBUG
+
+#include <assert.h>
+
+#ifndef NDEBUG
+#define unreachable() assert(0)
+#else
+#define unreachable __builtin_unreachable
+#endif
+
 
 // pallet must have 257 entries (for easier interpolation on 16 bit indices)
 // output pix = (pallet[in/256]*(in%256) + pallet[in/256+1]*(255-in%256])/256
@@ -14,10 +24,13 @@
 // the above is not done in 16 bit modes they just do out = pallet[in/256] (and convert the pallet)
 
 //TODO: load pallets from files of some sort
-#if defined(__SSE2__)
 
+
+#if defined(__SSE2__)
 static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int w, unsigned int h, const uint32_t *restrict pal)
 {
+	// TODO: _mm_loadl_epi64 is dumb, it takes a pointer to __m128i rather than a uint64_t or __m64, figure out a way around using it.
+	// TODO: set the constants with a literal rather than a function (except maybe zero)
 	const __m128i zero = _mm_setzero_si128();
 	const __m128i mask = _mm_set1_epi16(0xff);
 	const __m128i sub = _mm_set1_epi16(256);
@@ -30,7 +43,7 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 		// need to align our destination address so we can use non-temporal writes
 		// assume that the pixels are at least aligned to 4 bytes
 		uintptr_t dp = (uintptr_t)d;
-		switch(4 - ((dp/4)%16)) {
+		switch(4 - ((dp%16)/4)) {
 			__m128i col1, col2, v1, v1s;
 			case 2:
 				col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[0]/256)));
@@ -76,7 +89,7 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 				s+=2;
 				d+=2;
 				x+=2;
-			//fallthrough
+			//fall through
 			case 1:
 				col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[0]/256)));
 				col1 = _mm_unpacklo_epi32(col1, zero);
@@ -93,12 +106,15 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 				col1 = _mm_srli_epi16(col1, 8);
 
 				col1 = _mm_packus_epi16(col1, zero);
-				_mm_stream_si32(d, _mm_cvtsi128_si32(col1));
+				_mm_stream_si32((int *)d, _mm_cvtsi128_si32(col1));
 				s++;
 				d++;
 				x++;
-			default:
+			case 0:
+			case 4:
 				break;
+			default:
+				unreachable();// can't happen
 		}
 
 		for(; x + 8 < w; x+=8, s+=8, d+=8) {
@@ -310,7 +326,7 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 
 				s+=2;
 				d+=2;
-			//fallthrough
+			//fall through
 			case 1:
 				col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[0]/256)));
 				col1 = _mm_unpacklo_epi32(col1, zero);
@@ -327,18 +343,21 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 				col1 = _mm_srli_epi16(col1, 8);
 
 				col1 = _mm_packus_epi16(col1, zero);
-				_mm_stream_si32(d, _mm_cvtsi128_si32(col1));
-				s++;
-				d++;
-			default:
+				_mm_stream_si32((int *)d, _mm_cvtsi128_si32(col1));
+			case 0:
 				break;
+			default:
+				unreachable(); // can't happen
 		}
 	}
+
+	_mm_sfence(); // needed because of the non-temporal stores.
 }
 #elif defined(__MMX__)
+//TODO: split out an SSE1 version?
 static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int w, unsigned int h, const uint32_t *restrict pal)
 {
-	const __m64 zero = _mm_cvtsi32_si64(0ll);
+	const __m64 zero = (__m64)(0);
 	const __m64 mask = (__m64)(0x00ff00ff00ff);
 	const __m64 sub = (__m64)(0x010001000100);
 
@@ -380,7 +399,7 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 
 			tmp = _mm_packs_pu16(tmp, col1);
 #if defined(__SSE__)
-			_mm_stream_pi((__m64 *)(d+0), tmp); // can't control alignment of SDL buffers
+			_mm_stream_pi((__m64 *)(d+0), tmp);
 #else
 			*(__m64 *)(d + 0) = tmp;
 #endif
@@ -417,7 +436,7 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 
 			tmp = _mm_packs_pu16(tmp, col1);
 #if defined(__SSE__)
-			_mm_stream_pi((__m64 *)(d+2), tmp); // can't control alignment of SDL buffers
+			_mm_stream_pi((__m64 *)(d+2), tmp);
 #else
 			*(__m64 *)(d + 2) = tmp;
 #endif
@@ -425,6 +444,9 @@ static void pallet_blit32(uint32_t *restrict dest, unsigned int dst_stride, cons
 	}
 
 	_mm_empty();
+#if defined(__SSE__)
+	_mm_sfence(); // needed because of the non-temporal stores.
+#endif
 }
 #else
 static void pallet_blit32(uint8_t *restrict dest, unsigned int dst_stride, const uint16_t *restrict src, unsigned int w, unsigned int h, const uint32_t *restrict pal)
