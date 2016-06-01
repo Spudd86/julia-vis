@@ -145,7 +145,7 @@ static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_sr
 	uint32_t a10 = ((256-yf)*xf);
 	uint32_t a11 = ((256-yf)*(256-xf));
 
-	uint32_t off = (ipy/256)*iw + ipx/256;
+	uint32_t off = (ipy/256u)*iw + ipx/256u;
 
 	const int pnt_stride = pnt_src->w+1;
 	const uint16_t *s0 = pnt_src->data;

@@ -4,16 +4,21 @@
 #include "mymm.h"
 #include "map.h"
 
-#include "swizzle.h"
+#include <float.h>
 
 #define BLOCK_SIZE 8
 
+//TODO: streaming writes?
+
 static inline uint16_t bilin_samp(uint16_t *restrict in, int w, int h, float x, float y)
 {
-	int32_t xs = IMIN(IMAX(lrintf(x*w*256), 0), (w-1)*256);
-	int32_t ys = IMIN(IMAX(lrintf(y*h*256), 0), (h-1)*256);
-	int32_t x1 = xs>>8, x2 = x1+1;
-	int32_t y1 = ys>>8, y2 = y1+1;
+	// Conversion to int truncates, which in this case is exactly what we want
+	// since we clamp to the largest float smaller than 1.0f when multiply by w*256
+	// and convert to int we get an int x ∈ [0, w*256)
+	int32_t xs = fmaxf(fminf(x, 1.0f-FLT_EPSILON), 0.0f)*w*256;
+	int32_t ys = fmaxf(fminf(y, 1.0f-FLT_EPSILON), 0.0f)*h*256;
+	int32_t x1 = xs>>8, x2 = IMIN(x1+1, w-1);
+	int32_t y1 = ys>>8, y2 = IMIN(y1+1, h-1);
 	uint_fast32_t xf = xs&0xFF, yf = ys&0xFF;
 
 	uint_fast32_t p00 = in[y1*w + x1];
@@ -21,50 +26,64 @@ static inline uint16_t bilin_samp(uint16_t *restrict in, int w, int h, float x, 
 	uint_fast32_t p10 = in[y2*w + x1];
 	uint_fast32_t p11 = in[y2*w + x2];
 
+#if 0 // TODO: use top on 32bit machines
 	// it is critical that this entire calculation be done as at least uint32s
+	// otherwise it overflows
 	uint_fast32_t v = ((p00*(256u - xf) + p01*xf)*(256u-yf) +
 			           (p10*(256u - xf) + p11*xf)*yf) >> 16u;
 	v = (v*((256u*97u)/100u)) >> 8u; // now that we have fixed bilinear interp need a fade here
+#else
+	uint_fast64_t v = ((p00*(256u - xf) + p01*xf)*(256u-yf) +
+			           (p10*(256u - xf) + p11*xf)*yf);
+	v = (v*((256u*97u)/100u)) >> 24u; // now that we have fixed bilinear interp need a fade here
+#endif
 	return v;
 }
 
 static inline void block_interp_bilin(uint16_t *restrict out, uint16_t *restrict in, int w, int h, int xd, int yd, float x00, float y00, float x01, float y01, float x10, float y10, float x11, float y11)
 {
-	int x0 = IMIN(IMAX(lrintf(x00*w*256), 0), (w-1)*256);
-	int y0 = IMIN(IMAX(lrintf(y00*h*256), 0), (h-1)*256);
-	int x1 = IMIN(IMAX(lrintf(x01*w*256), 0), (w-1)*256);
-	int y1 = IMIN(IMAX(lrintf(y01*h*256), 0), (h-1)*256);
+	const uint_fast32_t clamph = (h-1)*w;
 
-	int x0s = (IMIN(IMAX(lrintf(x10*w*256), 0), (w-1)*256) - x0)/BLOCK_SIZE;
-	int x1s = (IMIN(IMAX(lrintf(x11*w*256), 0), (w-1)*256) - x1)/BLOCK_SIZE;
-	int y0s = (IMIN(IMAX(lrintf(y10*h*256), 0), (h-1)*256) - y0)/BLOCK_SIZE;
-	int y1s = (IMIN(IMAX(lrintf(y11*h*256), 0), (h-1)*256) - y1)/BLOCK_SIZE;
+	// Conversion to int truncates, which in this case is exactly what we want
+	// since we clamp to the largest float smaller than 1.0f when multiply by w*256
+	// and convert to int we get an int x ∈ [0, w*256)
 
-	int y_off = yd * w;
-	for(int yt=0; yt<BLOCK_SIZE; y_off+=w, yt++, x0+=x0s, y0+=y0s, x1+=x1s, y1+=y1s) {
-		int x = x0;
-		int y = y0;
+	float x0 = fmaxf(fminf(x00, 1.0f-FLT_EPSILON), 0.0f)*(w-0)*256;
+	float y0 = fmaxf(fminf(y00, 1.0f-FLT_EPSILON), 0.0f)*(h-0)*256;
+	float x1 = fmaxf(fminf(x01, 1.0f-FLT_EPSILON), 0.0f)*(w-0)*256;
+	float y1 = fmaxf(fminf(y01, 1.0f-FLT_EPSILON), 0.0f)*(h-0)*256;
+
+	float x0s = (fmaxf(fminf(x10, 1.0f-FLT_EPSILON), 0.0f)*(w-0)*256 - x0)/BLOCK_SIZE;
+	float y0s = (fmaxf(fminf(y10, 1.0f-FLT_EPSILON), 0.0f)*(h-0)*256 - y0)/BLOCK_SIZE;
+	float x1s = (fmaxf(fminf(x11, 1.0f-FLT_EPSILON), 0.0f)*(w-0)*256 - x1)/BLOCK_SIZE;
+	float y1s = (fmaxf(fminf(y11, 1.0f-FLT_EPSILON), 0.0f)*(h-0)*256 - y1)/BLOCK_SIZE;
+	for(int yt=0; yt<BLOCK_SIZE; yt++, x0+=x0s, y0+=y0s, x1+=x1s, y1+=y1s) {
+		int x = x0, y = y0;
 		int xst = (x1 - x0)/BLOCK_SIZE;
 		int yst = (y1 - y0)/BLOCK_SIZE;
+		uint16_t *restrict out_line = out + (yd+yt)*w + xd;
 		#pragma GCC ivdep
-		for(int xt=0; xt<BLOCK_SIZE; xt++, x+=xst, y+=yst) {
-			uint_fast32_t xs=x/256, ys=y/256;
-			uint_fast32_t xf=x&0xFF, yf=y&0xFF;
+		for(uint_fast32_t xt=0; xt<BLOCK_SIZE; xt++, x+=xst, y+=yst) {
+			uint_fast32_t xs, ys, xf, yf;
+			uint_fast32_t xi1, xi2, yi1, yi2;
 
-			uint_fast32_t xi1 = xs;
-			uint_fast32_t yi1 = ys;
-			uint_fast32_t xi2 = IMIN(xi1+1,(uint_fast32_t)w-1);
-			uint_fast32_t yi2 = IMIN(yi1+1,(uint_fast32_t)h-1);
+			xs=(uint_fast32_t)(x) >> 8, ys=(uint_fast32_t)(y) >> 8;
+			xf=(uint_fast32_t)(x)&0xFF, yf=(uint_fast32_t)(y)&0xFF;
 
-			uint_fast32_t p00 = in[yi1*w + xi1];
-			uint_fast32_t p01 = in[yi1*w + xi2];
-			uint_fast32_t p10 = in[yi2*w + xi1];
-			uint_fast32_t p11 = in[yi2*w + xi2];
+			xi1 = xs, yi1 = ys*w;
+			xi2 = IMIN(xi1+1, w-1u);
+			yi2 = IMIN(yi1+w, clamph);
 
-			uint_fast32_t v = ((p00*(256u - xf) + p01*xf)*(256u-yf) +
-			                   (p10*(256u - xf) + p11*xf)*yf) >> 16u;
+#if 0 // TODO: use top on 32bit machines
+			uint_fast32_t v = ((in[yi1 + xi1]*(256u - xf) + in[yi1 + xi2]*xf)*(256u-yf) +
+			                   (in[yi2 + xi1]*(256u - xf) + in[yi2 + xi2]*xf)*yf) >> 16u;
 			v = (v*((256u*97u)/100u)) >> 8u; // now that we have fixed bilinear interp need a fade here
-			out[y_off+xd+xt] = v;
+#else
+			uint_fast64_t v = ((in[yi1 + xi1]*(256u - xf) + in[yi1 + xi2]*xf)*(256u-yf) +
+			                   (in[yi2 + xi1]*(256u - xf) + in[yi2 + xi2]*xf)*yf);
+			v = (v*((256u*97u)/100u)) >> 24u; // now that we have fixed bilinear interp need a fade here
+#endif
+			*(out_line + xt) = v;
 		}
 	}
 }
