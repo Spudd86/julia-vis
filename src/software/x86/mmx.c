@@ -76,6 +76,7 @@ void pallet_blit32_mmx(uint8_t * restrict dest, unsigned int dst_stride,
 	const __m64 sub = (__m64)(0x010001000100ll);
 
 	//FIXME: add src_stride back in
+	//FIXME: deal with w%16 != 0
 	for(size_t y = 0; y < h; y++) {
 		const uint16_t *restrict s = src + y*w;
 		uint32_t *restrict d = (uint32_t *restrict)(dest + y*dst_stride);
@@ -201,6 +202,8 @@ void pallet_blit565_mmx(uint8_t * restrict dest, unsigned int dst_stride,
 	// it right to get it in the correct bit position
 
 	//TODO: interopolate colours and dither?
+
+	//FIXME: deal with w%16 != 0
 
 	const __m64 mask = (__m64)(0xfcfcfcfcf8f8f8f8ll);
 	const __m64 zero = (__m64)(0ll);
@@ -329,6 +332,8 @@ void pallet_blit555_mmx(uint8_t * restrict dest, unsigned int dst_stride,
 
 	//TODO: interopolate colours and dither?
 
+	//FIXME: deal with w%16 != 0
+
 	const __m64 mask = _mm_set1_pi8(0xf8);
 	const __m64 zero = (__m64)(0ll);
 	for(unsigned int y = 0; y < h; y++) {
@@ -416,6 +421,7 @@ void pallet_blit8_mmx(uint8_t* restrict dest, unsigned int dst_stride,
 		const uint16_t *restrict src, unsigned int src_stride,
 		unsigned int w, unsigned int h)
 {
+	//FIXME: deal with w%16 != 0
 	for(unsigned int y = 0; y < h; y++) {
 		const uint16_t *restrict s = src + y*src_stride;
 		__m64 *restrict d = (__m64 *restrict)(dest + y*dst_stride);

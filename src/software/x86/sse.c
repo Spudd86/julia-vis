@@ -30,6 +30,8 @@ _mm_shuffle_pi16 (__m64 __A, int const __N) { return (__m64) __builtin_ia32_pshu
 __attribute__((hot))
 void maxblend_sse(void *restrict dest, const void *restrict src, int w, int h)
 {
+	//FIXME: use src_stride
+	//FIXME: deal with w%16 != 0
 	__m64 *mbdst = dest; const __m64 *mbsrc = src;
 	const __m64 off = _mm_set1_pi16(0x8000);
 	_mm_prefetch(mbdst, _MM_HINT_NTA);
@@ -202,6 +204,8 @@ void pallet_blit565_sse(uint8_t * restrict dest, unsigned int dst_stride,
 
 	//TODO: interopolate colours and dither?
 
+	//FIXME: deal with w%16 != 0
+
 	const __m64 mask = (__m64)(0xfcfcfcfcf8f8f8f8ll);
 	const __m64 zero = (__m64)(0ll);
 	for(unsigned int y = 0; y < h; y++) {
@@ -327,6 +331,8 @@ void pallet_blit555_sse(uint8_t * restrict dest, unsigned int dst_stride,
 
 	//TODO: interopolate colours and dither?
 
+	//FIXME: deal with w%16 != 0
+
 	const __m64 mask = _mm_set1_pi8(0xf8);
 	const __m64 zero = (__m64)(0ll);
 	for(unsigned int y = 0; y < h; y++) {
@@ -415,6 +421,8 @@ void pallet_blit8_sse(uint8_t* restrict dest, unsigned int dst_stride,
 		const uint16_t *restrict src, unsigned int src_stride,
 		unsigned int w, unsigned int h)
 {
+	//FIXME: deal with w%16 != 0
+
 	for(unsigned int y = 0; y < h; y++) {
 		const uint16_t *restrict s = src + y*src_stride;
 		__m64 *restrict d = (__m64 *restrict)(dest + y*dst_stride);

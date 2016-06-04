@@ -4,10 +4,6 @@
 #include "x86_features.h"
 #include <cpuid.h>
 
-#ifndef bit_SSE41
-#define bit_SSE41       0x00080000
-#endif
-
 uint64_t x86feat_get_features(void)
 {
 	uint64_t features = 0;
