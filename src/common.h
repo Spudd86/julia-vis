@@ -54,6 +54,12 @@ typedef bool _Bool
 #endif
 #endif
 
+//TODO: maybe make configure check this stuff
+#if defined(_WIN32)
+#define aligned_alloc(align, size) _aligned_malloc(size, align)
+#else
+#endif
+
 //#define IMIN(x,y) ((x)+((((y)-(x)) >> 31)&((y)-(x))))
 //#define IMAX(x,y) ((x)-((((x)-(y)) >> 31)&((x)-(y))))
 #define IMIN(x,y) (((x)<(y))?(x):(y))

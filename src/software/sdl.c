@@ -1,7 +1,6 @@
 
 #include "common.h"
 #include <SDL.h>
-#include <mm_malloc.h>
 
 #include "map.h"
 #include "sdl-misc.h"
@@ -10,9 +9,7 @@
 #include "audio/audio.h"
 #include "maxsrc.h"
 
-#define MAP soft_map_interp
-
-#define IM_SIZE (384)
+#define IM_SIZE (512)
 
 static opt_data opts;
 
@@ -33,14 +30,15 @@ int main(int argc, char **argv)
 	printf("running with %dx%d bufs\n", im_w, im_h);
 
 	uint16_t *map_surf[2];
-	map_surf[0] = _mm_malloc(2 * im_w * im_h * sizeof(uint16_t), 32);
-	memset(map_surf[0], 0, 2 * im_w * im_h * sizeof(uint16_t));
-	map_surf[1] = map_surf[0] + im_w * im_h;
+	map_surf[0] = aligned_alloc(64, im_w * im_h * sizeof(uint16_t));
+	memset(map_surf[0], 0, im_w * im_h * sizeof(uint16_t));
+	map_surf[1] = aligned_alloc(64, im_w * im_h * sizeof(uint16_t));
+	memset(map_surf[0], 0, im_w * im_h * sizeof(uint16_t));
 
 	int m = 0, cnt = 0;
 
 	struct maxsrc *maxsrc = maxsrc_new(im_w, im_h);
-	struct pal_ctx *pal_ctx = pal_ctx_new(screen->format->BitsPerPixel == 8);
+	struct pal_ctx *pal_ctx = pal_ctx_new(screen->format->BitsPerPixel == 8); //TODO: write a helper that picks the right pallet channel order based on screen->format
 	struct point_data *pd = new_point_data(opts.rational_julia?4:2);
 
 	Uint32 tick0, fps_oldtime;
@@ -52,7 +50,8 @@ int main(int argc, char **argv)
 	uint32_t now = tick0;
 	uint32_t maxfrms = 0;
 
-	SDL_Event	event;
+	SDL_Event event;
+	memset(&event, 0, sizeof(event));
 	while(SDL_PollEvent(&event) >= 0) {
 		if(event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) break;
 
