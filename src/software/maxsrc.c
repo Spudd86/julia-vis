@@ -53,8 +53,7 @@ struct maxsrc *maxsrc_new(int w, int h)
 
 void maxsrc_delete(struct maxsrc *self)
 {
-	//free(self->buf); //FIXME: portable way to free aligned memory
-	// on windows need to use _aligned_free()
+	aligned_free(self->buf);
 	free((void*)self->pnt_src.data);
 	self->next_src = self->prev_src = self->buf = NULL;
 	self->iw = self->ih = self->samp = 0;

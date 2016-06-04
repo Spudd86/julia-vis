@@ -3,8 +3,6 @@
 #include <SDL.h>
 #include <SDL_thread.h>
 
-#include <mm_malloc.h>
-
 #include "tribuf.h"
 #include "pallet.h"
 #include "pixmisc.h"
@@ -109,13 +107,7 @@ int main(int argc, char **argv)
 	struct pal_ctx *pal_ctx = pal_ctx_new(screen->format->BitsPerPixel == 8);
 
 	uint16_t *map_surf[3];
-#ifdef HAVE_MMAP
-	// use mmap here since it'll give us a nice page aligned chunk (malloc will probably be using it anyway...)
-	void *map_surf_mem = mmap(NULL, 3 * im_w * im_h * sizeof(uint16_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, 0, 0);
-#else
-	//void *map_surf_mem = valloc(3 * im_w * im_h * sizeof(uint16_t));
-	void *map_surf_mem = _mm_malloc(3 * im_w * im_h * sizeof(uint16_t), 32);
-#endif
+	void *map_surf_mem = aligned_alloc(64, 3 * im_w * im_h * sizeof(uint16_t));
 	for(int i=0; i<3; i++)
 		map_surf[i] = map_surf_mem + i * im_w * im_h * sizeof(uint16_t);
 	memset(map_surf_mem, 0, 3 * im_w * im_h * sizeof(uint16_t));
@@ -145,7 +137,7 @@ int main(int argc, char **argv)
 				pal_ctx_step(pal_ctx, IMIN((now - lastpalstep)*256/2048, 64));
 				lastpalstep = now;
 			}
-			
+
 			pallet_blit_SDL(screen, tribuf_get_read(map_tb), im_w, im_h, pal_ctx_get_active(pal_ctx));
 			tribuf_finish_read(map_tb);
 
@@ -174,12 +166,7 @@ int main(int argc, char **argv)
 
 	int status;
 	SDL_WaitThread(map_thread, &status);
-
-#ifdef HAVE_MMAP
-	munmap(map_surf_mem, 3 * im_w * im_h * sizeof(uint16_t));
-#else
-	_mm_free(map_surf_mem);
-#endif
+	aligned_free(map_surf_mem);
 	audio_shutdown();
 	SDL_Quit();
     return 0;
