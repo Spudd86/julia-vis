@@ -20,6 +20,4 @@ int audio_get_buf_count(void);
 int audio_get_samples(audio_data *d);
 void audio_finish_samples(void);
 
-int audio_get_fft(audio_data *d);
-
 #endif

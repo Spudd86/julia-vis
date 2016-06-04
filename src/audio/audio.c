@@ -20,22 +20,15 @@ void split_radix_real_complex_fft(float *x, uint32_t n);
  * want all that stuff so we can drive a software render at fixed framerate
  * from the audio clock in a gstreamer pipeline or something like that.
  *
- * Also want to avoid having to do #if FFT_RINGBUF so that we can
- * actually use make properly, basically want audio-test to be able to
- * set things up so that it just gets audio samples from a ringbuffer and does
- * all it's fft and beat detection in the main thread, but all the other code
- * can continue the way it is now with the fft/beat detection happening in
- * the audio thread, all while also supporting the use case of the gst pipeline too
- *
  * basically we need to overhaul the structure of this code completely
  *
  * perhaps move fft calculation into the beat detector...
  *
- * also need to make grabbing beat counts safer
+ * need to make grabbing beat counts safer
  */
 
 typedef void (*audio_drv_shutdown_t)();
-audio_drv_shutdown_t audio_drv_shutdown = NULL;
+static audio_drv_shutdown_t audio_drv_shutdown = NULL;
 
 int audio_init(const opt_data *od)
 {
@@ -83,11 +76,6 @@ static int nr_samp = 0;
 static float *fft_tmp = NULL;
 
 static tribuf *samp_tb = NULL;
-
-#ifdef FFT_RINGBUF
-#include "rb.h"
-static rb_t *fft_rb = NULL;
-#endif
 
 static beat_ctx *gbl_beat_ctx = NULL;
 
@@ -177,12 +165,6 @@ void audio_update(const float *in, int n)
 	beat_ctx_update(gbl_beat_ctx, fft, nr_samp/2);
 	prev_buf = samps;
 
-#ifdef FFT_RINGBUF
-	size_t fft_len = sizeof(float)*(nr_samp/2 + 1);
-	if(rb_write_space(fft_rb) >=  fft_len)
-		rb_write(fft_rb, (char*)fft, fft_len);
-#endif
-
 	if(remain > 0) audio_update(in, remain);
 }
 
@@ -194,19 +176,6 @@ int audio_get_samples(audio_data *d) {
 void audio_finish_samples(void) { tribuf_finish_read(samp_tb); }
 
 #define MAX_SAMP 2048
-
-#ifdef FFT_RINGBUF
-static float fft_data[MAX_SAMP];
-
-int audio_get_fft(audio_data *d) {
-	d->len = nr_samp/2+1;
-	d->data = fft_data;
-	size_t fft_len = sizeof(float)*(nr_samp/2 + 1);
-	if(rb_read_space(fft_rb) >= fft_len)
-		rb_read(fft_rb, (void *)fft_data, fft_len);
-	return 0;
-}
-#endif
 
 // never need more memory than we get here.
 static float samp_bufs[MAX_SAMP*3] __attribute__ ((aligned (16)));
@@ -227,10 +196,6 @@ int audio_setup(int sr)
 	samp_data[2] = samp_bufs + MAX_SAMP*2;
 	memset(samp_data[0], 0, sizeof(float) * MAX_SAMP * 3);
 	samp_tb = tribuf_new(samp_data, 0);
-
-#ifdef FFT_RINGBUF
-	fft_rb = rb_create(8*MAX_SAMP*sizeof(float));
-#endif
 
 	gbl_beat_ctx = beat_new();
 

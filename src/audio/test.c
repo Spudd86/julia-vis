@@ -4,61 +4,29 @@
 #include "beat.h"
 #include "getsamp.h"
 
+// TODO: switch to doing audio stuff in here directly, in our audio_update() callback
+// just feed a ring-buffer and do all the analysis in the main thread since unlike
+// the julia set visualizer we DO care about every sample.
+// So in that case most of our mainloop then becomes driven off of the audio clock
+// via the ring buffer.
+// Doing this would let us drop a bunch of #ifdef logic from audio.c and would be a
+// help into making this project build properly (ie: compile each source file individually
+// rather than compile and link in one step for each different binary)
+
 #define IM_SIZE (768)
 
 static opt_data opts;
 
-static inline int inrange(int c, int a, int b) { return (unsigned)(c-a) <= (unsigned)(b-a); }
+void split_radix_real_complex_fft(float *x, uint32_t n);
 
-static inline void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
-{
-	if(!inrange(x,0,surface->w-1) || !inrange(y, 0, surface->h-1)) return;
+static void get_next_fft(audio_data *d);
+static int get_buf_count();
 
-    int bpp = surface->format->BitsPerPixel/8;
-    /* Here p is the address to the pixel we want to set */
-    Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
+static inline void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel);
+static inline void putpixel_mono(SDL_Surface *surface, int x, int y, int bri);
 
-    switch(bpp) {
-    case 1:
-        *p = pixel;
-        break;
-
-    case 2:
-        *(Uint16 *)p = pixel;
-        break;
-
-    case 3:
-        if(SDL_BYTEORDER == SDL_BIG_ENDIAN) {
-            p[0] = (pixel >> 16) & 0xff;
-            p[1] = (pixel >> 8) & 0xff;
-            p[2] = pixel & 0xff;
-        } else {
-            p[0] = pixel & 0xff;
-            p[1] = (pixel >> 8) & 0xff;
-            p[2] = (pixel >> 16) & 0xff;
-        }
-        break;
-
-    case 4:
-        *(Uint32 *)p = pixel;
-        break;
-    }
-}
-
-static inline void putpixel_mono(SDL_Surface *surface, int x, int y, int bri) {
-	const int pixbits = surface->format->BitsPerPixel;
-
-	if(pixbits == 16) {
-		int rb = bri >> 3;
-		int g = bri >> 2;
-		putpixel(surface, x, y, ((rb<<11) | (g<<5) | rb));
-	} else if(pixbits == 15) {
-		int p = bri >> 3;
-		putpixel(surface, x, y, ((p<<10) | (p<<5) | p));
-	} else {
-		putpixel(surface, x, y, ((bri<<16) | (bri<<8) | bri));
-	}
-}
+typedef void (*audio_drv_shutdown_t)();
+static audio_drv_shutdown_t audio_drv_shutdown = NULL;
 
 static inline float sigmoid(float x) {
 	float e = expf(x);
@@ -83,8 +51,8 @@ int main(int argc, char **argv)
 
 	audio_init(&opts);
 
-	unsigned int frmcnt = 0;
-	unsigned int tick0, fps_oldtime = tick0 = SDL_GetTicks();
+	uint64_t frmcnt = 0;
+	uint32_t tick0, fps_oldtime = tick0 = SDL_GetTicks();
 	float frametime = 100;
 	SDL_Event	event;
 	float beat_throb = 0.0f;
@@ -101,7 +69,7 @@ int main(int argc, char **argv)
 	beat_ctx *beat_ctx = beat_new();
 	int beat_nbands = beat_ctx_bands(beat_ctx);
 
-	Uint32 now = SDL_GetTicks();
+	uint32_t now = SDL_GetTicks();
 	audio_data d;
 	while(SDL_PollEvent(&event) >= 0)
 	{
@@ -109,15 +77,15 @@ int main(int argc, char **argv)
 			|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE))
 			break;
 		
-		//int delay =  (tick0 + frmcnt*10000/982) - now;
-		int delay =  (tick0 + frmcnt*10000/491) - now;
-		if(delay > 0) SDL_Delay(delay);
+		uint64_t next_frame =  (tick0 + frmcnt*10000/982);
+		//uint64_t next_frame =  (tick0 + frmcnt*10000/491);
+		if(next_frame > now) SDL_Delay(next_frame - now);
 		
 		//TODO: when we get new buffers make sure we process all of them before we attempt
 		// to actually update the front buffer, so that if we're running slow we don't
 		// waste time drawing frames that won't be seen
 
-		int avpx = audio_get_buf_count() % im_w;
+		int avpx = get_buf_count() % im_w;
 		//if(ovpx == avpx) continue;
 		//while(ovpx == avpx) { //SDL_Delay(0);
 		//	avpx = audio_get_buf_count() % im_w;
@@ -130,7 +98,7 @@ int main(int argc, char **argv)
 			SDL_Rect r = {0,0, im_w, im_h/2+1};
 			SDL_FillRect(screen, &r, 0);
 
-			audio_get_fft(&d);
+			get_next_fft(&d);
 		
 			beat_ctx_update(beat_ctx, d.data, d.len);
 			int beat_count = beat_ctx_count(beat_ctx);
@@ -153,7 +121,7 @@ int main(int argc, char **argv)
 			if(oldbc != beat_count)
 				draw_line(voice_print, vpx, im_h/4-5, vpx, im_h/4+5, 0xffffffff);
 		
-			beat_throb = beat_throb*(0.996) + (oldbc != beat_count);
+			beat_throb = beat_throb*(0.996f) + (oldbc != beat_count);
 			oldbc = beat_count;
 			ovpx = vpx;
 		}
@@ -207,8 +175,8 @@ int main(int argc, char **argv)
 			}
 		}
 
-		draw_line(screen, 2, im_h-10, 2, (sigmoid(-0.1*beat_throb)+0.5)*(im_h-12), 0xffffffff);
-		draw_line(screen, 3, im_h-10, 3, (sigmoid(-0.1*beat_throb)+0.5)*(im_h-12), 0xffffffff);
+		draw_line(screen, 2, im_h-10, 2, (sigmoid(-0.1f*beat_throb)+0.5f)*(im_h-12), 0xffffffff);
+		draw_line(screen, 3, im_h-10, 3, (sigmoid(-0.1f*beat_throb)+0.5f)*(im_h-12), 0xffffffff);
 
 		if(SDL_MUSTLOCK(screen)) SDL_UnlockSurface(screen);
 
@@ -226,5 +194,182 @@ int main(int argc, char **argv)
 
 	SDL_FreeSurface(voice_print);
 
+	audio_drv_shutdown();
+
     return 0;
 }
+
+static inline int inrange(int c, int a, int b) { return (unsigned)(c-a) <= (unsigned)(b-a); }
+
+static inline void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel)
+{
+	if(!inrange(x,0,surface->w-1) || !inrange(y, 0, surface->h-1)) return;
+
+    int bpp = surface->format->BitsPerPixel/8;
+    /* Here p is the address to the pixel we want to set */
+    Uint8 *p = (Uint8 *)surface->pixels + y * surface->pitch + x * bpp;
+
+    switch(bpp) {
+    case 1:
+        *p = pixel;
+        break;
+
+    case 2:
+        *(Uint16 *)p = pixel;
+        break;
+
+    case 3:
+        if(SDL_BYTEORDER == SDL_BIG_ENDIAN) {
+            p[0] = (pixel >> 16) & 0xff;
+            p[1] = (pixel >> 8) & 0xff;
+            p[2] = pixel & 0xff;
+        } else {
+            p[0] = pixel & 0xff;
+            p[1] = (pixel >> 8) & 0xff;
+            p[2] = (pixel >> 16) & 0xff;
+        }
+        break;
+
+    case 4:
+        *(Uint32 *)p = pixel;
+        break;
+    }
+}
+
+static inline void putpixel_mono(SDL_Surface *surface, int x, int y, int bri) {
+	const int pixbits = surface->format->BitsPerPixel;
+
+	if(pixbits == 16) {
+		int rb = bri >> 3;
+		int g = bri >> 2;
+		putpixel(surface, x, y, ((rb<<11) | (g<<5) | rb));
+	} else if(pixbits == 15) {
+		int p = bri >> 3;
+		putpixel(surface, x, y, ((p<<10) | (p<<5) | p));
+	} else {
+		putpixel(surface, x, y, ((bri<<16) | (bri<<8) | bri));
+	}
+}
+
+
+#include "rb.h"
+#include "audio-private.h"
+
+int audio_init(const opt_data *od)
+{
+	printf("\nAudio input starting...\n");
+
+	int rc;
+	switch(od->audio_driver) {
+	#ifdef HAVE_JACK
+		case AUDIO_JACK:
+			rc = jack_setup(od);
+			audio_drv_shutdown = jack_shutdown;
+			break;
+	#endif
+	#ifdef HAVE_PULSE
+		case AUDIO_PULSE:
+			audio_drv_shutdown = pulse_shutdown;
+			rc = pulse_setup(od);
+			break;
+	#endif
+	#ifdef HAVE_PORTAUDIO
+		case AUDIO_PORTAUDIO:
+			rc = audio_setup_pa(od);
+			audio_drv_shutdown = audio_stop_pa;
+			break;
+	#endif
+	#ifdef HAVE_SNDFILE
+		case AUDIO_SNDFILE:
+			rc = filedecode_setup(od);
+			audio_drv_shutdown = filedecode_shutdown;
+			break;
+	#endif
+		default:
+			printf("No Audio driver!\n");
+			//rc = audio_setup(48000);
+			rc = -1;
+	}
+
+	if(rc < 0) printf("Audio setup failed!\n");
+	else printf("Finished audio setup\n\n");
+	return rc;
+}
+
+#define MAX_SAMP 2048
+
+static int buf_count = 0;
+static int nr_samp = 0;
+static float fft_tmp[MAX_SAMP];
+static float samp_bufs[2][MAX_SAMP];
+static float *prev_samp = NULL;
+static float *cur_samp = NULL;
+static rb_t *samp_rb = NULL;
+
+int audio_setup(int sr)
+{
+	nr_samp = (sr<50000)?MAX_SAMP/2:MAX_SAMP;
+
+	printf("Sample Rate %i\nUsing %i samples/buffer\n", sr, nr_samp/2);
+
+	for(int i=0; i<MAX_SAMP; i++) {
+		fft_tmp[i] = samp_bufs[0][i] = samp_bufs[1][i] = 0;
+	}
+
+	prev_samp = samp_bufs[0];
+	cur_samp = samp_bufs[1];
+
+	samp_rb = rb_create(8*MAX_SAMP*sizeof(float));
+
+	return 0;
+}
+
+void audio_update(const float *in, int n)
+{
+	rb_write(samp_rb, (char*)in, n*sizeof(*in));
+}
+
+static int get_buf_count()
+{
+	return buf_count + rb_read_space(samp_rb)/(sizeof(float)*nr_samp/2);
+}
+
+static float *do_fft(float *in1, float *in2)
+{
+	for(int i=0; i<nr_samp;i++) { // window samples
+		// Hanning window
+		float w = 0.5f*(1.0f - cosf((2*M_PI_F*i)/(nr_samp-1)));
+		fft_tmp[i] = ((i < nr_samp/2)?in1[i]:in2[i-nr_samp/2])*w;
+	}
+
+	split_radix_real_complex_fft(fft_tmp, nr_samp);
+	float *fft = fft_tmp;
+
+	const float scl = 2.0f/nr_samp;
+	fft[0] = fabsf(fft_tmp[0])*scl;
+	for(int i=1; i < nr_samp/2; i++)
+		fft[i] = sqrtf(fft_tmp[i]*fft_tmp[i] + fft_tmp[nr_samp-i]*fft_tmp[nr_samp-i])*scl;
+	fft[nr_samp/2] = fabsf(fft_tmp[nr_samp/2])*scl;
+
+	return fft;
+}
+
+static void get_next_fft(audio_data *d)
+{
+	d->len = nr_samp/2+1;
+	d->data = fft_tmp;
+
+	size_t buf_len = sizeof(float)*(nr_samp/2);
+	if(rb_read_space(samp_rb)/sizeof(float) >= (nr_samp/2)) {
+		rb_read(samp_rb, (void *)cur_samp, buf_len);
+
+		d->data = do_fft(cur_samp, prev_samp);
+
+		float *tmp = cur_samp;
+		cur_samp = prev_samp;
+		prev_samp = tmp;
+
+		buf_count++;
+	}
+}
+
