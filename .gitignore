@@ -1,5 +1,6 @@
 *.gcda
 *.gcno
+*.dep
 *.o
 bin/*
 config.mk

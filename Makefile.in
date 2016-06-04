@@ -106,6 +106,8 @@ COMMON_SRCS = src/terminusIBM.c src/isaac/isaac.c src/pallet.c src/optproc.c src
 
 SOFT_SRCS = src/software/map.c src/software/maxsrc.c src/software/palletblit.c src/software/pixmisc.c
 
+X86_SOFT_SRCS = src/software/x86/cpuid.c src/software/x86/mmx.c src/software/x86/sse.c src/software/x86/sse2.c src/software/x86/sse4_1.c
+
 GL_SRCS = src/opengl/glmain.c src/opengl/glmisc.c src/opengl/glsl/glsl_maxsrc.c src/opengl/fixed/glf_maxsrc.c src/opengl/glscope.c src/opengl/glsl/glsl_pallet.c src/opengl/fixed/glf_pal.c src/opengl/fixed/glmap.c src/opengl/mandelbrot.c src/opengl/offscreen.c src/opengl/glsl/glsl_fract.c src/opengl/fixed/glf_fract.c
 
 ifeq ($(ENABLE_JACK),yes)
@@ -123,6 +125,8 @@ endif
 
 AUDIO_OBJS = $(AUDIO_SRCS:.c=.o)
 
+X86_SOFT_OBJS = $(X86_SOFT_SRCS:.c=.o)
+
 TRIBUF_SRCS = src/tribuf.c
 
 ifeq (@disable_atomics@,yes)
@@ -135,6 +139,8 @@ run: bin/sdlthread-test
 	bin/sdlthread-test
 
 clean:
+	-rm -f $(X86_SOFT_OBJS)
+	-rm -f src/opengl/gl_14.o
 	-rm -f src/*.o
 	-rm -f $(ALL_BINS)
 
@@ -146,9 +152,9 @@ distclean: clean
 config.mk:
 	touch config.mk
 
-bin/sdl-test$(EXEEXT): src/software/sdl.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) src/points.h src/common.h Makefile config.mk
+bin/sdl-test$(EXEEXT): src/software/sdl.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) $(X86_SOFT_OBJS) src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
-	src/software/sdl.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) \
+	src/software/sdl.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) $(X86_SOFT_OBJS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
 bin/gl-test$(EXEEXT): $(GL_LOADER) src/opengl/sdlmain.c src/sdl-misc.c $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
@@ -200,9 +206,9 @@ bin/kms-test$(EXEEXT): $(GL_LOADER) src/opengl/egl/kms.c $(GL_SRCS) $(COMMON_SRC
 src/opengl/gl_14.o: src/opengl/gl_14.c
 	$(CC) -g -O2 $(GL_CFLAGS) -c $< -o $@
 
-bin/sdlthread-test$(EXEEXT): src/software/sdl-thread.c src/sdl-misc.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) src/points.h src/common.h Makefile config.mk
+bin/sdlthread-test$(EXEEXT): src/software/sdl-thread.c src/sdl-misc.c $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) $(X86_SOFT_OBJS) src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_SDL \
-	src/software/sdl-thread.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) \
+	src/software/sdl-thread.c src/sdl-misc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_SRCS) $(X86_SOFT_OBJS) \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
 bin/audio-test$(EXEEXT): $(AUDIO_SRCS) src/audio/test.c src/sdl-misc.c src/terminusIBM.c src/optproc.c $(TRIBUF_SRCS) src/audio/rb.c src/software/line.c
@@ -210,7 +216,28 @@ bin/audio-test$(EXEEXT): $(AUDIO_SRCS) src/audio/test.c src/sdl-misc.c src/termi
 	$(AUDIO_SRCS) src/audio/test.c src/sdl-misc.c src/terminusIBM.c src/optproc.c $(TRIBUF_SRCS) src/audio/rb.c src/software/line.c \
 	$(SDL_FLAGS) $(AUDIO_FLAGS) $(LIBS) -o $@
 
+bin/pal-test$(EXEEXT): src/software/test_palletblit.c src/sdl-misc.c $(COMMON_SRCS) $(SOFT_SRCS) $(X86_SOFT_OBJS) src/common.h Makefile config.mk
+	$(CC) $(CFLAGS) -DUSE_SDL \
+	src/software/test_palletblit.c src/sdl-misc.c $(COMMON_SRCS) $(SOFT_SRCS) $(X86_SOFT_OBJS) \
+	$(SDL_FLAGS) $(LIBS) -o $@
+
 -include $(DEPS)
+
+src/software/x86/mmx.o: src/software/x86/mmx.c src/common.h src/software/pixmisc.h Makefile config.mk
+	@$(CC) -MM -MQ $@ $(CFLAGS) -mmmx $(PP_FLAGS) $< -MF $*.dep
+	$(CC) -c $(CFLAGS) -mmmx $(PP_FLAGS) $< -o $@
+
+src/software/x86/sse.o: src/software/x86/sse.c src/common.h src/software/pixmisc.h Makefile config.mk
+	@$(CC) -MM -MQ $@ $(CFLAGS) -msse $(PP_FLAGS) $< -MF $*.dep
+	$(CC) -c $(CFLAGS) -msse $(PP_FLAGS) $< -o $@
+
+src/software/x86/sse2.o: src/software/x86/sse2.c src/common.h src/software/pixmisc.h Makefile config.mk
+	@$(CC) -MM -MQ $@ $(CFLAGS) -msse2 $(PP_FLAGS) $< -MF $*.dep
+	$(CC) -c $(CFLAGS) -msse2 $(PP_FLAGS) $< -o $@
+
+src/software/x86/sse4_1.o: src/software/x86/sse4_1.c src/common.h src/software/pixmisc.h Makefile config.mk
+	@$(CC) -MM -MQ $@ $(CFLAGS) -msse4.1 $(PP_FLAGS) $< -MF $*.dep
+	$(CC) -c $(CFLAGS) -msse4.1 $(PP_FLAGS) $< -o $@
 
 tinycthread/%.o: tinycthread/%.c Makefile config.mk
 	$(CC) @CFLAGS@ @CPPFLAGS@ -c $< -o $@

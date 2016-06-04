@@ -1,10 +1,10 @@
 //#pragma GCC optimize "3,ira-hoist-pressure,inline-functions,merge-all-constants,modulo-sched,modulo-sched-allow-regmoves,aggressive-loop-optimizations,unsafe-loop-optimizations"
 
 #include "common.h"
-#include "mymm.h"
 #include "map.h"
 
 #include <float.h>
+#include <assert.h>
 
 #define BLOCK_SIZE 8
 
@@ -26,7 +26,7 @@ static inline uint16_t bilin_samp(uint16_t *restrict in, int w, int h, float x, 
 	uint_fast32_t p10 = in[y2*w + x1];
 	uint_fast32_t p11 = in[y2*w + x2];
 
-#if 0 // TODO: use top on 32bit machines
+#if 0 // TODO: use top version if we don't have fast 64bit ints
 	// it is critical that this entire calculation be done as at least uint32s
 	// otherwise it overflows
 	uint_fast32_t v = ((p00*(256u - xf) + p01*xf)*(256u-yf) +
@@ -64,6 +64,9 @@ static inline void block_interp_bilin(uint16_t *restrict out, uint16_t *restrict
 		uint16_t *restrict out_line = out + (yd+yt)*w + xd;
 		#pragma GCC ivdep
 		for(uint_fast32_t xt=0; xt<BLOCK_SIZE; xt++, x+=xst, y+=yst) {
+			assert(x >= 0); assert(x < w*256); // in debug builds make sure rounding hasn't messed us up
+			assert(y >= 0); assert(y < h*256);
+
 			uint_fast32_t xs, ys, xf, yf;
 			uint_fast32_t xi1, xi2, yi1, yi2;
 
@@ -74,7 +77,7 @@ static inline void block_interp_bilin(uint16_t *restrict out, uint16_t *restrict
 			xi2 = IMIN(xi1+1, w-1u);
 			yi2 = IMIN(yi1+w, clamph);
 
-#if 0 // TODO: use top on 32bit machines
+#if 0 // TODO: use top version if we don't have fast 64bit ints
 			uint_fast32_t v = ((in[yi1 + xi1]*(256u - xf) + in[yi1 + xi2]*xf)*(256u-yf) +
 			                   (in[yi2 + xi1]*(256u - xf) + in[yi2 + xi2]*xf)*yf) >> 16u;
 			v = (v*((256u*97u)/100u)) >> 8u; // now that we have fixed bilinear interp need a fade here
