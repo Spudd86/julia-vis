@@ -4,6 +4,7 @@
 
 #include "map.h"
 #include "sdl-misc.h"
+#include "sdlhelp.h"
 #include "pallet.h"
 #include "pixmisc.h"
 #include "audio/audio.h"
@@ -50,10 +51,18 @@ int main(int argc, char **argv)
 	uint32_t now = tick0;
 	uint32_t maxfrms = 0;
 
+	int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
+	int lastframe_key = 0;
+
 	SDL_Event event;
 	memset(&event, 0, sizeof(event));
 	while(SDL_PollEvent(&event) >= 0) {
 		if(event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)) break;
+		if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F1)) { if(!lastframe_key) { debug_maxsrc = !debug_maxsrc; } lastframe_key = 1; }
+		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F2)) { if(!lastframe_key) { debug_pal = !debug_pal; } lastframe_key = 1; }
+		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F3)) { if(!lastframe_key) { show_mandel = !show_mandel; } lastframe_key = 1; }
+		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F4)) { if(!lastframe_key) { show_fps_hist = !show_fps_hist; } lastframe_key = 1; }
+		else lastframe_key = 0;
 
 		m = (m+1)&0x1;
 
@@ -71,7 +80,10 @@ int main(int argc, char **argv)
 			pal_ctx_step(pal_ctx, IMIN((now - lastpalstep)*256/1024, 32));
 			lastpalstep = now;
 		}
-		pallet_blit_SDL(screen, map_surf[m], im_w, im_h, pal_ctx_get_active(pal_ctx));
+		if(debug_maxsrc)
+			pallet_blit_SDL(screen, maxsrc_get(maxsrc), im_w, im_h, pal_ctx_get_active(pal_ctx));
+		else
+			pallet_blit_SDL(screen, map_surf[m], im_w, im_h, pal_ctx_get_active(pal_ctx));
 
 		char buf[32];
 		sprintf(buf,"%6.1f FPS", 1000.0f / frametime);
@@ -81,7 +93,7 @@ int main(int argc, char **argv)
 		now = SDL_GetTicks();
 		int newbeat = beat_get_count();
 		if(newbeat != beats) pal_ctx_start_switch(pal_ctx, newbeat);
-		
+
 		if(newbeat != beats && now - last_beat_time > 1000) {
 			last_beat_time = now;
 			update_points(pd, (now - tick0), 1);
@@ -101,7 +113,7 @@ int main(int argc, char **argv)
 		fps_oldtime = SDL_GetTicks();
 		cnt++;
 	}
-	
+
 	pal_ctx_delete(pal_ctx);
 	maxsrc_delete(maxsrc);
 	audio_shutdown();

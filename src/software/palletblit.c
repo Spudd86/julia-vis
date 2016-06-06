@@ -1,6 +1,4 @@
 
-#pragma GCC optimize "3,inline-functions,merge-all-constants"
-
 #include "common.h"
 #include "pixmisc.h"
 #include "pallet.h"
@@ -25,7 +23,7 @@
 
 //TODO: find a way to do approximate gamma correct colour interpolation
 
-static void pallet_blit32_fallback(uint8_t * restrict dest, unsigned int dst_stride,
+void pallet_blit32_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h,
 					const uint32_t *restrict pal)
@@ -38,6 +36,38 @@ static void pallet_blit32_fallback(uint8_t * restrict dest, unsigned int dst_str
 		}
 	}
 }
+
+#if 0
+static inline float a_dither_flt(float input, uint32_t x, uint32_t y, int c, uint32_t levels)
+{
+	float mask;
+	switch (pattern) {
+		case 1: mask = ((x ^ y * 149) * 1234& 511)/511.0f; break;
+		case 2: mask = (((x+c*17) ^ y * 149) * 1234 & 511)/511.0f; break;
+		case 3: mask = ((x + y * 237) * 119 & 255)/255.0f; break;
+		case 4: mask = (((x+c*67) + y * 236) * 119 & 255)/255.0f; break;
+		case 5: mask = 0.5; break;
+		default: return input;
+	}
+	//return mask*255;
+	return (levels * input + mask)/levels;
+}
+
+static inline uint32_t a_dither(uint32_t input, uint32_t x, uint32_t y, int c, uint32_t levels)
+{
+	uint32_t mask;
+	switch (pattern) {
+		case 1: mask = ((x ^ y * 149) * 1234 & 511); break;
+		case 2: mask = (((x+c*17) ^ y * 149) * 1234 & 511); break;
+		case 3: mask = ((x + y * 237) * 119 & 255); break;
+		case 4: mask = (((x+c*67) + y * 236) * 119 & 255); break;
+		case 5: mask = 0.5; break;
+		default: return input;
+	}
+	return (levels * input + mask)/levels;
+}
+#endif
+
 
 static inline uint16_t a_dither1(uint16_t input, uint32_t x, uint32_t y, uint16_t bits)
 {
@@ -69,7 +99,7 @@ static inline uint8_t a_dither4(uint8_t input, uint32_t x, uint32_t y, int c, ui
 
 }
 
-static void pallet_blit565_fallback(uint8_t * restrict dest, unsigned int dst_stride,
+void pallet_blit565_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h,
 					const uint32_t *restrict pal)
@@ -91,7 +121,7 @@ static void pallet_blit565_fallback(uint8_t * restrict dest, unsigned int dst_st
 	}
 }
 
-static void pallet_blit555_fallback(uint8_t * restrict dest, unsigned int dst_stride,
+void pallet_blit555_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h,
 					const uint32_t *restrict pal)
@@ -113,7 +143,7 @@ static void pallet_blit555_fallback(uint8_t * restrict dest, unsigned int dst_st
 	}
 }
 
-static void pallet_blit8_fallback(uint8_t * restrict dest, unsigned int dst_stride,
+void pallet_blit8_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h)
 {
@@ -124,25 +154,6 @@ static void pallet_blit8_fallback(uint8_t * restrict dest, unsigned int dst_stri
 			*(d++) = *(s++)>>8;
 	}
 }
-
-typedef void (*pallet_blit8_fn)(uint8_t * restrict dest, unsigned int dst_stride,
-					const uint16_t *restrict src, unsigned int src_stride,
-					unsigned int w, unsigned int h);
-
-typedef void (*pallet_blit555_fn)(uint8_t * restrict dest, unsigned int dst_stride,
-					const uint16_t *restrict src, unsigned int src_stride,
-					unsigned int w, unsigned int h,
-					const uint32_t *restrict pal);
-
-typedef void (*pallet_blit565_fn)(uint8_t * restrict dest, unsigned int dst_stride,
-					const uint16_t *restrict src, unsigned int src_stride,
-					unsigned int w, unsigned int h,
-					const uint32_t *restrict pal);
-
-typedef void (*pallet_blit32_fn)(uint8_t *restrict dest, unsigned int dst_stride,
-					const uint16_t *restrict src, unsigned int src_stride,
-					unsigned int w, unsigned int h,
-					const uint32_t *restrict pal);
 
 #if (__x86_64__ || __i386__)
 
@@ -254,24 +265,4 @@ void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h,
 		pallet_blit8(dst->data, dst->pitch, src, src_stride, w, h);
 	}
 }
-
-#ifdef USE_SDL
-#include <SDL.h>
-void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal)
-{
-	const unsigned int src_stride = w;
-	w = IMIN(w, dst->w);
-	h = IMIN(h, dst->h);
-
-	if((SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) || w < 0 || h < 0) return;
-	if(dst->format->BitsPerPixel == 32) pallet_blit32(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
-	else if(dst->format->BitsPerPixel == 16) pallet_blit565(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
-	else if(dst->format->BitsPerPixel == 15) pallet_blit555(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
-	else if(dst->format->BitsPerPixel == 8) { // need to set surface's pallet
-		pallet_blit8(dst->pixels, dst->pitch, src, src_stride, w, h);
-		SDL_SetColors(dst, (void *)pal, 0, 256);
-	}
-	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
-}
-#endif
 

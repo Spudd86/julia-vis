@@ -6,6 +6,7 @@
 #include "tribuf.h"
 #include "pallet.h"
 #include "pixmisc.h"
+#include "sdlhelp.h"
 #include "sdl-misc.h"
 #include "map.h"
 #include "audio/audio.h"

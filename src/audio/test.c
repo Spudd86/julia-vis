@@ -1,4 +1,8 @@
 #include "common.h"
+
+#include <SDL.h>
+
+#include "software/sdlhelp.h"
 #include "sdl-misc.h"
 #include "audio.h"
 #include "beat.h"
@@ -65,7 +69,7 @@ int main(int argc, char **argv)
 
 	int beath[16][im_w];
 	memset(beath, 0, sizeof(beath));
-	
+
 	beat_ctx *beat_ctx = beat_new();
 	int beat_nbands = beat_ctx_bands(beat_ctx);
 
@@ -76,11 +80,11 @@ int main(int argc, char **argv)
 		if(event.type == SDL_QUIT
 			|| (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE))
 			break;
-		
+
 		uint64_t next_frame =  (tick0 + frmcnt*10000/982);
 		//uint64_t next_frame =  (tick0 + frmcnt*10000/491);
 		if(next_frame > now) SDL_Delay(next_frame - now);
-		
+
 		//TODO: when we get new buffers make sure we process all of them before we attempt
 		// to actually update the front buffer, so that if we're running slow we don't
 		// waste time drawing frames that won't be seen
@@ -91,7 +95,7 @@ int main(int argc, char **argv)
 		//	avpx = audio_get_buf_count() % im_w;
 		//}
 		int vpx = ovpx;
-		
+
 		while (ovpx != avpx) {
 			vpx = (ovpx+1) % im_w;
 
@@ -99,10 +103,10 @@ int main(int argc, char **argv)
 			SDL_FillRect(screen, &r, 0);
 
 			get_next_fft(&d);
-		
+
 			beat_ctx_update(beat_ctx, d.data, d.len);
 			int beat_count = beat_ctx_count(beat_ctx);
-		
+
 			for(int b=0; b < 16; b++) {
 				float samp = getsamp(d.data, d.len, b*d.len/(beat_nbands*2), d.len/(beat_nbands*4));
 				float s = 1 - 0.2f*log2f(1+31*samp);
@@ -120,12 +124,12 @@ int main(int argc, char **argv)
 
 			if(oldbc != beat_count)
 				draw_line(voice_print, vpx, im_h/4-5, vpx, im_h/4+5, 0xffffffff);
-		
+
 			beat_throb = beat_throb*(0.996f) + (oldbc != beat_count);
 			oldbc = beat_count;
 			ovpx = vpx;
 		}
-		
+
 		// screen update down here
 
 		SDL_Rect blit_rect = { 0, 0, vpx, im_h/2 };
@@ -373,3 +377,11 @@ static void get_next_fft(audio_data *d)
 	}
 }
 
+#include "software/pixmisc.h"
+// so that link doesn't fail, we don't actually need any pallet blitting
+// but we need functions out of sdlhelp.c, but pallet_blit_SDL() is in that file
+// and needs these symbols defined
+pallet_blit8_fn pallet_blit8 = NULL;
+pallet_blit555_fn pallet_blit555 = NULL;
+pallet_blit565_fn pallet_blit565 = NULL;
+pallet_blit32_fn pallet_blit32 = NULL;
