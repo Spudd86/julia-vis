@@ -2,7 +2,7 @@
 #include <SDL.h>
 
 #include "sdlhelp.h"
-#include "sdl-misc.h"
+#include "sdlsetup.h"
 #include "pallet.h"
 #include "pixmisc.h"
 

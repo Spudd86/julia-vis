@@ -7,7 +7,7 @@
 #include "pallet.h"
 #include "pixmisc.h"
 #include "sdlhelp.h"
-#include "sdl-misc.h"
+#include "sdlsetup.h"
 #include "map.h"
 #include "audio/audio.h"
 #include "maxsrc.h"

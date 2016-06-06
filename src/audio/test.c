@@ -3,7 +3,7 @@
 #include <SDL.h>
 
 #include "software/sdlhelp.h"
-#include "sdl-misc.h"
+#include "sdlsetup.h"
 #include "audio.h"
 #include "beat.h"
 #include "getsamp.h"

@@ -3,7 +3,7 @@
 #include <SDL.h>
 
 #include "map.h"
-#include "sdl-misc.h"
+#include "sdlsetup.h"
 #include "sdlhelp.h"
 #include "pallet.h"
 #include "pixmisc.h"

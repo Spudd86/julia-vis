@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include <SDL.h>
-#include "sdl-misc.h"
+#include "sdlsetup.h"
 
 static SDL_Surface *real_sdl_setup(opt_data *opts, int im_size, int enable_gl);
 
@@ -12,7 +12,7 @@ SDL_Surface *sdl_setup(opt_data *opts, int im_size) {
 }
 
 SDL_Surface *sdl_setup_gl(opt_data *opts, int im_size) {
-	return real_sdl_setup(opts, im_size, 1); //TODO: make gl stuff not need SDL_ttf
+	return real_sdl_setup(opts, im_size, 1);
 }
 
 // TODO: improve automatic mode selection

@@ -7,7 +7,7 @@
 
 #include <SDL.h>
 
-#include "sdl-misc.h"
+#include "sdlsetup.h"
 #include "glmisc.h"
 
 #include "glmisc.h"
