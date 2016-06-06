@@ -5,10 +5,10 @@
 
 #include "common.h"
 
+#include <SDL.h>
+
 #include "sdl-misc.h"
 #include "glmisc.h"
-
-#include <SDL.h>
 
 #include "glmisc.h"
 #include "audio/audio.h"
