@@ -44,43 +44,18 @@ PKG_CHECK_MODULES([SDL], [sdl])
 AC_SUBST(SDL_CFLAGS)
 AC_SUBST(SDL_LIBS)
 
-#TODO: default to enabled on windows
-AC_ARG_ENABLE([portaudio], AS_HELP_STRING([--enable-portaudio], [enable using portaudio for audio input (default: disabled)]))
-AS_IF([ test "x$enable_portaudio" = xyes ], [
-PKG_CHECK_MODULES([PORTAUDIO], [portaudio-2.0],
-		[AC_DEFINE([HAVE_PORTAUDIO], [1], [Define if portaudio is enabled])],
-		[AC_MSG_FAILURE([--enable-portaudio was given, but test for portaudio failed])]
-	)
-])
-AC_SUBST(PORTAUDIO_CFLAGS)
-AC_SUBST(PORTAUDIO_LIBS)
-AC_SUBST(enable_portaudio)
-
 AC_ARG_ENABLE([jack], AS_HELP_STRING([--enable-jack], [enable using jack for audio input (default: disabled)]))
 AS_IF([ test "x$enable_jack" = xyes ], [
-	PKG_CHECK_MODULES([JACK], [jack],
-		[AC_DEFINE([HAVE_JACK], [1], [Define if jack is enabled])],
+	PKG_CHECK_MODULES([JACK], [jack], [
+			AC_DEFINE([HAVE_JACK], [1], [Define if jack is enabled])
+			have_1_audio_driver=yes
+		],
 		[AC_MSG_FAILURE([--enable-jack was given, but test for jack failed])]
 	)
 ])
 AC_SUBST(JACK_CFLAGS)
 AC_SUBST(JACK_LIBS)
 AC_SUBST(enable_jack)
-
-AC_ARG_ENABLE([sndfile], AS_HELP_STRING([--enable-libsndfile], [enable using libsndfile for audio input (default: enabled)]))
-AS_IF([ test "x$enable_sndfile" != xno ], [
-	PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0.2, have_sndfile=yes, have_sndfile=no)
-])
-AS_IF([ test "x$enable_sndfile" = xyes && test "x$have_sndfile" = xno ], [
-	AC_MSG_FAILURE([--enable-libsndfile was given, but test for libsndfile failed])
-])
-AS_IF([ test "x$have_sndfile" = xyes], [
-	AC_DEFINE([HAVE_SNDFILE], [1], [Define if libsndfile is enabled])
-	enable_sndfile=yes
-])
-AC_SUBST(SNDFILE_CFLAGS)
-AC_SUBST(SNDFILE_LIBS)
-AC_SUBST(enable_sndfile)
 
 AC_ARG_ENABLE([pulseaudio], AS_HELP_STRING([--enable-pulseaudio], [enable using pulseaudio for audio input (default: enabled)]))
 AS_IF([ test "x$enable_pulseaudio" != xno ], [
@@ -92,10 +67,47 @@ AS_IF([ test "x$enable_pulseaudio" = xyes && test "x$have_pulse" = xno ], [
 AS_IF([ test "x$have_pulse" = xyes], [
 	AC_DEFINE([HAVE_PULSE], [1], [Define if pulseaudio is enabled])
 	enable_pulseaudio=yes
+	have_1_audio_driver=yes
 ])
 AC_SUBST(PULSE_CFLAGS)
 AC_SUBST(PULSE_LIBS)
 AC_SUBST(enable_pulseaudio)
+
+AC_ARG_ENABLE([portaudio], AS_HELP_STRING([--enable-portaudio], [enable using portaudio for audio input (default: disabled, unless nothing else is found)]))
+AS_IF([ test "x$enable_portaudio" != xno  -a \( "x$enable_portaudio" = xyes -o "x$have_1_audio_driver" != xyes \) ], [
+	PKG_CHECK_MODULES([PORTAUDIO], [portaudio-2.0], [have_portaudio=yes], [have_portaudio=no])
+])
+AS_IF([ test "x$enable_portaudio" = xyes && test "x$have_portaudio" != xyes ], [
+	AC_MSG_FAILURE([--enable-portaudio was given, but test for portaudio failed])
+])
+AS_IF([ test "x$have_portaudio" = xyes], [
+	AC_DEFINE([HAVE_PORTAUDIO], [1], [Define if portaudio is enabled])
+	enable_portaudio=yes
+	have_1_audio_driver=yes
+])
+AC_SUBST(PORTAUDIO_CFLAGS)
+AC_SUBST(PORTAUDIO_LIBS)
+AC_SUBST(enable_portaudio)
+
+AC_ARG_ENABLE([sndfile], AS_HELP_STRING([--enable-libsndfile], [enable using libsndfile for audio input (default: enabled)]))
+AS_IF([ test "x$enable_sndfile" != xno ], [
+	PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0.2, have_sndfile=yes, have_sndfile=no)
+])
+AS_IF([ test "x$enable_sndfile" = xyes && test "x$have_sndfile" = xno ], [
+	AC_MSG_FAILURE([--enable-libsndfile was given, but test for libsndfile failed])
+])
+AS_IF([ test "x$have_sndfile" = xyes], [
+	AC_DEFINE([HAVE_SNDFILE], [1], [Define if libsndfile is enabled])
+	enable_sndfile=yes
+	have_1_audio_driver=yes
+])
+AC_SUBST(SNDFILE_CFLAGS)
+AC_SUBST(SNDFILE_LIBS)
+AC_SUBST(enable_sndfile)
+
+AS_IF([ test "x$have_1_audio_driver" != xyes], [
+	AC_MSG_FAILURE([no audio drivers found!])
+])
 
 AC_ARG_ENABLE([opengl], AS_HELP_STRING([--disable-opengl], [enable opengl based versions (default: enabled)]))
 #TODO: make work on windows
