@@ -125,6 +125,8 @@ ifeq ($(ENABLE_SNDFILE),yes)
 AUDIO_DRV_SRCS += src/audio/filedecode.c tinycthread/tinycthread.c
 endif
 
+AUDIO_DRV_OBJS = $(AUDIO_DRV_SRCS:.c=.o)
+
 AUDIO_SRCS += $(AUDIO_DRV_SRCS)
 
 AUDIO_OBJS = $(AUDIO_SRCS:.c=.o)
@@ -158,49 +160,49 @@ distclean: clean
 config.mk:
 	touch config.mk
 
-bin/gl-test$(EXEEXT): $(GL_LOADER) $(GL_SDL_SRCS) $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+bin/gl-test$(EXEEXT): $(GL_LOADER) $(GL_SDL_SRCS) $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_GL \
 	$(GL_SDL_SRCS) $(GL_SRCS) \
-	$(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
+	$(COMMON_SRCS)  $(AUDIO_OBJS) $(TRIBUF_SRCS) \
 	$(GL_LOADER) $(SDL_FLAGS) $(AUDIO_CFLAGS) $(GL_CFLAGS) $(LDFLAGS) $(AUDIO_LIBS) $(GL_LIBS) $(LIBS) -o $@
 
-bin/glscope-test$(EXEEXT): $(GL_LOADER) $(GL_SDL_SRCS) src/opengl/glscope-test.c src/opengl/glscope.c src/opengl/glmisc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+bin/glscope-test$(EXEEXT): $(GL_LOADER) $(GL_SDL_SRCS) src/opengl/glscope-test.c src/opengl/glscope.c src/opengl/glmisc.c $(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_GL \
 	$(GL_SDL_SRCS) src/opengl/glscope-test.c src/opengl/glscope.c src/opengl/glmisc.c \
-	$(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) \
+	$(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) \
 	$(GL_LOADER) $(SDL_FLAGS) $(AUDIO_CFLAGS) $(GL_CFLAGS) $(LDFLAGS) $(AUDIO_LIBS) $(GL_LIBS) $(LIBS) -o $@
 	
-bin/glscopetris-test$(EXEEXT): $(GL_LOADER) $(GL_SDL_SRCS) src/tess/scopetris.c src/tess/hset.c src/opengl/glmisc.c $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+bin/glscopetris-test$(EXEEXT): $(GL_LOADER) $(GL_SDL_SRCS) src/tess/scopetris.c src/tess/hset.c src/opengl/glmisc.c $(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_GL -DSCOPETRIS_TEST \
 	$(GL_SDL_SRCS) src/tess/scopetris.c src/tess/hset.c src/opengl/glmaxsrc.c src/opengl/glmisc.c \
 	src/opengl/glmap.c \
-	$(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) \
+	$(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) \
 	$(GL_LOADER) $(SDL_FLAGS) $(AUDIO_CFLAGS) $(GL_CFLAGS) $(LDFLAGS) $(AUDIO_LIBS) $(GL_LIBS) $(LIBS) -o $@
 
-bin/glx-test$(EXEEXT): $(GL_LOADER) src/opengl/glxmain.c $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+bin/glx-test$(EXEEXT): $(GL_LOADER) src/opengl/glxmain.c $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_GL \
 	src/opengl/glxmain.c $(GL_SRCS) \
 	src/opengl/glx_gen.c \
-	$(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
+	$(COMMON_SRCS)  $(AUDIO_OBJS) $(TRIBUF_SRCS) \
 	$(AUDIO_CFLAGS) $(GL_CFLAGS) $(GL_LOADER) $(LDFLAGS) $(GL_LIBS) $(AUDIO_LIBS) $(LIBS) -o $@
 
-bin/fps-test$(EXEEXT): $(GL_LOADER) src/opengl/fpsmain.c src/opengl/fpsservo/fpsservo.c src/opengl/glx_gen.c $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+bin/fps-test$(EXEEXT): $(GL_LOADER) src/opengl/fpsmain.c src/opengl/fpsservo/fpsservo.c src/opengl/glx_gen.c $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_GL \
 	src/opengl/fpsmain.c $(GL_SRCS) \
 	src/opengl/fpsservo/fpsservo.c \
 	src/opengl/glx_gen.c \
-	$(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
+	$(COMMON_SRCS)  $(AUDIO_OBJS) $(TRIBUF_SRCS) \
 	$(AUDIO_CFLAGS) $(GL_CFLAGS) $(GL_LOADER) $(LDFLAGS) $(AUDIO_LIBS) $(GL_LIBS) $(LIBS) -o $@
 
-bin/egl-test$(EXEEXT): $(GL_LOADER) src/opengl/eglmain.c src/opengl/egl/xegl.c $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+bin/egl-test$(EXEEXT): $(GL_LOADER) src/opengl/eglmain.c src/opengl/egl/xegl.c $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_GL \
 	src/opengl/eglmain.c src/opengl/egl/xegl.c $(GL_SRCS) \
-	$(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) \
+	$(COMMON_SRCS)  $(AUDIO_OBJS) $(TRIBUF_SRCS) \
 	$(EGL_CFLAGS) $(EGL_LIBS) $(AUDIO_CFLAGS) $(GL_CFLAGS) $(GL_LOADER) $(LDFLAGS) $(AUDIO_LIBS) $(GL_LIBS) $(LIBS) -o $@
 
-bin/kms-test$(EXEEXT): $(GL_LOADER) src/opengl/egl/kms.c $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
+bin/kms-test$(EXEEXT): $(GL_LOADER) src/opengl/egl/kms.c $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_GL \
-	src/opengl/egl/kms.c $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) \
+	src/opengl/egl/kms.c $(GL_SRCS) $(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) \
 	$(AUDIO_CFLAGS) \
 	$(LDFLAGS) \
 	$(KMS_CFLAGS) $(KMS_LIBS) $(EGL_CFLAGS) $(EGL_LIBS) \
@@ -209,19 +211,19 @@ bin/kms-test$(EXEEXT): $(GL_LOADER) src/opengl/egl/kms.c $(GL_SRCS) $(COMMON_SRC
 src/opengl/gl_14.o: src/opengl/gl_14.c
 	$(CC) -g -O2 $(GL_CFLAGS) -c $< -o $@
 
-bin/sdl-test$(EXEEXT): src/software/sdl.c $(SDL_SOFT_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/points.h src/common.h Makefile config.mk
+bin/sdl-test$(EXEEXT): src/software/sdl.c $(SDL_SOFT_SRCS) $(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) \
-	src/software/sdl.c $(SDL_SOFT_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
+	src/software/sdl.c $(SDL_SOFT_SRCS) $(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
 	$(SDL_FLAGS) $(AUDIO_CFLAGS) $(LDFLAGS) $(AUDIO_LIBS) $(LIBS) -o $@
 
-bin/sdlthread-test$(EXEEXT): src/software/sdl-thread.c $(SDL_SOFT_SRCS) $(COMMON_SRCS)  $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/points.h src/common.h Makefile config.mk
+bin/sdlthread-test$(EXEEXT): src/software/sdl-thread.c $(SDL_SOFT_SRCS) $(COMMON_SRCS)  $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) \
-	src/software/sdl-thread.c $(SDL_SOFT_SRCS) $(COMMON_SRCS) $(AUDIO_SRCS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
+	src/software/sdl-thread.c $(SDL_SOFT_SRCS) $(COMMON_SRCS) $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
 	$(SDL_FLAGS) $(AUDIO_CFLAGS) $(LDFLAGS) $(AUDIO_LIBS) $(LIBS) -o $@
 
-bin/audio-test$(EXEEXT): $(AUDIO_DRV_SRCS) src/audio/test.c src/audio/beat.c src/audio/fft.c $(SDL_SOFT_SRCS) src/terminusIBM.c src/optproc.c src/audio/rb.c src/software/line.c
-	$(CC) $(CFLAGS) -DFFT_RINGBUF \
-	$(AUDIO_DRV_SRCS) src/audio/test.c src/audio/beat.c src/audio/fft.c $(SDL_SOFT_SRCS) src/terminusIBM.c src/optproc.c src/audio/rb.c src/software/line.c \
+bin/audio-test$(EXEEXT): $(AUDIO_DRV_OBJS) src/audio/test.c src/audio/beat.o src/audio/fft.o src/audio/rb.o $(SDL_SOFT_SRCS) src/terminusIBM.c src/optproc.c src/software/line.c
+	$(CC) $(CFLAGS) \
+	$(AUDIO_DRV_OBJS) src/audio/test.c src/audio/beat.o src/audio/fft.o src/audio/rb.o $(SDL_SOFT_SRCS) src/terminusIBM.c src/optproc.c src/software/line.c \
 	$(SDL_FLAGS) $(AUDIO_CFLAGS) $(LDFLAGS) $(AUDIO_LIBS) $(LIBS) -o $@
 
 bin/pal-test$(EXEEXT): src/software/test_palletblit.c $(SDL_SOFT_SRCS) $(COMMON_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/common.h Makefile config.mk
