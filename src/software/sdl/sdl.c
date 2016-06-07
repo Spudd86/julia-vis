@@ -1,14 +1,17 @@
 
 #include "common.h"
-#include <SDL.h>
 
-#include "map.h"
-#include "sdlsetup.h"
-#include "sdlhelp.h"
 #include "pallet.h"
-#include "pixmisc.h"
+
 #include "audio/audio.h"
-#include "maxsrc.h"
+
+#include "software/pixmisc.h"
+#include "software/maxsrc.h"
+#include "software/map.h"
+
+#include <SDL.h>
+#include "sdl/sdlsetup.h"
+#include "sdlhelp.h"
 
 #define IM_SIZE (512)
 

@@ -4,7 +4,7 @@
 #include <SDL.h>
 
 #include "sdlhelp.h"
-#include "pixmisc.h"
+#include "software/pixmisc.h"
 
 void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal)
 {

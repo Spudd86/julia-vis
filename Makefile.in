@@ -104,13 +104,13 @@ COMMON_SRCS = src/terminusIBM.c src/isaac/isaac.c src/pallet.c src/optproc.c src
 
 SOFT_SRCS = src/software/map.c src/software/maxsrc.c src/software/palletblit.c src/software/pixmisc.c
 
-SDL_SOFT_SRCS = src/software/sdlhelp.c src/sdlsetup.c
+SDL_SOFT_SRCS = src/software/sdl/sdlhelp.c src/sdl/sdlsetup.c
 
 X86_SOFT_SRCS = src/software/x86/cpuid.c src/software/x86/mmx.c src/software/x86/sse.c src/software/x86/sse2.c src/software/x86/sse4_1.c
 
 GL_SRCS = src/opengl/glmain.c src/opengl/glmisc.c src/opengl/glsl/glsl_maxsrc.c src/opengl/fixed/glf_maxsrc.c src/opengl/glscope.c src/opengl/glsl/glsl_pallet.c src/opengl/fixed/glf_pal.c src/opengl/fixed/glmap.c src/opengl/mandelbrot.c src/opengl/offscreen.c src/opengl/glsl/glsl_fract.c src/opengl/fixed/glf_fract.c
 
-GL_SDL_SRCS = src/opengl/sdlmain.c src/sdlsetup.c
+GL_SDL_SRCS = src/sdl/sdlglmain.c src/sdl/sdlsetup.c
 
 ifeq ($(ENABLE_JACK),yes)
 AUDIO_DRV_SRCS += src/audio/jack.c
@@ -216,24 +216,24 @@ bin/kms-test$(EXEEXT): $(GL_LOADER) src/opengl/egl/kms.c $(GL_SRCS) $(COMMON_OBJ
 src/opengl/gl_14.o: src/opengl/gl_14.c
 	$(CC) -g -O2 $(GL_CFLAGS) -c $< -o $@
 
-bin/sdl-test$(EXEEXT): src/software/sdl.c $(SDL_SOFT_SRCS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/points.h src/common.h Makefile config.mk
+bin/sdl-test$(EXEEXT): src/software/sdl/sdl.c $(SDL_SOFT_SRCS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) \
-	src/software/sdl.c $(SDL_SOFT_SRCS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
+	src/software/sdl/sdl.c $(SDL_SOFT_SRCS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
 	$(SDL_FLAGS) $(AUDIO_CFLAGS) $(LDFLAGS) $(AUDIO_LIBS) $(LIBS) -o $@
 
-bin/sdlthread-test$(EXEEXT): src/software/sdl-thread.c $(SDL_SOFT_SRCS) $(COMMON_OBJS)  $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/points.h src/common.h Makefile config.mk
+bin/sdlthread-test$(EXEEXT): src/software/sdl/sdl-thread.c $(SDL_SOFT_SRCS) $(COMMON_OBJS)  $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) \
-	src/software/sdl-thread.c $(SDL_SOFT_SRCS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
+	src/software/sdl/sdl-thread.c $(SDL_SOFT_SRCS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
 	$(SDL_FLAGS) $(AUDIO_CFLAGS) $(LDFLAGS) $(AUDIO_LIBS) $(LIBS) -o $@
 
-bin/audio-test$(EXEEXT): $(AUDIO_DRV_OBJS) src/audio/test.c src/audio/beat.o src/audio/fft.o src/audio/rb.o $(SDL_SOFT_SRCS) src/terminusIBM.o src/optproc.o src/software/line.c
+bin/audio-test$(EXEEXT): $(AUDIO_DRV_OBJS) src/sdl/audiotest.c src/audio/beat.o src/audio/fft.o src/audio/rb.o $(SDL_SOFT_SRCS) src/terminusIBM.o src/optproc.o src/software/sdl/line.c
 	$(CC) $(CFLAGS) \
-	$(AUDIO_DRV_OBJS) src/audio/test.c src/audio/beat.o src/audio/fft.o src/audio/rb.o $(SDL_SOFT_SRCS) src/terminusIBM.o src/optproc.o src/software/line.c \
+	$(AUDIO_DRV_OBJS) src/sdl/audiotest.c src/audio/beat.o src/audio/fft.o src/audio/rb.o $(SDL_SOFT_SRCS) src/terminusIBM.o src/optproc.o src/software/sdl/line.c \
 	$(SDL_FLAGS) $(AUDIO_CFLAGS) $(LDFLAGS) $(AUDIO_LIBS) $(LIBS) -o $@
 
-bin/pal-test$(EXEEXT): src/software/test_palletblit.c $(SDL_SOFT_SRCS) $(COMMON_OBJS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/common.h Makefile config.mk
+bin/pal-test$(EXEEXT): src/software/sdl/test_palletblit.c $(SDL_SOFT_SRCS) $(COMMON_OBJS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) \
-	src/software/test_palletblit.c $(SDL_SOFT_SRCS) $(COMMON_OBJS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
+	src/software/sdl/test_palletblit.c $(SDL_SOFT_SRCS) $(COMMON_OBJS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
 	$(SDL_FLAGS) $(LDFLAGS) $(LIBS) -o $@
 
 -include $(DEPS)

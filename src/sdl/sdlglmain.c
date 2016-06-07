@@ -4,14 +4,11 @@
  */
 
 #include "common.h"
+#include "opengl/glmisc.h"
+#include "audio/audio.h"
 
 #include <SDL.h>
-
 #include "sdlsetup.h"
-#include "glmisc.h"
-
-#include "glmisc.h"
-#include "audio/audio.h"
 
 int main(int argc, char **argv)
 {

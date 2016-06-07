@@ -1,10 +1,11 @@
 #include "common.h"
-#include <SDL.h>
 
-#include "sdlhelp.h"
-#include "sdlsetup.h"
 #include "pallet.h"
-#include "pixmisc.h"
+#include "software/pixmisc.h"
+
+#include <SDL.h>
+#include "sdlhelp.h"
+#include "sdl/sdlsetup.h"
 
 #define IM_SIZE (512)
 

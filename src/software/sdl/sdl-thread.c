@@ -1,16 +1,19 @@
 #include "common.h"
 
+#include "tribuf.h"
+#include "pallet.h"
+
+#include "audio/audio.h"
+
+#include "software/pixmisc.h"
+#include "software/map.h"
+#include "software/maxsrc.h"
+
 #include <SDL.h>
 #include <SDL_thread.h>
 
-#include "tribuf.h"
-#include "pallet.h"
-#include "pixmisc.h"
 #include "sdlhelp.h"
-#include "sdlsetup.h"
-#include "map.h"
-#include "audio/audio.h"
-#include "maxsrc.h"
+#include "sdl/sdlsetup.h"
 
 #ifdef _WIN32
 #define set_threadname(name)

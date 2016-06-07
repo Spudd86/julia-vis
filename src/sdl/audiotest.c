@@ -1,12 +1,12 @@
 #include "common.h"
 
-#include <SDL.h>
-
-#include "software/sdlhelp.h"
-#include "sdlsetup.h"
-#include "audio.h"
-#include "beat.h"
+#include "audio/audio.h"
+#include "audio/beat.h"
 #include "getsamp.h"
+
+#include <SDL.h>
+#include "software/sdl/sdlhelp.h"
+#include "sdlsetup.h"
 
 // TODO: switch to doing audio stuff in here directly, in our audio_update() callback
 // just feed a ring-buffer and do all the analysis in the main thread since unlike
@@ -256,8 +256,8 @@ static inline void putpixel_mono(SDL_Surface *surface, int x, int y, int bri) {
 }
 
 
-#include "rb.h"
-#include "audio-private.h"
+#include "audio/rb.h"
+#include "audio/audio-private.h"
 
 int audio_init(const opt_data *od)
 {
