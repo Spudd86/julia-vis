@@ -161,10 +161,13 @@ clean:
 	-rm -f src/opengl/gl_14.o
 	-rm -f $(ALL_BINS)
 
-distclean: clean
+depclean:
+	-rm -f $(DEPS)
+
+distclean: clean depclean
 	-rm -f Makefile config.h config.status config.cache config.log configure stamp-h
 
-.PHONY: all dfb dfb-run run clean
+.PHONY: all dfb dfb-run run clean depclean distclean
 
 config.mk:
 	touch config.mk
