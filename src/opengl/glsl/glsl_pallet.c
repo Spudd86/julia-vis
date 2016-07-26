@@ -37,17 +37,17 @@ static const char *pal_frag_shader =
 	"	float idx = texture2D(src, uv).x;\n"
 	"	gl_FragColor = mix(texture1D(pal1, idx), texture1D(pal2, idx), palpos);\n"
 	"}";
-	
+
 struct priv_ctx {
 	struct glpal_ctx pubctx;
 
 	GLhandleARB prog;
 	GLint palpos_loc;
-	
+
 	int numpal;
 	int curpal, nextpal, palpos;
 	bool pallet_changing;
-	
+
 	GLuint pal_tex[];
 };
 
@@ -76,19 +76,19 @@ static bool step(struct glpal_ctx *ctx, uint8_t step) {
 static void render(struct glpal_ctx *ctx, GLuint draw_tex)
 {DEBUG_CHECK_GL_ERR;
 	struct priv_ctx *priv = (struct priv_ctx *)ctx;
-	
+
 	glPushAttrib(GL_TEXTURE_BIT);
 	glUseProgramObjectARB(priv->prog);
-	
+
 	glUniform1fARB(priv->palpos_loc, priv->palpos/255.0f);
-	
+
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, draw_tex);
 	glActiveTexture(GL_TEXTURE1;
 	glBindTexture(GL_TEXTURE_1D, priv->pal_tex[priv->curpal]);
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_1D, priv->pal_tex[priv->nextpal]);
-	
+
 	glBegin(GL_TRIANGLES); //TODO: scale for aspect ration correction
 		glTexCoord2d( 0, 0); glVertex2d(-1, -1);
 		glTexCoord2d( 1, 0); glVertex2d( 1, -1);
@@ -110,7 +110,7 @@ static struct glpal_ctx * pal_init_glsl(GLboolean float_packed_pixels)
 		prog = compile_program(vtx_shader, pal_frag_mix);
 
 	if(!priv->prog) return NULL;
-	
+
 	struct pal_lst *pals = pallet_get_pallets();
 	struct priv_ctx *ctx = malloc(sizeof(*ctx) + sizeof(*ctx->pal_tex)*pals->numpal);
 	priv->render = render;
@@ -129,7 +129,7 @@ static struct glpal_ctx * pal_init_glsl(GLboolean float_packed_pixels)
 	printf("Pallet shader compiled\n");
 
 	glGenTextures(num_pal, priv->pal_tex);
-	
+
 	glPushAttrib(GL_TEXTURE_BIT);
 	for(int i=0; i<pals->numpal; i++) {
 		glBindTexture(GL_TEXTURE_1D, priv->pal_tex[i]);
@@ -195,13 +195,13 @@ static void render(struct glpal_ctx *ctx, GLuint draw_tex)
 	glBindTexture(GL_TEXTURE_2D, draw_tex);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_1D, priv->texture);
-	
+
 	glEnableVertexAttribArrayARB(0);
 	glVertexAttribPointerARB(0, 4, GL_FLOAT, GL_FALSE, sizeof(float)*4, verts);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-	
+
 	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, pal_ctx_get_active(ctx->pal));
-	
+
 	glUseProgramObjectARB(0);
 	glDisableVertexAttribArrayARB(0);
 	glActiveTexture(GL_TEXTURE1);
@@ -230,7 +230,7 @@ struct glpal_ctx *pal_init_glsl(GLboolean float_packed_pixels)
 	glBindAttribLocationARB(prog, 0, "vertex");
 	glUseProgramObjectARB(0);
 	printf("Pallet shader compiled\n");
-	
+
 	struct priv_ctx *priv = malloc(sizeof(*priv));
 	priv->pubctx.render = render;
 	priv->pubctx.pal = pal_ctx_new(0);
@@ -243,7 +243,7 @@ struct glpal_ctx *pal_init_glsl(GLboolean float_packed_pixels)
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glBindTexture(GL_TEXTURE_1D, 0);
-	
+
 	CHECK_GL_ERR;
 	return (struct glpal_ctx *)priv;
 }

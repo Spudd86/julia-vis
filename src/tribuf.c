@@ -14,12 +14,12 @@
 
 // defining TB_DEBUG_USER to 1 will cause the implementation to take locks in
 // such a way that many incorrect uses of the tribuf will cause a deadlock
-// so that you can debug your use of the tribuf with any of the various lock 
+// so that you can debug your use of the tribuf with any of the various lock
 // debugging tools.
 
 #if __GNU_LIBRARY__
 #	include <execinfo.h>
-	static void tb_backtrace_stderr(void)
+	static inline void tb_backtrace_stderr(void)
 	{
 		void *bt_buf[20];
 		fprintf(stderr, "Backtrace:\n");
@@ -55,7 +55,7 @@
 			       order, \
 			       memory_order_relaxed)
 #	define tb_atomic_inc(x) do { atomic_fetch_add_explicit(a, 1, memory_order_relaxed); } while(0)
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) && !defined(TB_NO_ATOMIC)
 #	if __GNUC__ >= 4 && __GNUC_MINOR__ >= 7
 		// use the gcc built in equivelents of stdatomic funcs since we have them
 		typedef int memory_order;
@@ -105,14 +105,16 @@
 #		warning "Using gcc __sync_* builtins for atomic ops"
 #	endif
 #else
-#	define atomic_init(obj, v) do { *obj = v; } while(0)
-#	warning "NO ATOMICS, using threads and locks"
-#	define TB_NO_ATOMIC 1
+#	define atomic_init(obj, v) do { *(obj) = (v); } while(0)
+#	ifndef TB_NO_ATOMIC
+#		warning "NO ATOMICS, using threads and locks"
+#		define TB_NO_ATOMIC 1
+#	endif
 #endif
 
 #if defined(TB_DEBUG_USER) || defined(TB_NO_ATOMIC)
-# if __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_THREADS__)
-#	include <threads.h>	
+# if __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_THREADS__) && !defined(TB_NO_STDC_THREADS)
+#	include <threads.h>
 	typedef mtx_t tb_mutex;
 	static inline void tb_lock(tb_mutex *m) {
 		int r = mtx_lock(m);
@@ -206,7 +208,7 @@ typedef union frms {
 		unsigned int idf: 1; ///< 1 if the idle buffer is newer than the read buffer
 		unsigned int aw : 2; ///< current write buffer
 		unsigned int id : 2; ///< current idle buffer
-		unsigned int ar : 2; ///< current read buffer 
+		unsigned int ar : 2; ///< current read buffer
 	};
 }frms;
 
@@ -215,7 +217,7 @@ struct tribuf_s {
 	tb_mutex debug_read_lock, debug_write_lock;
 #endif
 
-// might want to do something to force this onto a seperate cache line from 
+// might want to do something to force this onto a seperate cache line from
 // everything else so that the lock elision coming in glibc doesn't always abort
 // since the only thing we do that might cause an abort is write to the ints if
 // they share a cache line
@@ -254,7 +256,7 @@ tribuf* tribuf_new(void **data, int locking)
 #ifdef TB_NO_ATOMIC
 	tb_mutex_init(&tb->lock);
 #endif
-	
+
 	return tb;
 }
 
@@ -275,7 +277,7 @@ void tribuf_destroy(tribuf *tb)
 // *********************** logic and management *****************************
 
 static frms do_finish_write(frms active)
-{	
+{
 	frms f;
 	f.v = 0;
 	f.idf = 1;
@@ -289,23 +291,23 @@ static frms do_finish_write(frms active)
 }
 
 static frms do_get_read(frms active)
-{	
+{
 	frms f;
 	f.v = 0;
 	f.idf = 0;
 	f.aw = active.aw;
-	
-	// check the fresh bit to see if we've got a new buffer, 
+
+	// check the fresh bit to see if we've got a new buffer,
 	// if not just return the same one as last time because it's still the
 	// most recent one
-	if(active.idf) { 
+	if(active.idf) {
 		f.id = active.ar;
 		f.ar = active.id;
 	} else {
 		f.id = active.id;
 		f.ar = active.ar;
 	}
-	
+
 	tb_check_invariants(active);
 	tb_check_invariants(f);
 	return f;
@@ -328,9 +330,9 @@ void* tribuf_get_write(tribuf *tb)
 {
 	frms active;
 	active.v = atomic_load_explicit(&tb->active, memory_order_consume);
-	
+
 	user_debug_lock(tb, write);
-	
+
 	return tb->data[active.aw];
 }
 
@@ -338,7 +340,7 @@ void tribuf_finish_write(tribuf *tb)
 {
 	user_debug_unlock(tb, write);
 	frms f, active;
-	
+
 	active.v = atomic_load_explicit(&tb->active, memory_order_consume);
 	do {
 		f = do_finish_write(active);
@@ -369,7 +371,7 @@ void* tribuf_get_read_nolock(tribuf *tb) { // should only be used by write side 
 	return tb->data[do_get_read_nolock(active)];
 }
 
-int tribuf_check_fresh(tribuf *tb) 
+int tribuf_check_fresh(tribuf *tb)
 {
 	frms active;
 	active.v = atomic_load_explicit(&tb->active, memory_order_consume); //TODO: can this be memory_order_relaxed?

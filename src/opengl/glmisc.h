@@ -78,4 +78,8 @@ void draw_string(const char *str);
 		"//	return rgba.x;\n"\
 		"}\n"
 
+#define  GL_MISC_STRINGIFY__( _x )               # _x
+#define  GL_MISC_STRINGIFY_( _x )                GL_MISC_STRINGIFY__( _x )
+#define  GL_SHADER_STRING_SRC_LOC       "#line "  GL_MISC_STRINGIFY_(__LINE__) " \"" __FILE__ "\" \n\n"
+
 #endif /* include guard */

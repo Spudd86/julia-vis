@@ -1,6 +1,6 @@
 /**
  * glscope.c
- * 
+ *
  * functions for drawing the wiggly line in the middle, the name
  * reflects where this whole thing came from (the "superscope" from AVS)
  */
@@ -49,7 +49,7 @@ struct glscope_ctx {
 	GLuint pnt_tex;
 	int samp;
 	float pw, ph;
-	
+
 	GLfloat sco_verts[128*8*4];
 	GLint sco_ind[128*3*6];
 };
@@ -59,14 +59,14 @@ struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean
 	struct glscope_ctx *ctx = calloc(sizeof(*ctx), 1);
 	ctx->pw = PNT_RADIUS*0.5f*fmaxf(1.0f/24, 8.0f/width), ctx->ph = PNT_RADIUS*0.5f*fmaxf(1.0f/24, 8.0f/height);
 	ctx->samp = num_samp;
-	
+
 	//GLint oldtex;
 	//glGetIntegerv(GL_TEXTURE_BINDING_2D, &oldtex);
 	if(!force_fixed) { // compile succeed
 		ctx->shader_prog = compile_program_defs("#version 110\n", pnt_vtx_shader, pnt_shader_src);
 		printf("scope shader compiled\n");
 	}
-	
+
 	if(!ctx->shader_prog) {
 		glGenTextures(1, &ctx->pnt_tex);
 		glBindTexture(GL_TEXTURE_2D, ctx->pnt_tex);
@@ -75,14 +75,14 @@ struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean
 		uint16_t *data = setup_point_16(pnt_size, pnt_size);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, pnt_size, pnt_size, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, data);
 		free(data);
-	
+
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}
-	
+
 	GLfloat *sco_verts = ctx->sco_verts;
 	GLint *sco_ind = ctx->sco_ind;
 	for(int i=0; i<ctx->samp; i++) {
@@ -99,30 +99,30 @@ struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean
 	for(int i=0; i<ctx->samp; i++) {
 		sco_ind[(i*6+0)*3+0] = i*8+0; sco_ind[(i*6+0)*3+1] = i*8+1; sco_ind[(i*6+0)*3+2] = i*8+3;
 		sco_ind[(i*6+1)*3+0] = i*8+0; sco_ind[(i*6+1)*3+1] = i*8+3; sco_ind[(i*6+1)*3+2] = i*8+2;
-		
+
 		sco_ind[(i*6+2)*3+0] = i*8+2; sco_ind[(i*6+2)*3+1] = i*8+4; sco_ind[(i*6+2)*3+2] = i*8+5;
 		sco_ind[(i*6+3)*3+0] = i*8+2; sco_ind[(i*6+3)*3+1] = i*8+5; sco_ind[(i*6+3)*3+2] = i*8+3;
-		
+
 		sco_ind[(i*6+4)*3+0] = i*8+4; sco_ind[(i*6+4)*3+1] = i*8+6; sco_ind[(i*6+4)*3+2] = i*8+7;
 		sco_ind[(i*6+5)*3+0] = i*8+4; sco_ind[(i*6+5)*3+1] = i*8+7; sco_ind[(i*6+5)*3+2] = i*8+5;
 	}
 	CHECK_GL_ERR;
-	
+
 	return ctx;
 }
 
 void render_scope(struct glscope_ctx *ctx, float R[3][3], const float *data, int len)
 {
 	// do the rotate/project ourselves because the GL matrix won't do the right
-	// thing if we just send it our verticies, we want wour tris to always be 
+	// thing if we just send it our verticies, we want wour tris to always be
 	// parrallel to the view plane, because we're actually drawing a fuzzy line
 	// not a 3D object
 	// also it makes it easier to match the software implementation
-	
+
 	GLfloat *sco_verts = ctx->sco_verts;
 	const float pw = ctx->pw, ph = ctx->ph;
 	const int samp = ctx->samp;
-	
+
 	float px, py;
 	{
 		float s = getsamp(data, len, 0, len/96);
@@ -161,16 +161,16 @@ void render_scope(struct glscope_ctx *ctx, float R[3][3], const float *data, int
 		sco_verts[(i*8+7)*4+2] =  x+nx+tx; sco_verts[(i*8+7)*4+3] =  y+ny+ty;
 		px=x,py=y;
 	}
-	
+
 	//TODO: save/restore GL state
 	GLboolean blend_was_enabled = glIsEnabled(GL_BLEND);
 	GLint old_blend_eq; glGetIntegerv(GL_BLEND_EQUATION, &old_blend_eq);
-	
+
 	glEnable(GL_BLEND);
 	glBlendEquation(GL_MAX);
 	if(ctx->shader_prog) glUseProgramObjectARB(ctx->shader_prog);
 	if(ctx->pnt_tex) glBindTexture(GL_TEXTURE_2D, ctx->pnt_tex);
-	
+
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -179,12 +179,12 @@ void render_scope(struct glscope_ctx *ctx, float R[3][3], const float *data, int
 	glDrawElements(GL_TRIANGLES, samp*3*6, GL_UNSIGNED_INT, ctx->sco_ind);
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-	
+
 	if(ctx->shader_prog) glUseProgramObjectARB(0);
-	
+
 	glBlendEquation(old_blend_eq);
 	if(!blend_was_enabled) glDisable(GL_BLEND);
-	
+
 	CHECK_GL_ERR;
 }
 

@@ -18,10 +18,16 @@ struct beat_ctx {
 	float E[BANDS];
 };
 
-beat_ctx *beat_new(void) {
+beat_ctx *beat_new(void)
+{
 	beat_ctx *self = malloc(sizeof(beat_ctx));
 	memset(self, 0, sizeof(beat_ctx));
 	return self;
+}
+
+void beat_delete(struct beat_ctx *self)
+{
+	free(self);
 }
 
 int beat_ctx_count(beat_ctx *self) { return self->beat_count; }
@@ -53,10 +59,10 @@ void beat_ctx_update(beat_ctx *self, const float *restrict fft, int fft_len)
 		// since log2(samp+1)/2 should give us a nice linear relation to percived volume
 		float tmp = log2f(getsamp(fft, fft_len, b*fft_len/(BANDS*2) , fft_len/(BANDS*4)) + 1.0f)/2;
 		//float tmp = getsamp(fft, fft_len, b*fft_len/(BANDS*2) , fft_len/(BANDS*4));
-		
+
 		float *const restrict Ehb = self->Eh[b];
 
-		
+
 
 		//float C = -0.0025714f*V[b]+1.5142857f;
 		//float C = -0.0025714f*V[b]+1.5142857f*2;
@@ -68,7 +74,7 @@ void beat_ctx_update(beat_ctx *self, const float *restrict fft, int fft_len)
 			}
 			//__sync_add_and_fetch(beat_bands + b, 1);
 		}
-		
+
 		float v = 0;
 		for(int i=0; i<HIST; i++) v += sqr(Ehb[(hi + HIST + i)%(HIST*2)]) - sqr(E[b]);
 		self->V[b] = sqrtf(v);

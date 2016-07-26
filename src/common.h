@@ -177,7 +177,7 @@ typedef struct {
 	int pitch;
 	int bpp;
 	void *data;
-}Pixbuf;
+} Pixbuf;
 
 typedef struct {
 	uint16_t w, h;

@@ -157,7 +157,9 @@ void audio_update(const float *in, int n)
 		if(bufp == 0) {
 			cur_buf = NULL;
 			tribuf_finish_write(samp_tb);
-		} else return;
+		} else {
+			return; // not enough samples yet
+		}
 	}
 
 	buf_count++;

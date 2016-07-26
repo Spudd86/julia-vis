@@ -8,7 +8,7 @@
 static const char *vtx_shader =
 	"varying vec2 uv;\n"
 	"void main() {\n"
-	"	uv = gl_MultiTexCoord0.st;\n"
+	"	uv = gl_MultiTexCoord0.st*2.0f-1.0f;\n"
 	"	gl_Position = gl_Vertex;\n"
 	"}";
 
@@ -37,7 +37,7 @@ static const char *frag_src =
 //	"	gl_FragColor = (c - max(vec4(2/256.0f), c*0.01f));\n"
 	"#endif\n"
 	"}\n";
-	
+
 struct priv_ctx {
 	struct glmaxsrc_ctx pubctx;
 	struct glscope_ctx *glscope;
@@ -58,7 +58,7 @@ struct glmaxsrc_ctx *maxsrc_new_glsl(int width, int height, GLboolean packed_int
 	GLuint prog = compile_program_defs(defs, vtx_shader, frag_src);
 	GLint R_loc = -1;
 	if(!prog) return NULL;
-	
+
 	printf("maxsrc shader compiled\n");
 	glUseProgramObjectARB(prog);
 	glUniform1iARB(glGetUniformLocationARB(prog, "prev"), 0);
@@ -67,14 +67,14 @@ struct glmaxsrc_ctx *maxsrc_new_glsl(int width, int height, GLboolean packed_int
 	CHECK_GL_ERR;
 
 	int samp = MIN(MIN(width/2, height/2), 128);
-	printf("maxsrc using %i points\n", samp);	
+	printf("maxsrc using %i points\n", samp);
 	struct priv_ctx *priv = calloc(sizeof(*priv), 1);
 	priv->pubctx.update = update;
 	priv->pubctx.offscr = offscr_new(width, height, false, !packed_intesity_pixels);
 	priv->glscope = gl_scope_init(width, height, samp, false);
 	priv->prog = prog;
 	priv->R_loc = R_loc;
-	
+
 	return &priv->pubctx;
 }
 
@@ -93,32 +93,33 @@ static void update(struct glmaxsrc_ctx *ctx, const float *audio, int audiolen)
 		{sz*cy+cz*sx*sy,  cz*cx, -sy*sz+cy*cz*sx},
 		{cx*sy         ,    -sx,  cy*cx}
 	};
-	
+
 	const float Rt[9] = {
 		R[0][0], R[1][0], R[2][0],
 		R[0][1], R[1][1], R[2][1],
 		R[0][2], R[1][2], R[2][2],
 	};
-	
+
 	GLint src_tex = offscr_start_render(ctx->offscr);
-	
+
 	glUseProgramObjectARB(priv->prog);
 	glUniformMatrix3fvARB(priv->R_loc, 1, 0, Rt);
 	glBindTexture(GL_TEXTURE_2D, src_tex);
+
 	glBegin(GL_TRIANGLE_STRIP);
-		glTexCoord2d(-1,-1); glVertex2d(-1, -1);
-		glTexCoord2d( 1,-1); glVertex2d( 1, -1);
-		glTexCoord2d(-1, 1); glVertex2d(-1,  1);
-		glTexCoord2d( 1, 1); glVertex2d( 1,  1);
+		glTexCoord2d(0,0); glVertex2d(-1, -1);
+		glTexCoord2d(1,0); glVertex2d( 1, -1);
+		glTexCoord2d(0,1); glVertex2d(-1,  1);
+		glTexCoord2d(1,1); glVertex2d( 1,  1);
 	glEnd();
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glUseProgramObjectARB(0);
 	DEBUG_CHECK_GL_ERR;
-	
+
 	render_scope(priv->glscope, R, audio, audiolen);
 	DEBUG_CHECK_GL_ERR;
 	offscr_finish_render(ctx->offscr);
-	
+
 	priv->tx+=0.02f*dt; priv->ty+=0.01f*dt; priv->tz-=0.003f*dt;
 
 	DEBUG_CHECK_GL_ERR;

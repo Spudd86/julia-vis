@@ -81,7 +81,7 @@ static void gl_debug_callback(GLenum source,
                               GLvoid* parm)
 {(void)length;(void)parm;
 	fprintf(stderr,
-	        "Source:%s\tType:%s\tID:%d\tSeverity:%s\tMessage:%s\n", 
+	        "Source:%s\tType:%s\tID:%d\tSeverity:%s\tMessage:%s\n",
 	        gl_debug_msg_source[source - GL_DEBUG_SOURCE_API_ARB],
 	        gl_debug_msg_type[type - GL_DEBUG_TYPE_ERROR_ARB],
 	        id,
@@ -142,26 +142,26 @@ void init_gl(const opt_data *opt_data, int width, int height)
                                     sizei count,
                                     const uint* ids,
                                     boolean enabled);
- */	
+ */
 	if(ogl_ext_ARB_debug_output) {
 		glDebugMessageCallbackARB((GLDEBUGPROCARB)gl_debug_callback, NULL);
 #if DEBUG
-		glDebugMessageControlARB(GL_DONT_CARE, 
+		glDebugMessageControlARB(GL_DONT_CARE,
 		                         GL_DONT_CARE,
-		                         GL_DONT_CARE, 
-		                         0, NULL, 
+		                         GL_DONT_CARE,
+		                         0, NULL,
 		                         GL_TRUE);
 		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
 #else
-		glDebugMessageControlARB(GL_DONT_CARE, 
+		glDebugMessageControlARB(GL_DONT_CARE,
 		                         GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB,
-		                         GL_DONT_CARE, 
-		                         0, NULL, 
+		                         GL_DONT_CARE,
+		                         0, NULL,
 		                         GL_TRUE);
-		glDebugMessageControlARB(GL_DONT_CARE, 
+		glDebugMessageControlARB(GL_DONT_CARE,
 		                         GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB,
-		                         GL_DONT_CARE, 
-		                         0, NULL, 
+		                         GL_DONT_CARE,
+		                         0, NULL,
 		                         GL_TRUE);
 #endif
 		printf("Have ARB_debug_output: registered callback\n");
@@ -171,7 +171,7 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	// for ES we need:
 	//    EXT_blend_minmax
 	//    EXT_texture_format_BGRA8888
-	
+
 	// optionally we should use
 	//    EXT_texture_rg + OES_texture_float/OES_texture_half_float
 	//    OES_mapbuffer
@@ -185,12 +185,13 @@ void init_gl(const opt_data *opt_data, int width, int height)
 		exit(1);
 	}
 
+	// TODO: this should also pass if we have GL 2.0+
 	if(!ogl_ext_ARB_shading_language_100 && !(ogl_ext_ARB_fragment_shader && ogl_ext_ARB_vertex_shader && ogl_ext_ARB_shader_objects)) {
-		if(!ogl_ext_ARB_pixel_buffer_object) 
+		if(!ogl_ext_ARB_pixel_buffer_object)
 			printf("Missing GLSL and no pixel buffer objects, WILL be slow!\n");
 		else
 			printf("No GLSL using all fixed function! (might be slow)\n");
-	}	
+	}
 
 	if(force_fixed) {
 		printf("Fixed function code forced\n");
@@ -204,22 +205,22 @@ void init_gl(const opt_data *opt_data, int width, int height)
 
 	init_mandel(); CHECK_GL_ERR;
 
-	if(!force_fixed) glfract = fractal_glsl_init(opts, im_w, im_h, packed_intesity_pixels); 
+	if(!force_fixed) glfract = fractal_glsl_init(opts, im_w, im_h, packed_intesity_pixels);
 	if(!glfract) glfract = fractal_fixed_init(opts, im_w, im_h);
 	CHECK_GL_ERR;
-	
-	if(!force_fixed) glmaxsrc = maxsrc_new_glsl(IMAX(im_w>>res_boost, 256), IMAX(im_h>>res_boost, 256), packed_intesity_pixels); 
+
+	if(!force_fixed) glmaxsrc = maxsrc_new_glsl(IMAX(im_w>>res_boost, 256), IMAX(im_h>>res_boost, 256), packed_intesity_pixels);
 	if(!glmaxsrc) glmaxsrc = maxsrc_new_fixed(IMAX(im_w>>res_boost, 256), IMAX(im_h>>res_boost, 256));
 	CHECK_GL_ERR;
-	
+
 	if(!force_fixed) glpal = pal_init_glsl(packed_intesity_pixels);
 	if(!glpal) glpal = pal_init_fixed(im_w, im_h);
 	CHECK_GL_ERR;
-	
+
 	pd = new_point_data(opts->rational_julia?4:2);
 
 	memset(frametimes, 0, sizeof(frametimes));
-	totframetime = frametimes[0] = MIN(10000000/opts->draw_rate, 1);
+	totframetime = frametimes[0] = MAX(10000000/opts->draw_rate, 1);
 	memset(worktimes, 0, sizeof(worktimes));
 	totworktime = worktimes[0] = MIN(10000000/opts->draw_rate, 1);
 	tick0 = uget_ticks();
@@ -232,12 +233,12 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	static uint32_t last_beat_time = 0, lastpalstep = 0, fps_oldtime = 0;
 	static int beats = 0;
 	static uint64_t now = 0, workstart = 0;
-	
+
 	//TODO: move this up to top
 	workstart = now = uget_ticks();
 	int delay =  (tick0 + cnt*INT64_C(1000000)/opts->draw_rate) - now;
 	if(delay > 0) { udodelay(delay); now = uget_ticks(); }
-	
+
 
 	// rate limit our maxsrc updates, but run at full frame rate if we're close the opts.maxsrc_rate to avoid choppyness
 	if((tick0-now)*opts->maxsrc_rate + (maxfrms*INT64_C(1000000)) > INT64_C(1000000) ) {
@@ -272,7 +273,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 		draw_tex_quad(0.5f, -0.5f, 0.5f);
 	}
 	if(debug_pal || debug_maxsrc) { glPopAttrib(); if(packed_intesity_pixels) glColor3f(1.0f, 1.0f, 1.0f); }
-	
+
 	if(show_fps_hist) { DEBUG_CHECK_GL_ERR;
 		glPushMatrix();
 		glScalef(0.5f, 0.25f, 1);
@@ -297,7 +298,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	}
 
 	render_debug_overlay();
-	
+
 	swap_buffers(); CHECK_GL_ERR;
 
 	now = uget_ticks();
@@ -315,12 +316,12 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	} else update_points(pd, (now - tick0)/1000, 0);
 	beats = newbeat;
 
-	
+
 	now = uget_ticks();
 	totframetime -= frametimes[cnt%FPS_HIST_LEN];
 	totframetime += (frametimes[cnt%FPS_HIST_LEN] = now - fps_oldtime);
 	fps_oldtime = now;
-	
+
 	totworktime -= worktimes[cnt%FPS_HIST_LEN];
 	totworktime += (worktimes[cnt%FPS_HIST_LEN] = now - workstart);
 

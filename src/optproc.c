@@ -4,6 +4,9 @@
 #include <orc/orc.h>
 #endif
 
+//FIXME: correct help message currently broken because
+// USE_GL will never be defined when building this file
+
 static const char *helpstr =
 "Usage: %s [-w width] [-h height] [-s screen updates/second] [-fdpu]\n"
 "\t-r use rational map\n"
@@ -64,7 +67,7 @@ void optproc(int argc, char **argv, opt_data *res)
 #endif
 
 	int opt;
-	
+
 	res->w = res->h = -1;
 	res->fullscreen = 0;
 	res->draw_rate = 60;
