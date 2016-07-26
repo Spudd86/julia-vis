@@ -45,10 +45,11 @@ CFLAGS += -I "./src" -I "./tinycthread"
 -include config.mk
 
 ifdef DEBUG
-	CFLAGS += -ggdb -Og
+	CFLAGS += -ggdb -O0
 else
 	CFLAGS += -DNDEBUG
 	CFLAGS += -g -O2 
+	#CFLAGS += -finline-functions
 	#CFLAGS += -finline-functions -maccumulate-outgoing-args -fdelete-null-pointer-checks 
 	#CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller
 	#CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear 
@@ -239,6 +240,11 @@ bin/pal-test$(EXEEXT): src/software/sdl/test_palletblit.o $(SDL_SOFT_OBJS) $(COM
 	src/software/sdl/test_palletblit.o $(SDL_SOFT_OBJS) $(COMMON_OBJS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
 	$(SDL_CFLAGS) $(LDFLAGS) $(SDL_LIBS) $(LIBS) -o $@
 
+bin/pal-test2$(EXEEXT): src/software/sdl/test_pallets.o $(SDL_SOFT_OBJS) $(COMMON_OBJS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/common.h Makefile config.mk
+	$(CC) $(CFLAGS) \
+	src/software/sdl/test_pallets.o $(SDL_SOFT_OBJS) $(COMMON_OBJS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
+	$(SDL_CFLAGS) $(LDFLAGS) $(SDL_LIBS) $(LIBS) -o $@
+
 -include $(DEPS)
 
 src/software/x86/mmx.o: src/software/x86/mmx.c src/software/x86/palblit_mmxsse.c src/common.h src/software/pixmisc.h Makefile config.mk
@@ -279,7 +285,6 @@ src/%.o: src/%.c Makefile config.mk
 	
 %.s: %.c src/*.h Makefile config.mk
 	$(CC) $< $(CFLAGS) -S -o $@
-
 
 # automatic re-running of configure if the ocnfigure.in file has changed
 configure: configure.ac

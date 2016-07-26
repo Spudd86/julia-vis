@@ -14,14 +14,8 @@
 
 //TODO: load pallets from files of some sort
 
-//TODO: optimize 16 bit modes
-//  - move y*w calculations outside of the loop
-//  - non-temporal store version if sse is available
-
-//TODO: dispatch based on availability of instructions
-//   except maybe on x86_64 since sse2 is always available there
-
 //TODO: find a way to do approximate gamma correct colour interpolation
+// http://chilliant.blogspot.ca/2012/08/srgb-approximations-for-hlsl.html
 
 void pallet_blit32_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
@@ -32,7 +26,10 @@ void pallet_blit32_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 		uint32_t * restrict d = (uint32_t *restrict)(dest + y*dst_stride);
 		const uint16_t *restrict s = src + y*src_stride;
 		for(unsigned int x = 0; x < w; x++) {
-			*(d++) = pal[*(s++)>>8];
+			uint16_t v = *(s++);
+			//uint32_t mask = ((x + y * 237) * 119 & 255); // a_dither3
+			//v = MIN( (uint32_t)v + mask, UINT16_MAX);
+			*(d++) = pal[v>>8];
 		}
 	}
 }
@@ -52,50 +49,16 @@ static inline float a_dither_flt(float input, uint32_t x, uint32_t y, int c, uin
 	//return mask*255;
 	return (levels * input + mask)/levels;
 }
-
-static inline uint32_t a_dither(uint32_t input, uint32_t x, uint32_t y, int c, uint32_t levels)
-{
-	uint32_t mask;
-	switch (pattern) {
-		case 1: mask = ((x ^ y * 149) * 1234 & 511); break;
-		case 2: mask = (((x+c*17) ^ y * 149) * 1234 & 511); break;
-		case 3: mask = ((x + y * 237) * 119 & 255); break;
-		case 4: mask = (((x+c*67) + y * 236) * 119 & 255); break;
-		case 5: mask = 0.5; break;
-		default: return input;
-	}
-	return (levels * input + mask)/levels;
-}
 #endif
-
-
-static inline uint16_t a_dither1(uint16_t input, uint32_t x, uint32_t y, uint16_t bits)
-{
-	uint32_t mask = ((x ^ y * 149) * 1234& 511)/511.0f;
-	return MIN( (((uint32_t)input<<bits) + mask)>>bits, UINT16_MAX);
-}
 
 static inline uint8_t a_dither4(uint8_t input, uint32_t x, uint32_t y, int c, uint16_t bits)
 {
-#if 0
-	float mask;
-	switch (pattern) {
-		case 1: mask = ((x ^ y * 149) * 1234& 511)/511.0f; break;
-		case 2: mask = (((x+c*17) ^ y * 149) * 1234 & 511)/511.0f; break;
-		case 3: mask = ((x + y * 237) * 119 & 255)/255.0f; break;
-		case 4: mask = (((x+c*67) + y * 236) * 119 & 255)/255.0f; break;
-		case 5: mask = 0.5; break;
-		default: return input;
-	}
-	//return mask*255;
-	return (levels * input + mask)/levels;
-#endif
-	// dither_line = c*67*119 + y*236*119;
-	// dither = (x*119 + dither_line) & 255; // note stuff inside bracket can be stepped across a line
-	//
+	// dither_line = (c*67*119 + y*236*119) ;
+	// dither = (x*119 + dither_line) & 255 ;
+	// note stuff inside bracket can be stepped across a line
+	// saturating add with pixel
 	uint8_t mask = ((x+c*67) + y * 236) * 119 & 255;
-	return MIN( (((uint16_t)input<<bits) + mask)>>bits, 255 );
-	//return MIN( input + (mask>>(8-bits)), 255 );
+	return MIN( (uint16_t)input + (mask>>bits), UINT8_MAX );
 
 }
 
