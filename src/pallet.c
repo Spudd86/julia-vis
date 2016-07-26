@@ -3,6 +3,9 @@
 
 #include "common.h"
 #include "pallet.h"
+#include <float.h>
+
+#define NO_LINEAR_PALLET_EXPAND 1
 
 struct pallet_colour {
 	uint8_t r, g, b;
@@ -11,18 +14,6 @@ struct pallet_colour {
 
 #define NUM_PALLETS 10
 static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
-
-#if 0
-	{	//  r    g    b  pos
-		{   0,   0,   0,   0},
-		{   0, 255, 255,   1},
-		{   0,   0,   0,   2},
-		{   0,   0,  64,  60},
-		{ 255, 128,  64, 137},
-		{ 255, 255, 255, 240},
-		{ 255, 255, 255, 255}
-	},
-#endif
 
 	{	//  r    g    b  pos
 		{   0,   0,   0,   0},
@@ -74,7 +65,7 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 		{   0,  64, 128, 200},
 		{   0,   0,   0, 255},
 	}, */
-	
+
 	//punkie21 STRANGE
 	{	//  r    g    b  pos
 		{   0,   0,   0,   0},
@@ -84,7 +75,7 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 		{ 255, 255,   0, 189},
 		{ 255, 255, 255, 255},
 	},
-	
+
 	//punkie22 GORTOX
 	{	//  r    g    b  pos
 		{   0,   0,   0,   0},
@@ -102,14 +93,14 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 		{  96,   8,  76, 236},
 		{   0,   0,   0, 255},
 	},
-	
+
 	//punkie20 OUTERDUST
 	{	//  r    g    b  pos
 		{   0,   0,   0,   0},
 		{ 228, 231, 152, 172},
 		{   0,   0,   0, 255},
 	},
-	
+
 	//punkie18 GOTSOME
 	{	//  r    g    b  pos
 		{   0,   0,   0,   0},
@@ -117,7 +108,7 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 		{   0,   0,   0, 191},
 		{   0, 255,   0, 255},
 	},
-	
+
 	//punkie16 VULCANO
 	{	//  r    g    b  pos
 		{   0,   0,   0,   0},
@@ -131,7 +122,7 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 		{  60,  60,  60, 255},
 	},
 
-/*	
+/*
 	{	//  r    g    b  pos
 		{   0,   0,   0,   0},
 		{ 255, 255, 255, 255},
@@ -149,14 +140,32 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 /*#define NUM_PALLETS NUM_PUNKIE_PAL*/
 /*#define pallets32 punkie_pals*/
 
+#include "colourspace.h"
+
 static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, int bswap)
 {
+	//TODO: try out gamma correct interpolation here
 	int j = 0;
 	do { j++;
 		for(int i = curpal[j-1].pos; i <= curpal[j].pos; i++) {
-			int r = (curpal[j-1].r*(curpal[j].pos-i) + curpal[j].r*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
-			int g = (curpal[j-1].g*(curpal[j].pos-i) + curpal[j].g*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
-			int b = (curpal[j-1].b*(curpal[j].pos-i) + curpal[j].b*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
+#if 0 //NO_LINEAR_PALLET_EXPAND
+			uint32_t r = (curpal[j-1].r*(curpal[j].pos-i) + curpal[j].r*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
+			uint32_t g = (curpal[j-1].g*(curpal[j].pos-i) + curpal[j].g*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
+			uint32_t b = (curpal[j-1].b*(curpal[j].pos-i) + curpal[j].b*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
+#else
+			colourf c1 = make_linear(curpal[j-1].r, curpal[j-1].g, curpal[j-1].b);
+			colourf c2 = make_linear(curpal[j].r,   curpal[j].g,   curpal[j].b);
+			c1 = rgb2luv(c1);
+			c2 = rgb2luv(c2);
+			for(int k=0; k < 3; k++)
+				c1.v[k] = (c1.v[k]*(curpal[j].pos-i) + c2.v[k]*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
+			c1 = luv2rgb(c1);
+
+			//TODO: cope better with out of gamut colours
+			uint32_t r = fmaxf(0, fminf(255, gamma_curve(c1.r)));
+			uint32_t g = fmaxf(0, fminf(255, gamma_curve(c1.g)));
+			uint32_t b = fmaxf(0, fminf(255, gamma_curve(c1.b)));
+#endif
 
 			if(bswap) dest[i] = (r)|(g<<8)|(b<<16);
 			else dest[i] = (r<<16)|(g<<8)|b;
@@ -175,8 +184,8 @@ struct pal_ctx {
 	 * extra element makes pallet blit much simpler (Don't have to check for last element)
 	 */
 	uint32_t active_pal[257] __attribute__((aligned(16)));
-	
-	uint32_t pallets32[NUM_PALLETS][256] __attribute__((aligned(16)));
+
+	uint32_t pallets32[NUM_PALLETS][256];
 };
 
 static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_t *restrict next, const uint8_t *restrict prev);
@@ -222,8 +231,8 @@ int pal_ctx_step(struct pal_ctx *self, uint8_t step) {
 		self->curpal = self->nextpal;
 		memcpy(self->active_pal, self->pallets32[self->nextpal], 256);
 	} else
-		do_pallet_step(self->palpos, 
-		               self->active_pal, 
+		do_pallet_step(self->palpos,
+		               self->active_pal,
 		               (uint8_t *restrict)self->pallets32[self->nextpal],
 		               (uint8_t *restrict)self->pallets32[self->curpal]);
 
@@ -233,8 +242,12 @@ int pal_ctx_step(struct pal_ctx *self, uint8_t step) {
 
 static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_t *restrict next, const uint8_t *restrict prev) {
 	uint8_t *restrict d = (uint8_t *restrict)active_pal;
-	for(int i=0; i<256*4; i++)
-		d[i] = (uint8_t)((next[i]*pos + prev[i]*(255-pos))>>8);
+	const float p1 = pos/256.0f, p2 = (256-pos)/256.0f;
+	for(int i=0; i<256*4; i++) {
+		//d[i] = (uint8_t)((next[i]*pos + prev[i]*(256-pos))>>8);
+		float out = linearize(next[i])*p1 + linearize(prev[i])*p2;
+		d[i] = (uint8_t)fmaxf(0, fminf(255, gamma_curve(out)));
+	}
 }
 
 

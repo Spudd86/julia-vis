@@ -217,9 +217,6 @@ bin/kms-test$(EXEEXT): $(GL_LOADER) src/opengl/egl/kms.c $(GL_SRCS) $(COMMON_OBJ
 	$(KMS_CFLAGS) $(KMS_LIBS) $(EGL_CFLAGS) $(EGL_LIBS) \
 	$(GL_CFLAGS) $(GL_LOADER) $(GL_LIBS) $(AUDIO_LIBS) $(LIBS) -o $@
 
-src/opengl/gl_14.o: src/opengl/gl_14.c
-	$(CC) -g -O2 $(GL_CFLAGS) -c $< -o $@
-
 bin/sdl-test$(EXEEXT): src/software/sdl/sdl.o $(SDL_SOFT_OBJS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) src/points.h src/common.h Makefile config.mk
 	$(CC) $(CFLAGS) \
 	src/software/sdl/sdl.o $(SDL_SOFT_OBJS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
@@ -246,6 +243,9 @@ bin/pal-test2$(EXEEXT): src/software/sdl/test_pallets.o $(SDL_SOFT_OBJS) $(COMMO
 	$(SDL_CFLAGS) $(LDFLAGS) $(SDL_LIBS) $(LIBS) -o $@
 
 -include $(DEPS)
+
+src/opengl/gl_14.o: src/opengl/gl_14.c
+	$(CC) -g -O2 $(GL_CFLAGS) -c $< -o $@
 
 src/software/x86/mmx.o: src/software/x86/mmx.c src/software/x86/palblit_mmxsse.c src/common.h src/software/pixmisc.h Makefile config.mk
 	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse -mmmx $(PP_FLAGS) $< -MF $*.dep

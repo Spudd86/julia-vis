@@ -59,6 +59,14 @@ void maxblend_sse2(void *restrict dest, const void *restrict src, int w, int h)
 	}
 }
 
+// this is exactly what the gcc version of the intrinsic _mm_loadl_epi64 does
+// only we don't cast away const and restrict
+//TODO: work out weather or not _mm_loadu_si128 works just as well
+#define my_load_epi64(p) (_mm_set_epi64((__m64)0LL, *(const __m64 *restrict)(p)))
+#define pb32_load_v(s) (_mm_setr_epi16(*((s)+0), *((s)+0), *((s)+0), *((s)+0), *((s)+1), *((s)+1), *((s)+1), *((s)+1)))
+//#define pb32_load_v(s) (_mm_set1_epi32(*(const uint32_t *)(s)))
+
+#if 1
 __attribute__((always_inline,hot))
 static inline void blit32_1(uint32_t *restrict d, const uint16_t *restrict s, const uint32_t *restrict pal)
 {
@@ -77,7 +85,7 @@ static inline void blit32_1(uint32_t *restrict d, const uint16_t *restrict s, co
 	col1 = _mm_unpacklo_epi8(col1, zero);
 	col2 = _mm_unpackhi_epi8(col2, zero);
 
-	v1   = _mm_set1_epi32(*(const uint32_t *)(s + 0));
+	v1   = _mm_set1_epi16(*(s + 0));
 	v1   = _mm_and_si128(v1, mask);
 	col2 = _mm_mullo_epi16(col2, v1);
 	v1s  = _mm_sub_epi16(sub, v1);
@@ -107,7 +115,7 @@ static inline void blit32_2(uint32_t *restrict d, const uint16_t *restrict s, co
 	col1 = _mm_unpacklo_epi8(col1, zero);
 	col2 = _mm_unpackhi_epi8(col2, zero);
 
-	v1   = _mm_set1_epi32(*(const uint32_t *)(s + 0));
+	v1   = pb32_load_v(s+0);
 	v1   = _mm_and_si128(v1, mask);
 	col2 = _mm_mullo_epi16(col2, v1);
 	v1s  = _mm_sub_epi16(sub, v1);
@@ -141,7 +149,7 @@ static inline void blit32_4(uint32_t *restrict d, const uint16_t *restrict s, co
 	col1 = _mm_unpacklo_epi8(col1, zero);
 	col2 = _mm_unpackhi_epi8(col2, zero);
 
-	v1   = _mm_set1_epi32(*(const uint32_t *)(s + 0));
+	v1   = pb32_load_v(s+0);
 	v1   = _mm_and_si128(v1, mask);
 	col2 = _mm_mullo_epi16(col2, v1);
 	v1s  = _mm_sub_epi16(sub, v1);
@@ -160,7 +168,7 @@ static inline void blit32_4(uint32_t *restrict d, const uint16_t *restrict s, co
 	col3 = _mm_unpacklo_epi8(col3, zero);
 	col4 = _mm_unpackhi_epi8(col4, zero);
 
-	v2   = _mm_set1_epi32(*(const uint32_t *)(s + 2));//_mm_set1_epi32(s[2] | (s[3] << 16));
+	v2   = pb32_load_v(s+2);
 	v2   = _mm_and_si128(v2, mask);
 	col4 = _mm_mullo_epi16(col4, v2);
 	v2s  = _mm_sub_epi16(sub, v2);
@@ -185,8 +193,11 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 	static const __m128i mask = (const __m128i){0x00ff00ff00ff00ffll, 0x00ff00ff00ff00ffll}; // _mm_set1_epi16(0xff);
 	static const __m128i sub  = (const __m128i){0x0100010001000100ll, 0x0100010001000100ll}; // _mm_set1_epi16(256);
 
+
 	for(size_t y = 0; y < h; y++) {
 		const uint16_t *restrict s = src + y*w; // for some reason actually using src_sride is a lot slower (like 10FPS)
+		_mm_prefetch(s, _MM_HINT_NTA);
+
 		uint32_t *restrict d = (uint32_t *restrict)(dest + y*dst_stride);
 		size_t x = 0;
 
@@ -219,6 +230,7 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 		}
 
 		for(; x + 8 < w; x+=8, s+=8, d+=8) {
+			_mm_prefetch(s + 8, _MM_HINT_NTA);
 			__m128i col1, col2, col3, col4, v1, v2, v1s, v2s;
 
 			col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[0]/256u)));
@@ -228,7 +240,7 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			col1 = _mm_unpacklo_epi8(col1, zero);
 			col2 = _mm_unpackhi_epi8(col2, zero);
 
-			v1   = _mm_set1_epi32(*(const uint32_t *)(s + 0));
+			v1   = pb32_load_v(s+0);
 			v1   = _mm_and_si128(v1, mask);
 			col2 = _mm_mullo_epi16(col2, v1);
 			v1s  = _mm_sub_epi16(sub, v1);
@@ -247,7 +259,7 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			col3 = _mm_unpacklo_epi8(col3, zero);
 			col4 = _mm_unpackhi_epi8(col4, zero);
 
-			v2   = _mm_set1_epi32(*(const uint32_t *)(s + 2));//_mm_set1_epi32(s[2] | (s[3] << 16));
+			v2   = pb32_load_v(s+2);
 			v2   = _mm_and_si128(v2, mask);
 			col4 = _mm_mullo_epi16(col4, v2);
 			v2s  = _mm_sub_epi16(sub, v2);
@@ -267,7 +279,7 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			col1 = _mm_unpacklo_epi8(col1, zero);
 			col2 = _mm_unpackhi_epi8(col2, zero);
 
-			v1   = _mm_set1_epi32(*(const uint32_t *)(s + 4));
+			v1   = pb32_load_v(s+4);
 			v1   = _mm_and_si128(v1, mask);
 			col2 = _mm_mullo_epi16(col2, v1);
 			v1s  = _mm_sub_epi16(sub, v1);
@@ -286,7 +298,7 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			col3 = _mm_unpacklo_epi8(col3, zero);
 			col4 = _mm_unpackhi_epi8(col4, zero);
 
-			v2   = _mm_set1_epi32(*(const uint32_t *)(s + 6));//_mm_set1_epi32(s[2] | (s[3] << 16));
+			v2   = pb32_load_v(s+6);
 			v2   = _mm_and_si128(v2, mask);
 			col4 = _mm_mullo_epi16(col4, v2);
 			v2s  = _mm_sub_epi16(sub, v2);
@@ -335,5 +347,69 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 #endif
 	_mm_sfence(); // needed because of the non-temporal stores.
 }
+#else
+__attribute__((hot))
+void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
+                        const uint16_t *restrict src, unsigned int src_stride,
+                        unsigned int w, unsigned int h,
+                        const uint32_t *restrict pal)
+{
+	static const __m128i zero = (const __m128i){0ll, 0ll}; // _mm_setzero_si128();
+	static const __m128i mask = (const __m128i){0x00ff00ff00ff00ffll, 0x00ff00ff00ff00ffll}; // _mm_set1_epi16(0xff);
+	static const __m128i sub  = (const __m128i){0x0100010001000100ll, 0x0100010001000100ll}; // _mm_set1_epi16(256);
+
+	for(size_t y = 0; y < h; y++) {
+		const uint16_t *restrict s = src + y*w;
+		_mm_prefetch(s, _MM_HINT_NTA);
+		uint32_t *restrict d = (uint32_t *restrict)(dest + y*dst_stride);
+		size_t x = 0;
+
+		for(; x < w; x+=4, s+=4, d+=4) {
+			_mm_prefetch(s+4, _MM_HINT_NTA);
+			__m128i col1, col2, col3, col4, v1, v2, v1s, v2s;
+
+			col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[0]/256u)));
+			col2 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[1]/256u)));
+			col1 = _mm_unpacklo_epi32(col1, col2);
+			col2 = col1;
+			col1 = _mm_unpacklo_epi8(col1, zero);
+			col2 = _mm_unpackhi_epi8(col2, zero);
+
+			v1   = pb32_load_v(s+0);
+			v1   = _mm_and_si128(v1, mask);
+			col2 = _mm_mullo_epi16(col2, v1);
+			v1s  = _mm_sub_epi16(sub, v1);
+			col1 = _mm_mullo_epi16(col1, v1s);
+			col1 = _mm_add_epi16(col1, col2);
+			col1 = _mm_srli_epi16(col1, 8);
+
+			col1 = _mm_packus_epi16(col1, zero);
+
+
+			col3 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[2]/256u)));
+			col4 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[3]/256u)));
+
+			col3 = _mm_unpacklo_epi32(col3, col4);
+			col4 = col3;
+			col3 = _mm_unpacklo_epi8(col3, zero);
+			col4 = _mm_unpackhi_epi8(col4, zero);
+
+			v2   = pb32_load_v(s+2);
+			v2   = _mm_and_si128(v2, mask);
+			col4 = _mm_mullo_epi16(col4, v2);
+			v2s  = _mm_sub_epi16(sub, v2);
+			col3 = _mm_mullo_epi16(col3, v2s);
+			col3 = _mm_add_epi16(col3, col4);
+			col3 = _mm_srli_epi16(col3, 8);
+
+			col3 = _mm_packus_epi16(col3, zero);
+
+			_mm_stream_si128((__m128i *)(d + 0), _mm_unpacklo_epi64(col1, col3));
+			//_mm_storeu_si128((__m128i *restrict)(d + 0), _mm_unpacklo_epi64(col1, col3));
+		}
+	}
+	_mm_empty();
+}
+#endif
 
 #endif

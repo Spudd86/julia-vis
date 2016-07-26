@@ -1,4 +1,4 @@
-#pragma GCC optimize "3,ira-hoist-pressure,inline-functions,merge-all-constants,modulo-sched,modulo-sched-allow-regmoves"
+//#pragma GCC optimize "3,ira-hoist-pressure,inline-functions,merge-all-constants,modulo-sched,modulo-sched-allow-regmoves"
 
 #include "common.h"
 #include "audio/audio.h"
@@ -140,8 +140,7 @@ static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_sr
 	uint32_t off = (ipy/256u)*iw + ipx/256u;
 
 	const int pnt_stride = pnt_src->w+1;
-	const uint16_t *s0 = pnt_src->data;
-	const uint16_t *s1 = pnt_src->data + pnt_stride;
+
 #if defined(__SSE__) //TODO: runtime detect
 	if(pnt_src->w % 4 == 0) {
 		const __m64 w00 = _mm_set1_pi16(a00);
@@ -152,13 +151,15 @@ static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_sr
 		const __m64 max_off = _mm_set1_pi16(0x8000);
 		for(int y=0; y < pnt_src->h; y++) {
 			uint16_t *restrict dst_line = (uint16_t *restrict)dest + off + iw*y;
+			const uint16_t *s0 = pnt_src->data + y*pnt_stride;
+			const uint16_t *s1 = s0 + pnt_stride;
 			_mm_prefetch(dst_line, _MM_HINT_NTA);
-			for(int x=0; x < pnt_src->w; x+=4) {
-				_mm_prefetch(dst_line + x + 4, _MM_HINT_NTA);
-				__m64 p00 = *(const __m64 *)(s0 + x);
-				__m64 p01 = *(const __m64 *)(s0 + x + 1);
-				__m64 p10 = *(const __m64 *)(s1 + x);
-				__m64 p11 = *(const __m64 *)(s1 + x + 1);
+			for(int x=0; x < pnt_src->w; x+=4, dst_line+=4, s0+=4, s1+=4) {
+				_mm_prefetch(dst_line + 4, _MM_HINT_NTA);
+				__m64 p00 = *(const __m64 *)(s0);
+				__m64 p01 = *(const __m64 *)(s0 + 1);
+				__m64 p10 = *(const __m64 *)(s1);
+				__m64 p11 = *(const __m64 *)(s1 + 1);
 
 				p00 = _mm_mulhi_pu16(p00, w00);
 				p01 = _mm_mulhi_pu16(p01, w01);
@@ -168,22 +169,24 @@ static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_sr
 				__m64 oa = _mm_add_pi16(p00, p01);
 				__m64 ob = _mm_add_pi16(p10, p11);
 				__m64 res = _mm_add_pi16(oa, ob);
+				// no need to shift because when we did the multiplication we
+				// only got the high 16 bits
 
-				__m64 dp = *(__m64 *)(dst_line + x);
+				__m64 dp = *(__m64 *)(dst_line);
 				dp  = _mm_add_pi16(dp,  max_off);
 				res = _mm_add_pi16(res, max_off);
 				res = _mm_max_pi16(res, dp);
 				res = _mm_sub_pi16(res, max_off);
 
-				*(__m64 *)(dst_line + x) = res;
+				*(__m64 *)(dst_line) = res;
 			}
-			s0 += pnt_stride;
-			s1 += pnt_stride;
 		}
 		_mm_empty();
 		return;
 	}
 #endif
+	const uint16_t *s0 = pnt_src->data;
+	const uint16_t *s1 = pnt_src->data + pnt_stride;
 	for(int y=0; y < pnt_src->h; y++) {
 		uint16_t *restrict dst_line = (uint16_t *restrict)dest + off + iw*y;
 		for(int x=0; x < pnt_src->w; x++) {
@@ -197,7 +200,7 @@ static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_sr
 	}
 }
 
-#define BLOCK_SIZE 16
+#define BLOCK_SIZE 8
 
 static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3])
 {

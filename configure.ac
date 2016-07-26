@@ -89,7 +89,7 @@ AC_SUBST(PORTAUDIO_CFLAGS)
 AC_SUBST(PORTAUDIO_LIBS)
 AC_SUBST(enable_portaudio)
 
-AC_ARG_ENABLE([sndfile], AS_HELP_STRING([--enable-libsndfile], [enable using libsndfile for audio input (default: enabled)]))
+AC_ARG_ENABLE([sndfile], AS_HELP_STRING([--enable-sndfile], [enable using libsndfile for audio input (default: enabled)]))
 AS_IF([ test "x$enable_sndfile" != xno ], [
 	PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0.2, have_sndfile=yes, have_sndfile=no)
 ])
@@ -171,12 +171,13 @@ AC_SUBST(GBM_LIBS)
 AC_SUBST(DRM_CFLAGS)
 AC_SUBST(DRM_LIBS)
 
-AC_ARG_ENABLE([orc], AS_HELP_STRING([--enable-orc], [enable using orc (default: disabled)]))
-AS_IF([ test "x$enable_orc" = xyes ], [
-	PKG_CHECK_MODULES([ORC], [orc-0.4], 
-		[AC_DEFINE([HAVE_ORC], [1], [Define if we have orc])],
-		[AC_MSG_FAILURE([--enable-orc was given, but test for orc failed])])
-])
+#FIXME currently build is broken
+#AC_ARG_ENABLE([orc], AS_HELP_STRING([--enable-orc], [enable using orc (default: disabled)]))
+#AS_IF([ test "x$enable_orc" = xyes ], [
+#	PKG_CHECK_MODULES([ORC], [orc-0.4], 
+#		[AC_DEFINE([HAVE_ORC], [1], [Define if we have orc])],
+#		[AC_MSG_FAILURE([--enable-orc was given, but test for orc failed])])
+#])
 AC_SUBST(ORC_CFLAGS)
 AC_SUBST(ORC_LIBS)
 AC_SUBST(enable_orc)

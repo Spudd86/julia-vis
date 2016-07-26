@@ -20,8 +20,8 @@ void APPEND_CPUCAP(pallet_blit32)(uint8_t * restrict dest, unsigned int dst_stri
 					const uint32_t *restrict pal)
 {
 	const __m64 zero = (__m64)(0ll);
-	const __m64 mask = (__m64)(0x00ff00ff00ffll);
-	const __m64 sub = (__m64)(0x010001000100ll);
+	const __m64 mask = (__m64)(0x00ff00ff00ff00ffll);
+	const __m64 sub  = (__m64)(0x0100010001000100ll);
 
 	//FIXME: add src_stride back in
 	//FIXME: deal with w%16 != 0
