@@ -12,6 +12,10 @@ struct pallet_colour {
 	uint8_t pos;
 };
 
+struct col_shifts {
+	uint8_t r, g, b, x;
+};
+
 #define NUM_PALLETS 10
 static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 
@@ -142,19 +146,24 @@ static const struct pallet_colour static_pallets[NUM_PALLETS][64] = {
 
 #include "colourspace.h"
 
-static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, int bswap)
+static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, struct col_shifts s)
 {
 	//TODO: try out gamma correct interpolation here
 	int j = 0;
 	do { j++;
 		for(int i = curpal[j-1].pos; i <= curpal[j].pos; i++) {
-#if 0 //NO_LINEAR_PALLET_EXPAND
+#if NO_GAMMA_CORRECT_PALLET_EXPAND
 			uint32_t r = (curpal[j-1].r*(curpal[j].pos-i) + curpal[j].r*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
 			uint32_t g = (curpal[j-1].g*(curpal[j].pos-i) + curpal[j].g*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
 			uint32_t b = (curpal[j-1].b*(curpal[j].pos-i) + curpal[j].b*(i-curpal[j-1].pos))/(curpal[j].pos-curpal[j-1].pos);
 #else
 			colourf c1 = make_linear(curpal[j-1].r, curpal[j-1].g, curpal[j-1].b);
 			colourf c2 = make_linear(curpal[j].r,   curpal[j].g,   curpal[j].b);
+			// interpolate in L*u*v* colour space because it's perceptually uniform
+			// not using L*a*b* because during fades to black it makes colours out
+			// of nowhere and generally doesn't look as good.
+			// Not using Lch because we don't want to move around the colour wheel
+			// as we interpolate.
 			c1 = rgb2luv(c1);
 			c2 = rgb2luv(c2);
 			for(int k=0; k < 3; k++)
@@ -167,9 +176,7 @@ static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, in
 			uint32_t b = fmaxf(0, fminf(255, gamma_curve(c1.b)));
 #endif
 
-			if(bswap) dest[i] = (r)|(g<<8)|(b<<16);
-			else dest[i] = (r<<16)|(g<<8)|b;
-			dest[i] |= 255<<24;
+			dest[i] = (r << s.r) | (g << s.g) | (b << s.b) | (255 << s.x);
 		}
 	} while(curpal[j].pos < 255);
 }
@@ -192,9 +199,57 @@ static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_
 
 struct pal_ctx *pal_ctx_new(int bswap)
 {
+	struct col_shifts shifts;
+	if(bswap) {
+		shifts.r =  0;
+		shifts.g =  8;
+		shifts.b = 16;
+		shifts.x = 24;
+	} else {
+		shifts.r = 16;
+		shifts.g =  8;
+		shifts.b =  0;
+		shifts.x = 24;
+	}
 	struct pal_ctx *self = malloc(sizeof(struct pal_ctx));
 	for(int p=0; p < NUM_PALLETS; p++)
-		expand_pallet(static_pallets[p], self->pallets32[p], bswap);
+		expand_pallet(static_pallets[p], self->pallets32[p], shifts);
+	self->pallet_changing = 0;
+	self->palpos = 0;
+	self->nextpal = 0;
+	self->curpal = 0;
+	memcpy(self->active_pal, self->pallets32[0], sizeof(uint32_t)*256);
+	self->active_pal[256] = self->active_pal[255];
+	return self;
+}
+
+//TODO: endianness?
+static const struct col_shifts format_shifts[] = {
+//	{  r,  g,  b,  x}
+#if 0
+	{  0, 10, 20, 30}, // SOFT_PIX_FMT_RGBx101010,
+	{ 20, 10,  0, 30}, // SOFT_PIX_FMT_BGRx101010,
+#else
+	{  0,  8, 16, 24}, // SOFT_PIX_FMT_RGBx101010,
+	{ 24,  8,  0, 24}, // SOFT_PIX_FMT_BGRx101010,
+#endif
+	{  0,  8, 16, 24}, // SOFT_PIX_FMT_RGBx8888,
+	{ 16,  8,  0, 24}, // SOFT_PIX_FMT_BGRx8888,
+	{  8, 16, 24,  0}, // SOFT_PIX_FMT_xRGB8888,
+	{ 24, 16,  8,  0}, // SOFT_PIX_FMT_xBGR8888,
+	{ 16,  8,  0, 24}, // SOFT_PIX_FMT_RGB565,
+	{  0,  8, 16, 24}, // SOFT_PIX_FMT_BGR565,
+	{ 16,  8,  0, 24}, // SOFT_PIX_FMT_RGB555,
+	{  0,  8, 16, 24}, // SOFT_PIX_FMT_BGR555,
+	{  0,  8, 16, 24}, // SOFT_PIX_FMT_8_RGB_PAL,
+	{ 16,  8,  0, 24}, // SOFT_PIX_FMT_8_BGR_PAL
+};
+
+struct pal_ctx *pal_ctx_pix_format_new(julia_vis_pixel_format format)
+{
+	struct pal_ctx *self = malloc(sizeof(struct pal_ctx));
+	for(int p=0; p < NUM_PALLETS; p++)
+		expand_pallet(static_pallets[p], self->pallets32[p], format_shifts[format]);
 	self->pallet_changing = 0;
 	self->palpos = 0;
 	self->nextpal = 0;
@@ -230,17 +285,19 @@ int pal_ctx_step(struct pal_ctx *self, uint8_t step) {
 		self->pallet_changing = self->palpos = 0;
 		self->curpal = self->nextpal;
 		memcpy(self->active_pal, self->pallets32[self->nextpal], 256);
-	} else
+	} else {
 		do_pallet_step(self->palpos,
 		               self->active_pal,
 		               (uint8_t *restrict)self->pallets32[self->nextpal],
 		               (uint8_t *restrict)self->pallets32[self->curpal]);
+	}
 
 	self->active_pal[256] = self->active_pal[255];
 	return 1;
 }
 
-static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_t *restrict next, const uint8_t *restrict prev) {
+static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_t *restrict next, const uint8_t *restrict prev)
+{
 	uint8_t *restrict d = (uint8_t *restrict)active_pal;
 	const float p1 = pos/256.0f, p2 = (256-pos)/256.0f;
 	for(int i=0; i<256*4; i++) {

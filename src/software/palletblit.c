@@ -2,6 +2,7 @@
 #include "common.h"
 #include "pixmisc.h"
 #include "pallet.h"
+#include "pixformat.h"
 
 #include <assert.h>
 
@@ -27,9 +28,13 @@ void pallet_blit32_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 		const uint16_t *restrict s = src + y*src_stride;
 		for(unsigned int x = 0; x < w; x++) {
 			uint16_t v = *(s++);
-			//uint32_t mask = ((x + y * 237) * 119 & 255); // a_dither3
-			//v = MIN( (uint32_t)v + mask, UINT16_MAX);
-			*(d++) = pal[v>>8];
+			const uint8_t *p = (const uint8_t *)(pal + (v>>8));
+			v = v & 0xff;
+			uint8_t *db = (uint8_t *)(d++);
+			db[0] = ((uint16_t)p[0]*(256-v) + (uint16_t)p[4]*v) >> 8;
+			db[1] = ((uint16_t)p[1]*(256-v) + (uint16_t)p[5]*v) >> 8;
+			db[2] = ((uint16_t)p[2]*(256-v) + (uint16_t)p[6]*v) >> 8;
+			db[3] = ((uint16_t)p[3]*(256-v) + (uint16_t)p[7]*v) >> 8;
 		}
 	}
 }
@@ -222,6 +227,11 @@ pallet_blit565_fn pallet_blit565 = pallet_blit565_fallback;
 pallet_blit32_fn pallet_blit32 = pallet_blit32_fallback;
 #endif
 
+#ifndef NDEBUG
+#define unreachable() do { assert(0); __builtin_unreachable(); } while(0)
+#else
+#define unreachable __builtin_unreachable
+#endif
 
 void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal)
 {
@@ -229,11 +239,27 @@ void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h,
 	w = IMIN(w, dst->w);
 	h = IMIN(h, dst->h);
 
-	if(dst->bpp == 32) pallet_blit32(dst->data, dst->pitch, src, src_stride, w, h, pal);
-	else if(dst->bpp == 16) pallet_blit565(dst->data, dst->pitch, src, src_stride, w, h, pal);
-	else if(dst->bpp == 15) pallet_blit555(dst->data, dst->pitch, src, src_stride, w, h, pal);
-	else if(dst->bpp == 8) { // need to set surface's pallet
+	switch(dst->format) { // pallet code takes care of channel order
+		case SOFT_PIX_FMT_RGBx8888:
+		case SOFT_PIX_FMT_BGRx8888:
+		case SOFT_PIX_FMT_xRGB8888:
+		case SOFT_PIX_FMT_xBGR8888:
+			pallet_blit32(dst->data, dst->pitch, src, src_stride, w, h, pal);
+			break;
+		case SOFT_PIX_FMT_RGB565:
+		case SOFT_PIX_FMT_BGR565:
+			pallet_blit565(dst->data, dst->pitch, src, src_stride, w, h, pal);
+			break;
+		case SOFT_PIX_FMT_RGB555:
+		case SOFT_PIX_FMT_BGR555:
+			pallet_blit555(dst->data, dst->pitch, src, src_stride, w, h, pal);
+			break;
+		case SOFT_PIX_FMT_8_RGB_PAL:
+		case SOFT_PIX_FMT_8_BGR_PAL:
 		pallet_blit8(dst->data, dst->pitch, src, src_stride, w, h);
+			break;
+		default:
+			unreachable();
 	}
 }
 

@@ -6,9 +6,12 @@
 #ifndef PALLET_H_
 #define PALLET_H_
 
+#include "software/pixformat.h"
+
 //TODO: now that we've dropped the global variable based version rename these functions
 struct pal_ctx;
 struct pal_ctx *pal_ctx_new(int bswap);
+struct pal_ctx *pal_ctx_pix_format_new(julia_vis_pixel_format format);
 void pal_ctx_delete(struct pal_ctx *self);
 const uint32_t *pal_ctx_get_active(struct pal_ctx *self);
 void pal_ctx_start_switch(struct pal_ctx *self, int next);

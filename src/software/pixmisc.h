@@ -1,6 +1,7 @@
 #ifndef PIXMISC_H
 #define PIXMISC_H
 
+#include "pixformat.h"
 typedef void (*maxblend_fn)(void *restrict dest, const void *restrict src, int w, int h);
 
 // require w%16 == 0

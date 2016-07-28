@@ -173,13 +173,6 @@ typedef uint16_t * restrict __attribute__ ((aligned (16)))  pixbuf_t;
 
 typedef struct {
 	uint16_t w, h;
-	int pitch;
-	int bpp;
-	void *data;
-} Pixbuf;
-
-typedef struct {
-	uint16_t w, h;
 } ivec;
 
 #endif

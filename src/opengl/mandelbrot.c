@@ -6,6 +6,7 @@
 #include "common.h"
 #include "glmisc.h"
 #include "points.h"
+#include "software/pixformat.h"
 
 #include <complex.h>
 
