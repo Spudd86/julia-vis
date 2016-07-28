@@ -25,6 +25,17 @@ Makefile
 /config.*
 /autom4te.cache
 /build-aux
+/gst/m4/libtool.m4
+/gst/m4/lt*.m4
+/gst/libtool
+/gst/ltmain.sh
+/gst/install-sh
+/gst/aclocal.m4
+/gst/configure
+/gst/stamp-h?
+/gst/config.*
+/gst/autom4te.cache
+/gst/build-aux
 .dirstamp
 .sconsign.dblite
 *.tar.*
