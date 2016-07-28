@@ -192,32 +192,33 @@ bin/glscopetris-test$(EXEEXT): $(GL_LOADER) $(GL_SDL_OBJS) src/tess/scopetris.c 
 	$(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) \
 	$(GL_LOADER) $(SDL_CFLAGS) $(AUDIO_CFLAGS) $(GL_CFLAGS) $(LDFLAGS) $(SDL_LIBS) $(AUDIO_LIBS) $(GL_LIBS) $(LIBS) -o $@
 
-#FIXME: need to properly detect X
+#FIXME: need to properly detect X and pthreads
 bin/glx-test$(EXEEXT): $(GL_LOADER) src/opengl/glxmain.c $(GL_SRCS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
-	$(CC) $(CFLAGS) -DUSE_GL \
+	$(CC) -pthread $(CFLAGS) -DUSE_GL \
 	src/opengl/glxmain.c -lX11 $(GL_SRCS) \
 	src/opengl/glx_gen.c \
 	$(COMMON_OBJS)  $(AUDIO_OBJS) $(TRIBUF_SRCS) \
 	$(AUDIO_CFLAGS) $(GL_CFLAGS) $(GL_LOADER) $(LDFLAGS) $(GL_LIBS) $(AUDIO_LIBS) $(LIBS) -o $@
 
-#FIXME: need to properly detect X
+#FIXME: need to properly detect X and pthreads
 bin/fps-test$(EXEEXT): $(GL_LOADER) src/opengl/fpsmain.c src/opengl/fpsservo/fpsservo.c src/opengl/glx_gen.c $(GL_SRCS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
-	$(CC) $(CFLAGS) -DUSE_GL \
+	$(CC) -pthread $(CFLAGS) -DUSE_GL \
 	src/opengl/fpsmain.c -lX11 $(GL_SRCS) \
 	src/opengl/fpsservo/fpsservo.c \
 	src/opengl/glx_gen.c \
 	$(COMMON_OBJS)  $(AUDIO_OBJS) $(TRIBUF_SRCS) \
 	$(AUDIO_CFLAGS) $(GL_CFLAGS) $(GL_LOADER) $(LDFLAGS) $(AUDIO_LIBS) $(GL_LIBS) $(LIBS) -o $@
 
-#FIXME: need to properly detect X
+#FIXME: need to properly detect X and pthreads
 bin/egl-test$(EXEEXT): $(GL_LOADER) src/opengl/eglmain.c src/opengl/egl/xegl.c $(GL_SRCS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
-	$(CC) $(CFLAGS) -DUSE_GL \
+	$(CC) -pthread $(CFLAGS) -DUSE_GL \
 	src/opengl/eglmain.c src/opengl/egl/xegl.c -lX11 $(GL_SRCS) \
 	$(COMMON_OBJS)  $(AUDIO_OBJS) $(TRIBUF_SRCS) \
 	$(EGL_CFLAGS) $(EGL_LIBS) $(AUDIO_CFLAGS) $(GL_CFLAGS) $(GL_LOADER) $(LDFLAGS) $(AUDIO_LIBS) $(GL_LIBS) $(LIBS) -o $@
 
+#FIXME: need to properly detect pthreads
 bin/kms-test$(EXEEXT): $(GL_LOADER) src/opengl/egl/kms.c $(GL_SRCS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) src/opengl/glmisc.h src/points.h src/common.h Makefile config.mk
-	$(CC) $(CFLAGS) -DUSE_GL \
+	$(CC) -pthread $(CFLAGS) -DUSE_GL \
 	src/opengl/egl/kms.c $(GL_SRCS) $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_SRCS) \
 	$(AUDIO_CFLAGS) \
 	$(LDFLAGS) \
@@ -254,11 +255,11 @@ bin/pal-test2$(EXEEXT): src/software/sdl/test_pallets.o $(SDL_SOFT_OBJS) $(COMMO
 src/opengl/gl_14.o: src/opengl/gl_14.c
 	$(CC) -g -O2 $(GL_CFLAGS) -c $< -o $@
 
-src/software/x86/mmx.o: src/software/x86/mmx.c src/software/x86/palblit_mmxsse.c src/common.h src/software/pixmisc.h Makefile config.mk
+src/software/x86/mmx.o: src/software/x86/mmx.c src/software/x86/palblit_mmxsse.h src/common.h src/software/pixmisc.h Makefile config.mk
 	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse -mmmx $(PP_FLAGS) $< -MF $*.dep
 	$(CC) -c $(CFLAGS) -mno-sse -mmmx $(PP_FLAGS) $< -o $@
 
-src/software/x86/sse.o: src/software/x86/sse.c src/software/x86/palblit_mmxsse.c src/common.h src/software/pixmisc.h Makefile config.mk
+src/software/x86/sse.o: src/software/x86/sse.c src/software/x86/palblit_mmxsse.h src/common.h src/software/pixmisc.h Makefile config.mk
 	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse2 -msse $(PP_FLAGS) $< -MF $*.dep
 	$(CC) -c $(CFLAGS) -mno-sse2 -msse $(PP_FLAGS) $< -o $@
 
