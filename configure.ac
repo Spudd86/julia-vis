@@ -182,30 +182,6 @@ AC_SUBST(ORC_CFLAGS)
 AC_SUBST(ORC_LIBS)
 AC_SUBST(enable_orc)
 
-AC_ARG_ENABLE([gstreamer], AS_HELP_STRING([--enable-gstreamer], [enable building a gstreamer plugin (default: disabled)]))
-AS_IF([ test "x$enable_gstreamer" == xyes ], [
-	PKG_CHECK_MODULES(GST, [
-		gstreamer-1.0
-		gstreamer-base-1.0
-		gstreamer-audio-1.0
-		gstreamer-video-1.0
-		gstreamer-pbutils-1.0
-	], [
-		AC_SUBST(GST_CFLAGS)
-		AC_SUBST(GST_LIBS)
-	], [
-		AC_MSG_ERROR([
-		  You need to install or upgrade the GStreamer development
-		  packages on your system. On debian-based systems these are
-		  libgstreamer1.0-dev and libgstreamer-plugins-base1.0-dev.
-		  on RPM-based systems gstreamer1.0-devel, libgstreamer1.0-devel
-		  or similar. The minimum version required is $GST_REQUIRED.
-		])
-	])
-])
-AC_SUBST(GST_CFLAGS)
-AC_SUBST(GST_LIBS)
-AC_SUBST(enable_gstreamer)
 
 AC_ARG_ENABLE([atomics], AS_HELP_STRING([--disable-atomics], [enable using pthread locks to syncronize tribufs instead of atomic ops (default: disabled)]))
 if test "x$enable_atomics" = xno; then
