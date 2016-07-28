@@ -27,7 +27,7 @@ void split_radix_real_complex_fft(float *x, uint32_t n);
  * need to make grabbing beat counts safer
  */
 
-typedef void (*audio_drv_shutdown_t)();
+typedef void (*audio_drv_shutdown_t)(void);
 static audio_drv_shutdown_t audio_drv_shutdown = NULL;
 
 int audio_init(const opt_data *od)

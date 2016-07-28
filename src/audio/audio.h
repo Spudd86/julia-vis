@@ -14,7 +14,7 @@ typedef struct {
 int beat_get_count(void);
 
 int audio_init(const opt_data *);
-void audio_shutdown();
+void audio_shutdown(void);
 int audio_get_buf_count(void);
 
 int audio_get_samples(audio_data *d);
