@@ -1356,7 +1356,7 @@ extern void (CODEGEN_FUNCPTR *_ptrc_glAttachObjectARB)(GLhandleARB, GLhandleARB)
 #define glAttachObjectARB _ptrc_glAttachObjectARB
 extern void (CODEGEN_FUNCPTR *_ptrc_glCompileShaderARB)(GLhandleARB);
 #define glCompileShaderARB _ptrc_glCompileShaderARB
-extern GLhandleARB (CODEGEN_FUNCPTR *_ptrc_glCreateProgramObjectARB)();
+extern GLhandleARB (CODEGEN_FUNCPTR *_ptrc_glCreateProgramObjectARB)(void);
 #define glCreateProgramObjectARB _ptrc_glCreateProgramObjectARB
 extern GLhandleARB (CODEGEN_FUNCPTR *_ptrc_glCreateShaderObjectARB)(GLenum);
 #define glCreateShaderObjectARB _ptrc_glCreateShaderObjectARB
@@ -1693,9 +1693,9 @@ extern void (CODEGEN_FUNCPTR *_ptrc_glEdgeFlagv)(const GLboolean *);
 #define glEdgeFlagv _ptrc_glEdgeFlagv
 extern void (CODEGEN_FUNCPTR *_ptrc_glEnable)(GLenum);
 #define glEnable _ptrc_glEnable
-extern void (CODEGEN_FUNCPTR *_ptrc_glEnd)();
+extern void (CODEGEN_FUNCPTR *_ptrc_glEnd)(void);
 #define glEnd _ptrc_glEnd
-extern void (CODEGEN_FUNCPTR *_ptrc_glEndList)();
+extern void (CODEGEN_FUNCPTR *_ptrc_glEndList)(void);
 #define glEndList _ptrc_glEndList
 extern void (CODEGEN_FUNCPTR *_ptrc_glEvalCoord1d)(GLdouble);
 #define glEvalCoord1d _ptrc_glEvalCoord1d
@@ -1723,9 +1723,9 @@ extern void (CODEGEN_FUNCPTR *_ptrc_glEvalPoint2)(GLint, GLint);
 #define glEvalPoint2 _ptrc_glEvalPoint2
 extern void (CODEGEN_FUNCPTR *_ptrc_glFeedbackBuffer)(GLsizei, GLenum, GLfloat *);
 #define glFeedbackBuffer _ptrc_glFeedbackBuffer
-extern void (CODEGEN_FUNCPTR *_ptrc_glFinish)();
+extern void (CODEGEN_FUNCPTR *_ptrc_glFinish)(void);
 #define glFinish _ptrc_glFinish
-extern void (CODEGEN_FUNCPTR *_ptrc_glFlush)();
+extern void (CODEGEN_FUNCPTR *_ptrc_glFlush)(void);
 #define glFlush _ptrc_glFlush
 extern void (CODEGEN_FUNCPTR *_ptrc_glFogf)(GLenum, GLfloat);
 #define glFogf _ptrc_glFogf
@@ -1747,7 +1747,7 @@ extern void (CODEGEN_FUNCPTR *_ptrc_glGetClipPlane)(GLenum, GLdouble *);
 #define glGetClipPlane _ptrc_glGetClipPlane
 extern void (CODEGEN_FUNCPTR *_ptrc_glGetDoublev)(GLenum, GLdouble *);
 #define glGetDoublev _ptrc_glGetDoublev
-extern GLenum (CODEGEN_FUNCPTR *_ptrc_glGetError)();
+extern GLenum (CODEGEN_FUNCPTR *_ptrc_glGetError)(void);
 #define glGetError _ptrc_glGetError
 extern void (CODEGEN_FUNCPTR *_ptrc_glGetFloatv)(GLenum, GLfloat *);
 #define glGetFloatv _ptrc_glGetFloatv
@@ -1817,7 +1817,7 @@ extern void (CODEGEN_FUNCPTR *_ptrc_glIndexs)(GLshort);
 #define glIndexs _ptrc_glIndexs
 extern void (CODEGEN_FUNCPTR *_ptrc_glIndexsv)(const GLshort *);
 #define glIndexsv _ptrc_glIndexsv
-extern void (CODEGEN_FUNCPTR *_ptrc_glInitNames)();
+extern void (CODEGEN_FUNCPTR *_ptrc_glInitNames)(void);
 #define glInitNames _ptrc_glInitNames
 extern GLboolean (CODEGEN_FUNCPTR *_ptrc_glIsEnabled)(GLenum);
 #define glIsEnabled _ptrc_glIsEnabled
@@ -1845,7 +1845,7 @@ extern void (CODEGEN_FUNCPTR *_ptrc_glLineWidth)(GLfloat);
 #define glLineWidth _ptrc_glLineWidth
 extern void (CODEGEN_FUNCPTR *_ptrc_glListBase)(GLuint);
 #define glListBase _ptrc_glListBase
-extern void (CODEGEN_FUNCPTR *_ptrc_glLoadIdentity)();
+extern void (CODEGEN_FUNCPTR *_ptrc_glLoadIdentity)(void);
 #define glLoadIdentity _ptrc_glLoadIdentity
 extern void (CODEGEN_FUNCPTR *_ptrc_glLoadMatrixd)(const GLdouble *);
 #define glLoadMatrixd _ptrc_glLoadMatrixd
@@ -1933,15 +1933,15 @@ extern void (CODEGEN_FUNCPTR *_ptrc_glPolygonMode)(GLenum, GLenum);
 #define glPolygonMode _ptrc_glPolygonMode
 extern void (CODEGEN_FUNCPTR *_ptrc_glPolygonStipple)(const GLubyte *);
 #define glPolygonStipple _ptrc_glPolygonStipple
-extern void (CODEGEN_FUNCPTR *_ptrc_glPopAttrib)();
+extern void (CODEGEN_FUNCPTR *_ptrc_glPopAttrib)(void);
 #define glPopAttrib _ptrc_glPopAttrib
-extern void (CODEGEN_FUNCPTR *_ptrc_glPopMatrix)();
+extern void (CODEGEN_FUNCPTR *_ptrc_glPopMatrix)(void);
 #define glPopMatrix _ptrc_glPopMatrix
-extern void (CODEGEN_FUNCPTR *_ptrc_glPopName)();
+extern void (CODEGEN_FUNCPTR *_ptrc_glPopName)(void);
 #define glPopName _ptrc_glPopName
 extern void (CODEGEN_FUNCPTR *_ptrc_glPushAttrib)(GLbitfield);
 #define glPushAttrib _ptrc_glPushAttrib
-extern void (CODEGEN_FUNCPTR *_ptrc_glPushMatrix)();
+extern void (CODEGEN_FUNCPTR *_ptrc_glPushMatrix)(void);
 #define glPushMatrix _ptrc_glPushMatrix
 extern void (CODEGEN_FUNCPTR *_ptrc_glPushName)(GLuint);
 #define glPushName _ptrc_glPushName
@@ -2232,7 +2232,7 @@ extern void (CODEGEN_FUNCPTR *_ptrc_glNormalPointer)(GLenum, GLsizei, const GLvo
 #define glNormalPointer _ptrc_glNormalPointer
 extern void (CODEGEN_FUNCPTR *_ptrc_glPolygonOffset)(GLfloat, GLfloat);
 #define glPolygonOffset _ptrc_glPolygonOffset
-extern void (CODEGEN_FUNCPTR *_ptrc_glPopClientAttrib)();
+extern void (CODEGEN_FUNCPTR *_ptrc_glPopClientAttrib)(void);
 #define glPopClientAttrib _ptrc_glPopClientAttrib
 extern void (CODEGEN_FUNCPTR *_ptrc_glPrioritizeTextures)(GLsizei, const GLuint *, const GLfloat *);
 #define glPrioritizeTextures _ptrc_glPrioritizeTextures
@@ -2450,10 +2450,10 @@ enum ogl_LoadStatus
 	ogl_LOAD_SUCCEEDED = 1,
 };
 
-int ogl_LoadFunctions();
+int ogl_LoadFunctions(void);
 
-int ogl_GetMinorVersion();
-int ogl_GetMajorVersion();
+int ogl_GetMinorVersion(void);
+int ogl_GetMajorVersion(void);
 int ogl_IsVersionGEQ(int majorVersion, int minorVersion);
 
 #ifdef __cplusplus
