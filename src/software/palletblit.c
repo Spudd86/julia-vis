@@ -151,8 +151,10 @@ static void pallet_blit8_dispatch(uint8_t * restrict dest, unsigned int dst_stri
 
 	uint64_t feat = x86feat_get_features();
 
+#if !defined(__x86_64__)
 	if(feat & X86FEAT_MMX) pallet_blit8 = pallet_blit8_mmx;
 	if(feat & X86FEAT_MMXEXT) pallet_blit8 = pallet_blit8_sse;
+#endif
 	if(feat & X86FEAT_SSE) pallet_blit8 = pallet_blit8_sse;
 
 	pallet_blit8(dest, dst_stride, src, src_stride, w, h);
@@ -167,8 +169,10 @@ static void pallet_blit555_dispatch(uint8_t * restrict dest, unsigned int dst_st
 
 	uint64_t feat = x86feat_get_features();
 
+#if !defined(__x86_64__)
 	if(feat & X86FEAT_MMX) pallet_blit555 = pallet_blit555_mmx;
 	if(feat & X86FEAT_MMXEXT) pallet_blit555 = pallet_blit555_sse;
+#endif
 	if(feat & X86FEAT_SSE) pallet_blit555 = pallet_blit555_sse;
 
 	pallet_blit555(dest, dst_stride, src, src_stride, w, h, pal);
@@ -183,8 +187,10 @@ static void pallet_blit565_dispatch(uint8_t * restrict dest, unsigned int dst_st
 
 	uint64_t feat = x86feat_get_features();
 
+#if !defined(__x86_64__)
 	if(feat & X86FEAT_MMX) pallet_blit565 = pallet_blit565_mmx;
 	if(feat & X86FEAT_MMXEXT) pallet_blit565 = pallet_blit565_sse;
+#endif
 	if(feat & X86FEAT_SSE) pallet_blit565 = pallet_blit565_sse;
 
 	pallet_blit565(dest, dst_stride, src, src_stride, w, h, pal);
@@ -199,8 +205,10 @@ static void pallet_blit32_dispatch(uint8_t * restrict dest, unsigned int dst_str
 
 	uint64_t feat = x86feat_get_features();
 
+#if !defined(__x86_64__)
 	if(feat & X86FEAT_MMX) pallet_blit32 = pallet_blit32_mmx;
 	if(feat & X86FEAT_MMXEXT) pallet_blit32 = pallet_blit32_sse;
+#endif
 	if(feat & X86FEAT_SSE) pallet_blit32 = pallet_blit32_sse;
 	if(feat & X86FEAT_SSE2) pallet_blit32 = pallet_blit32_sse2;
 

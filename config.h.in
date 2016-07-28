@@ -1,4 +1,4 @@
-/* src/config.h.in.  Generated from configure.ac by autoheader.  */
+/* config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* Define if we have egl */
 #undef HAVE_EGL

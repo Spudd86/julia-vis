@@ -1,6 +1,6 @@
 
 #if (__x86_64__ || __i386__)
-#pragma GCC target("no-sse4.2")
+#pragma GCC target("no-sse4.2,sse4.1")
 
 #include "common.h"
 #include "../pixmisc.h"

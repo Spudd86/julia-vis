@@ -1,6 +1,6 @@
 
 #if (__x86_64__ || __i386__)
-#pragma GCC target("no-sse3")
+#pragma GCC target("no-sse3,sse2")
 #pragma GCC optimize "3,inline-functions,merge-all-constants"
 
 #include "common.h"

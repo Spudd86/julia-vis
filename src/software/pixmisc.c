@@ -40,17 +40,13 @@ static void maxblend_dispatch(void *restrict dest, const void *restrict src, int
 
 	uint64_t feat = x86feat_get_features();
 
-	if(feat & X86FEAT_SSE4_1) {
-		blend = maxblend_sse4_1;
-	} else if(feat & X86FEAT_SSE2) {
-		blend = maxblend_sse2;
-	} else if(feat & X86FEAT_SSE) { // TODO: check for the extend mmx from AMD that adds the sse instructions we need here
-		blend = maxblend_sse;
-	} else if(feat & X86FEAT_MMXEXT) {
-		blend = maxblend_sse; // AMD added the extra mmx instructions without doing all of sse, we only need the ones in both places
-	} else if(feat & X86FEAT_MMX) { // mmx
-		blend = maxblend_mmx;
-	}
+#if !defined(__x86_64__)
+	if(feat & X86FEAT_MMX) blend = maxblend_mmx;
+	if(feat & X86FEAT_MMXEXT) blend = maxblend_sse; // AMD added the extra mmx instructions without doing all of sse, we only need the ones in both places
+	if(feat & X86FEAT_SSE) blend = maxblend_sse;
+#endif
+	if(feat & X86FEAT_SSE2) blend = maxblend_sse2;
+	if(feat & X86FEAT_SSE4_1) blend = maxblend_sse4_1;
 
 	blend(dest, src, w, h);
 }

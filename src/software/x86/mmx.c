@@ -1,7 +1,7 @@
 
-#if (__x86_64__ || __i386__)
+#if (__i386__)
 
-#pragma GCC target("no-sse")
+#pragma GCC target("mmx,no-sse")
 #pragma GCC optimize "3,inline-functions,merge-all-constants"
 
 #include "common.h"
@@ -65,6 +65,6 @@ void maxblend_mmx(void *restrict dest, const void *restrict src, int w, int h)
 	_mm_empty();
 }
 
-#include "palblit_mmxsse.c"
+#include "palblit_mmxsse.h"
 
 #endif
