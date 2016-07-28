@@ -19,7 +19,7 @@ typedef enum {
 	E_QUIT
 } egl_event;
 
-EGLNativeDisplayType egl_get_native_display();
+EGLNativeDisplayType egl_get_native_display(void);
 EGLNativeWindowType egl_native_window(EGLNativeDisplayType dpy, EGLDisplay edpy, EGLConfig conf, opt_data *opts, int im_size);
 void egl_destroy_native_window(EGLNativeDisplayType dpy, EGLNativeWindowType win);
 void egl_destroy_native_display(EGLNativeDisplayType dpy);
