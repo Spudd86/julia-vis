@@ -1,12 +1,11 @@
 dnl required version of autoconf
 AC_PREREQ(2.60)
 
-AC_INIT([julia-vis],[1.0.0])
+AC_INIT([julia-vis-gst],[0.0.0])
 
 AC_CONFIG_SRCDIR([src/element2.c])
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([
-  check-news
   foreign
   1.11
   -Wall
@@ -47,6 +46,7 @@ AC_SEARCH_LIBS([sqrt], [m])
 
 LT_INIT([
   disable-static
+  shared
   pic-only
   win32-dll
 ])

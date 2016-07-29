@@ -15,7 +15,7 @@ AM_LDFLAGS = \
 	-Wl,--gc-sections \
 	-Wl,--as-needed
 
-lib_LTLIBRARIES = libgstjuliavis.la
+plugin_LTLIBRARIES = libgstjuliavis.la
 
 libgstjuliavis_la_SOURCES = \
 ../src/common.h \
