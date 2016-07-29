@@ -3,11 +3,11 @@
 
 AC_PREREQ([2.61])
 AC_INIT([julia-vis], [0.1], [BUG-REPORT-ADDRESS], [julia-vis], [http://github.com/Spudd86/julia-vis])
+AC_CONFIG_SRCDIR([src/optproc.c])
 AC_PROG_CC_STDC
 AC_USE_SYSTEM_EXTENSIONS
 AC_SYS_LARGEFILE
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_SRCDIR([src/optproc.c])
 
 m4_include([m4/ax_check_gl.m4])
 m4_include([m4/ax_check_glu.m4])
@@ -94,7 +94,7 @@ AS_IF([ test "x$enable_sndfile" != xno ], [
 	PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0.2, have_sndfile=yes, have_sndfile=no)
 ])
 AS_IF([ test "x$enable_sndfile" = xyes && test "x$have_sndfile" = xno ], [
-	AC_MSG_FAILURE([--enable-libsndfile was given, but test for libsndfile failed])
+	AC_MSG_FAILURE([--enable-sndfile was given, but test for libsndfile failed])
 ])
 AS_IF([ test "x$have_sndfile" = xyes], [
 	AC_DEFINE([HAVE_SNDFILE], [1], [Define if libsndfile is enabled])
