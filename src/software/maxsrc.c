@@ -1,8 +1,6 @@
 //#pragma GCC optimize "3,ira-hoist-pressure,inline-functions,merge-all-constants,modulo-sched,modulo-sched-allow-regmoves"
 
 #include "common.h"
-#include "audio/audio.h"
-#include "tribuf.h"
 #include "maxsrc.h"
 #include "getsamp.h"
 
