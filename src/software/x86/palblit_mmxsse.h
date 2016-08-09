@@ -12,7 +12,8 @@
 #	define APPEND_CPUCAP(name) name##_mmx
 #endif
 
-
+//TODO: our prefetchnta is always going to fetch at least 32 bytes
+// so we probably ought to unroll the loop to process at least that many (8 pixels)
 __attribute__((hot))
 void APPEND_CPUCAP(pallet_blit32)(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
@@ -184,7 +185,7 @@ void APPEND_CPUCAP(pallet_blit565)(uint8_t * restrict dest, unsigned int dst_str
 			bg = _mm_adds_pu8(bg, _mm_unpacklo_pi32(*dith_b, *dith_g));
 			r  = _mm_adds_pu8(r,  *dith_r);
 
-			bg = _mm_and_si64(bg, mask); // mask of low bits we don't want
+			bg = _mm_and_si64(bg, mask); // mask off low bits we don't want
 			r  = _mm_and_si64(r,  mask);
 
 			b = _mm_unpacklo_pi8(bg, zero);
@@ -214,7 +215,7 @@ void APPEND_CPUCAP(pallet_blit565)(uint8_t * restrict dest, unsigned int dst_str
 			bg = _mm_adds_pu8(bg, _mm_unpackhi_pi32(*dith_b, *dith_g));
 			r  = _mm_adds_pu8(r,  _mm_srli_si64(*dith_r, 32));
 
-			bg = _mm_and_si64(bg, mask); // mask of low bits we don't want
+			bg = _mm_and_si64(bg, mask); // mask off low bits we don't want
 			r  = _mm_and_si64(r,  mask);
 
 			b = _mm_unpacklo_pi8(bg, zero);
@@ -315,7 +316,7 @@ void APPEND_CPUCAP(pallet_blit555)(uint8_t * restrict dest, unsigned int dst_str
 			bg = _mm_adds_pu8(bg, _mm_unpacklo_pi32(*dith_b, *dith_g));
 			r  = _mm_adds_pu8(r,  *dith_r);
 
-			bg = _mm_and_si64(bg, mask); // mask of low bits we don't want
+			bg = _mm_and_si64(bg, mask); // mask off low bits we don't want
 			r  = _mm_and_si64(r,  mask);
 
 			b = _mm_unpacklo_pi8(bg, zero);
@@ -345,7 +346,7 @@ void APPEND_CPUCAP(pallet_blit555)(uint8_t * restrict dest, unsigned int dst_str
 			bg = _mm_adds_pu8(bg, _mm_unpackhi_pi32(*dith_b, *dith_g));
 			r  = _mm_adds_pu8(r,  _mm_srli_si64(*dith_r, 32));
 
-			bg = _mm_and_si64(bg, mask); // mask of low bits we don't want
+			bg = _mm_and_si64(bg, mask); // mask off low bits we don't want
 			r  = _mm_and_si64(r,  mask);
 
 			b = _mm_unpacklo_pi8(bg, zero);
