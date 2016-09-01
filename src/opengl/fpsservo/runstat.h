@@ -3,7 +3,7 @@
 
 struct runstat {
 	int n;
-	int sum;
+	int64_t sum;
 	int64_t sqrsum;
 	int data[];
 };
