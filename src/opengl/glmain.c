@@ -237,7 +237,7 @@ void render_frame(GLboolean debug_maxsrc, GLboolean debug_pal, GLboolean show_ma
 	//TODO: move this up to top
 	workstart = now = uget_ticks();
 	int delay =  (tick0 + cnt*INT64_C(1000000)/opts->draw_rate) - now;
-	if(delay > 0) { udodelay(delay); now = uget_ticks(); }
+	if(delay > 0) { udodelay(delay); workstart = now = uget_ticks(); }
 
 
 	// rate limit our maxsrc updates, but run at full frame rate if we're close the opts.maxsrc_rate to avoid choppyness
