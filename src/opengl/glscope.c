@@ -14,9 +14,10 @@
 #define xstr(s) str(s)
 #define str(s) #s
 
-#define PNT_RADIUS 1.5f
+#define PNT_RADIUS 1.0f
 
 //#define USE_VBO 1
+#define USE_TRIANGLE_STRIP 1
 
 static uint16_t *setup_point_16(int w, int h)
 {
@@ -51,13 +52,15 @@ struct glscope_ctx {
 	float pw, ph;
 
 	GLfloat sco_verts[128*8*4];
-	GLint sco_ind[128*3*6];
+	uint16_t sco_ind[128*3*6];
+	// uint16_t sco_ind[8*128 + 2*(128-1)];
 };
 
 struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean force_fixed)
 {
 	struct glscope_ctx *ctx = calloc(sizeof(*ctx), 1);
-	ctx->pw = PNT_RADIUS*0.5f*fmaxf(1.0f/24, 8.0f/width), ctx->ph = PNT_RADIUS*0.5f*fmaxf(1.0f/24, 8.0f/height);
+	//point_init(&self->pnt_src, IMAX(w/24, 8), IMAX(h/24, 8));
+	ctx->pw = PNT_RADIUS*fmaxf(1.0f/24, 8.0f/width), ctx->ph = PNT_RADIUS*fmaxf(1.0f/24, 8.0f/height);
 	ctx->samp = num_samp;
 
 	//GLint oldtex;
@@ -76,15 +79,16 @@ struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, pnt_size, pnt_size, 0, GL_LUMINANCE, GL_UNSIGNED_SHORT, data);
 		free(data);
 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glBindTexture(GL_TEXTURE_2D, 0);
+		CHECK_GL_ERR;
 	}
 
+
 	GLfloat *sco_verts = ctx->sco_verts;
-	GLint *sco_ind = ctx->sco_ind;
 	for(int i=0; i<ctx->samp; i++) {
 		sco_verts[(i*8+0)*4+0] = 0; sco_verts[(i*8+0)*4+1] = 2;
 		sco_verts[(i*8+1)*4+0] = 0; sco_verts[(i*8+1)*4+1] = 0;
@@ -96,6 +100,27 @@ struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean
 		sco_verts[(i*8+7)*4+0] = 2; sco_verts[(i*8+7)*4+1] = 0;
 	}
 
+#if USE_TRIANGLE_STRIP
+	// Now build the index data
+	int nstrips = ctx->samp;
+	int ndegenerate = 2 * (nstrips - 1);
+	int verts_per_strip = 8;
+	int total_verts = verts_per_strip*nstrips + ndegenerate;
+
+ 	uint16_t *idx_buf = ctx->sco_ind;
+	for(size_t i = 0, offset = 0; i < nstrips; i++) {
+		if(i > 0) { // Degenerate begin: repeat first vertex
+			idx_buf[offset++] = i*verts_per_strip;
+		}
+		for(size_t j = 0; j < verts_per_strip; j++) { // One part of the strip
+			idx_buf[offset++] = i*verts_per_strip + j;
+		}
+		if(i < nstrips-1) { // Degenerate end: repeat last vertex
+			idx_buf[offset++] = i*verts_per_strip + (verts_per_strip - 1);
+		}
+	}
+#else
+	GLushort *sco_ind = ctx->sco_ind;
 	for(int i=0; i<ctx->samp; i++) {
 		sco_ind[(i*6+0)*3+0] = i*8+0; sco_ind[(i*6+0)*3+1] = i*8+1; sco_ind[(i*6+0)*3+2] = i*8+3;
 		sco_ind[(i*6+1)*3+0] = i*8+0; sco_ind[(i*6+1)*3+1] = i*8+3; sco_ind[(i*6+1)*3+2] = i*8+2;
@@ -106,6 +131,7 @@ struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean
 		sco_ind[(i*6+4)*3+0] = i*8+4; sco_ind[(i*6+4)*3+1] = i*8+6; sco_ind[(i*6+4)*3+2] = i*8+7;
 		sco_ind[(i*6+5)*3+0] = i*8+4; sco_ind[(i*6+5)*3+1] = i*8+7; sco_ind[(i*6+5)*3+2] = i*8+5;
 	}
+#endif
 	CHECK_GL_ERR;
 
 	return ctx;
@@ -176,7 +202,11 @@ void render_scope(struct glscope_ctx *ctx, float R[3][3], const float *data, int
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts);
 	glVertexPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts + 2);
-	glDrawElements(GL_TRIANGLES, samp*3*6, GL_UNSIGNED_INT, ctx->sco_ind);
+#if USE_TRIANGLE_STRIP
+	glDrawRangeElements(GL_TRIANGLE_STRIP, 0, samp*8, 8*samp + 2*(samp-1), GL_UNSIGNED_SHORT, ctx->sco_ind); // core since GL 1.2
+#else
+	glDrawRangeElements(GL_TRIANGLES, 0, samp*8, samp*3*6, GL_UNSIGNED_SHORT, ctx->sco_ind); // core since GL 1.2
+#endif
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
