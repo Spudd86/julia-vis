@@ -4,11 +4,21 @@
 #	define do_prefetch(addr) _mm_prefetch((s), _MM_HINT_NTA)
 #	define stream_str(addr, v) _mm_stream_pi((addr), (v))
 #	define do_sfence() _mm_sfence()
+#	define do_mm_empty() _mm_empty()
 #	define APPEND_CPUCAP(name) name##_sse
+#elif defined(__3dNOW__)
+// should be the same as the sse version but split out just to be sure gcc doesn't generate any sse only instructions
+// plus lets us use femms which is faster on some AMD CPUs
+#	define do_prefetch(addr) __builtin_prefetch((addr), 0, 0)
+#	define stream_str(addr, v) __builtin_ia32_movntq((addr), (v))
+#	define do_sfence() __builtin_ia32_sfence()
+#	define do_mm_empty() _m_femms()
+#	define APPEND_CPUCAP(name) name##_3dnow
 #else
 #	define do_prefetch(addr)
 #	define stream_str(addr, v)  *(addr) = (v);
 #	define do_sfence()
+#	define do_mm_empty() _mm_empty()
 #	define APPEND_CPUCAP(name) name##_mmx
 #endif
 
@@ -32,15 +42,17 @@ void APPEND_CPUCAP(pallet_blit32)(uint8_t * restrict dest, unsigned int dst_stri
 		do_prefetch((const __m64 *restrict)(s));
 		for(size_t x = 0; x < w; x+=4, s+=4, d+=2) {
 			do_prefetch((const __m64 *restrict)(s+4));
-			uint16_t v = s[0];
+			__m64 col1, col2, vt, tmp;
+			uint16_t v;
 
-			__m64 col1 = *(const __m64 *)(pal+(v/256u));
-			__m64 col2 = col1;
+			v = s[0];
+			col1 = *(const __m64 *)(pal+(v/256u));
+			col2 = col1;
 			col1 = _mm_unpacklo_pi8(col1, zero);
 			col2 = _mm_unpackhi_pi8(col2, zero);
 
 			//col1 = (col2*v + col1*(256-v))/256;
-			__m64 vt = _mm_set1_pi16(v);
+			vt = _mm_set1_pi16(v);
 			vt = _mm_and_si64(vt, mask);
 			col2 = _mm_mullo_pi16(col2, vt);
 			vt = _mm_subs_pu16(sub, vt);
@@ -48,7 +60,7 @@ void APPEND_CPUCAP(pallet_blit32)(uint8_t * restrict dest, unsigned int dst_stri
 			col1 = _mm_add_pi16(col1, col2);
 			col1 = _mm_srli_pi16(col1, 8);
 
-			__m64 tmp = col1;
+			tmp = col1;
 
 			v = s[1];
 			col1 = *(const __m64 *)(pal+(v/256u));
@@ -103,7 +115,7 @@ void APPEND_CPUCAP(pallet_blit32)(uint8_t * restrict dest, unsigned int dst_stri
 	}
 
 	do_sfence(); // needed because of the non-temporal stores. (sse/mmxext)
-	_mm_empty();
+	do_mm_empty();
 }
 
 __attribute__((hot))
@@ -233,7 +245,7 @@ void APPEND_CPUCAP(pallet_blit565)(uint8_t * restrict dest, unsigned int dst_str
 	}
 
 	do_sfence(); // needed because of the non-temporal stores. (sse/mmxext)
-	_mm_empty();
+	do_mm_empty();
 }
 
 __attribute__((hot))
@@ -363,7 +375,7 @@ void APPEND_CPUCAP(pallet_blit555)(uint8_t * restrict dest, unsigned int dst_str
 		}
 	}
 	do_sfence(); // needed because of the non-temporal stores. (sse/mmxext)
-	_mm_empty();
+	do_mm_empty();
 }
 
 
@@ -402,5 +414,5 @@ void APPEND_CPUCAP(pallet_blit8)(uint8_t* restrict dest, unsigned int dst_stride
 		}
 	}
 	do_sfence(); // needed because of the non-temporal stores. (sse/mmxext)
-	_mm_empty();
+	do_mm_empty();
 }

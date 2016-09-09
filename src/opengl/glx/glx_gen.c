@@ -97,6 +97,8 @@ static PROC WinGetProcAddress(const char *name)
 
 int glx_ext_OML_sync_control = glx_LOAD_FAILED;
 int glx_ext_ARB_create_context = glx_LOAD_FAILED;
+int glx_ext_EXT_swap_control = glx_LOAD_FAILED;
+int glx_ext_SGI_swap_control = glx_LOAD_FAILED;
 
 Bool (CODEGEN_FUNCPTR *_ptrc_glXGetMscRateOML)(Display *, GLXDrawable, int32_t *, int32_t *) = NULL;
 Bool (CODEGEN_FUNCPTR *_ptrc_glXGetSyncValuesOML)(Display *, GLXDrawable, int64_t *, int64_t *, int64_t *) = NULL;
@@ -130,6 +132,26 @@ static int Load_ARB_create_context()
 	return numFailed;
 }
 
+void (CODEGEN_FUNCPTR *_ptrc_glXSwapIntervalEXT)(Display *, GLXDrawable, int) = NULL;
+
+static int Load_EXT_swap_control()
+{
+	int numFailed = 0;
+	_ptrc_glXSwapIntervalEXT = (void (CODEGEN_FUNCPTR *)(Display *, GLXDrawable, int))IntGetProcAddress("glXSwapIntervalEXT");
+	if(!_ptrc_glXSwapIntervalEXT) numFailed++;
+	return numFailed;
+}
+
+int (CODEGEN_FUNCPTR *_ptrc_glXSwapIntervalSGI)(int) = NULL;
+
+static int Load_SGI_swap_control()
+{
+	int numFailed = 0;
+	_ptrc_glXSwapIntervalSGI = (int (CODEGEN_FUNCPTR *)(int))IntGetProcAddress("glXSwapIntervalSGI");
+	if(!_ptrc_glXSwapIntervalSGI) numFailed++;
+	return numFailed;
+}
+
 typedef int (*PFN_LOADFUNCPOINTERS)();
 typedef struct glx_StrToExtMap_s
 {
@@ -138,12 +160,14 @@ typedef struct glx_StrToExtMap_s
 	PFN_LOADFUNCPOINTERS LoadExtension;
 } glx_StrToExtMap;
 
-static glx_StrToExtMap ExtensionMap[2] = {
+static glx_StrToExtMap ExtensionMap[4] = {
 	{"GLX_OML_sync_control", &glx_ext_OML_sync_control, Load_OML_sync_control},
 	{"GLX_ARB_create_context", &glx_ext_ARB_create_context, Load_ARB_create_context},
+	{"GLX_EXT_swap_control", &glx_ext_EXT_swap_control, Load_EXT_swap_control},
+	{"GLX_SGI_swap_control", &glx_ext_SGI_swap_control, Load_SGI_swap_control},
 };
 
-static int g_extensionMapSize = 2;
+static int g_extensionMapSize = 4;
 
 static glx_StrToExtMap *FindExtEntry(const char *extensionName)
 {
@@ -162,6 +186,8 @@ static void ClearExtensionVars()
 {
 	glx_ext_OML_sync_control = glx_LOAD_FAILED;
 	glx_ext_ARB_create_context = glx_LOAD_FAILED;
+	glx_ext_EXT_swap_control = glx_LOAD_FAILED;
+	glx_ext_SGI_swap_control = glx_LOAD_FAILED;
 }
 
 

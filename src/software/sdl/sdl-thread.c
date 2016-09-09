@@ -17,6 +17,12 @@
 
 #ifdef _WIN32
 #define set_threadname(name)
+#elif defined(__linux__)
+#include <sys/prctl.h>
+void set_threadname(const char *name)
+{
+	prctl(PR_SET_NAME, name);
+}
 #else
 #include <pthread.h>
 void set_threadname(const char *name)
@@ -62,7 +68,6 @@ static int run_map_thread(tribuf *tb)
 		uint16_t *map_dest = tribuf_get_write(tb);
 		map_func(map_dest, map_src, im_w, im_h, pd);
 		maxblend(map_dest, maxsrc_get(maxsrc), im_w, im_h);
-
 		tribuf_finish_write(tb);
 		map_src=map_dest;
 

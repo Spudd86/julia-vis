@@ -291,7 +291,7 @@ static void pallet_blit8_dispatch(uint8_t * restrict dest, unsigned int dst_stri
 
 #if !defined(__x86_64__)
 	if(feat & X86FEAT_MMX) pallet_blit8 = pallet_blit8_mmx;
-	if(feat & X86FEAT_MMXEXT) pallet_blit8 = pallet_blit8_sse;
+	if(feat & X86FEAT_MMXEXT) pallet_blit8 = pallet_blit8_3dnow;
 #endif
 	if(feat & X86FEAT_SSE) pallet_blit8 = pallet_blit8_sse;
 
@@ -309,7 +309,7 @@ static void pallet_blit555_dispatch(uint8_t * restrict dest, unsigned int dst_st
 
 #if !defined(__x86_64__)
 	if(feat & X86FEAT_MMX) pallet_blit555 = pallet_blit555_mmx;
-	if(feat & X86FEAT_MMXEXT) pallet_blit555 = pallet_blit555_sse;
+	if(feat & X86FEAT_MMXEXT) pallet_blit555 = pallet_blit555_3dnow;
 #endif
 	if(feat & X86FEAT_SSE) pallet_blit555 = pallet_blit555_sse;
 
@@ -327,7 +327,7 @@ static void pallet_blit565_dispatch(uint8_t * restrict dest, unsigned int dst_st
 
 #if !defined(__x86_64__)
 	if(feat & X86FEAT_MMX) pallet_blit565 = pallet_blit565_mmx;
-	if(feat & X86FEAT_MMXEXT) pallet_blit565 = pallet_blit565_sse;
+	if(feat & X86FEAT_MMXEXT) pallet_blit565 = pallet_blit565_3dnow;
 #endif
 	if(feat & X86FEAT_SSE) pallet_blit565 = pallet_blit565_sse;
 
@@ -345,10 +345,11 @@ static void pallet_blit32_dispatch(uint8_t * restrict dest, unsigned int dst_str
 
 #if !defined(__x86_64__)
 	if(feat & X86FEAT_MMX) pallet_blit32 = pallet_blit32_mmx;
-	if(feat & X86FEAT_MMXEXT) pallet_blit32 = pallet_blit32_sse;
+	if(feat & X86FEAT_MMXEXT) pallet_blit32 = pallet_blit32_3dnow;
 #endif
 	if(feat & X86FEAT_SSE) pallet_blit32 = pallet_blit32_sse;
 	if(feat & X86FEAT_SSE2) pallet_blit32 = pallet_blit32_sse2;
+	if(feat & X86FEAT_AVX2) pallet_blit32 = pallet_blit32_avx2;
 
 	pallet_blit32(dest, dst_stride, src, src_stride, w, h, pal);
 }
@@ -387,9 +388,11 @@ void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h,
 		case SOFT_PIX_FMT_BGR555:
 			pallet_blit555(dst->data, dst->pitch, src, src_stride, w, h, pal);
 			break;
-		case SOFT_PIX_FMT_8_RGB_PAL:
-		case SOFT_PIX_FMT_8_BGR_PAL:
-		pallet_blit8(dst->data, dst->pitch, src, src_stride, w, h);
+		case SOFT_PIX_FMT_8_xRGB_PAL:
+		case SOFT_PIX_FMT_8_xBGR_PAL:
+		case SOFT_PIX_FMT_8_RGBx_PAL:
+		case SOFT_PIX_FMT_8_BGRx_PAL:
+			pallet_blit8(dst->data, dst->pitch, src, src_stride, w, h);
 			break;
 		default:
 			unreachable();

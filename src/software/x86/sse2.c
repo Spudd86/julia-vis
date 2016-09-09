@@ -1,7 +1,9 @@
 
 #if (__x86_64__ || __i386__)
 #pragma GCC target("no-sse3,sse2")
+#ifdef NDEBUG
 #pragma GCC optimize "3,inline-functions,merge-all-constants"
+#endif
 
 #include "common.h"
 #include "../pixmisc.h"
@@ -57,16 +59,17 @@ void maxblend_sse2(void *restrict dest, const void *restrict src, int w, int h)
 		v4 = _mm_sub_epi16(v4, off);
 		mbdst[3]=v4;
 	}
+	_mm_mfence(); // needed because of the non-temporal stores.
 }
 
 //#define pb32_load_v(s) (_mm_setr_epi16(*((s)+0), *((s)+0), *((s)+0), *((s)+0), *((s)+1), *((s)+1), *((s)+1), *((s)+1)))
-static inline __attribute__((__gnu_inline__, __always_inline__, __artificial__))
+static inline __attribute__((__always_inline__, __artificial__))
 __m128i pb32_load_v(const uint16_t *restrict s) {
 	// yes this REALLY is faster than calling _mm_setr_epi16
-	__m128i r = (__m128i)(__v4si){0, 0, 0, *(const uint32_t *)(s)};
-	r = _mm_shuffle_epi32(r, 0);
-	r = _mm_shufflehi_epi16(r, _MM_SHUFFLE(1,1,1,1));
+	__m128i r = _mm_set_epi32(0,0,0,*(const uint32_t *)(s)); // compiler WILL actually fold this to down a single movd instruction
+	r = _mm_shuffle_epi32(r, _MM_SHUFFLE(3,0,1,0)); // pass through values we don't care about, clang changed our mask to this when we used 0 so probably an optimisation
 	r = _mm_shufflelo_epi16(r, 0);
+	r = _mm_shufflehi_epi16(r, _MM_SHUFFLE(1,1,1,1));
 	return r;
 }
 
@@ -81,8 +84,6 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 	static const __m128i zero  = (const __m128i){0ll, 0ll}; // _mm_setzero_si128();
 	static const __m128i mask  = (const __m128i){0x00ff00ff00ff00ffll, 0x00ff00ff00ff00ffll}; // _mm_set1_epi16(0xff);
 	static const __m128i sub   = (const __m128i){0x0100010001000100ll, 0x0100010001000100ll}; // _mm_set1_epi16(256);
-	static const __m128i mvcmp = (const __m128i){0x0000000000000001ll, 0x0000000200000003ll}; // _mm_setr_epi32(0, 1, 2, 3)
-
 
 	for(size_t y = 0; y < h; y++) {
 		const uint16_t *restrict s = src + y*w; // for some reason actually using src_sride is a lot slower (like 10FPS) maybe because it's doing a transformation of some kind...
@@ -96,9 +97,10 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 		uintptr_t dp = (uintptr_t)d;
 		dp = 4 - ((dp%16)/4);
 		if(dp) {
-			const __m128i move_mask = _mm_cmplt_epi32(mvcmp, _mm_set1_epi32(dp));
+			const __m128i move_mask = _mm_cmplt_epi32(_mm_setr_epi32(0, 1, 2, 3), _mm_set1_epi32(dp));
 			__m128i col1, col2, col3, col4, v1, v2, v1s, v2s;
 
+			//FIXME: these might not be aligned for 64 bit read properly, use more correct load
 			col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[0]/256u)));
 			col2 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[1]/256u)));
 			v1   = pb32_load_v(s+0);
@@ -115,8 +117,6 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			col1 = _mm_add_epi16(col1, col2);
 			col1 = _mm_srli_epi16(col1, 8);
 
-			col1 = _mm_packus_epi16(col1, zero);
-
 
 			col3 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[2]/256u)));
 			col4 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[3]/256u)));
@@ -128,16 +128,14 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			col3 = _mm_unpacklo_epi8(col3, zero);
 			col4 = _mm_unpackhi_epi8(col4, zero);
 
-			
 			col4 = _mm_mullo_epi16(col4, v2);
 			v2s  = _mm_sub_epi16(sub, v2);
 			col3 = _mm_mullo_epi16(col3, v2s);
 			col3 = _mm_add_epi16(col3, col4);
 			col3 = _mm_srli_epi16(col3, 8);
 
-			col3 = _mm_packus_epi16(col3, zero);
 
-			col1 = _mm_unpacklo_epi64(col1, col3);
+			col1 = _mm_packus_epi16(col1, col3);
 			_mm_maskmoveu_si128(col1, move_mask, (char *restrict)(d + 0));
 			x+=dp;
 			d+=dp;
@@ -152,6 +150,7 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			_mm_prefetch(s + 8, _MM_HINT_NTA);
 			__m128i col1, col2, col3, col4, v1, v2, v1s, v2s;
 
+			//FIXME: these might not be aligned for 64 bit read properly, use more correct load
 			col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[0]/256u)));
 			col2 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[1]/256u)));
 			v1   = pb32_load_v(s+0);
@@ -167,8 +166,6 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			col1 = _mm_mullo_epi16(col1, v1s);
 			col1 = _mm_add_epi16(col1, col2);
 			col1 = _mm_srli_epi16(col1, 8);
-
-			col1 = _mm_packus_epi16(col1, zero);
 
 
 			col3 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[2]/256u)));
@@ -187,9 +184,8 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			col3 = _mm_add_epi16(col3, col4);
 			col3 = _mm_srli_epi16(col3, 8);
 
-			col3 = _mm_packus_epi16(col3, zero);
 
-			col1 = _mm_unpacklo_epi64(col1, col3);
+			col1 = _mm_packus_epi16(col1, col3);
 			_mm_stream_si128((__m128i *)(d + 0), col1);
 			//_mm_storeu_si128((__m128i *restrict)(d + 0), col1);
 
@@ -209,8 +205,6 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			col1 = _mm_add_epi16(col1, col2);
 			col1 = _mm_srli_epi16(col1, 8);
 
-			col1 = _mm_packus_epi16(col1, zero);
-
 
 			col3 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[6]/256u)));
 			col4 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[7]/256u)));
@@ -228,9 +222,8 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			col3 = _mm_add_epi16(col3, col4);
 			col3 = _mm_srli_epi16(col3, 8);
 
-			col3 = _mm_packus_epi16(col3, zero);
 
-			col1 = _mm_unpacklo_epi64(col1, col3);
+			col1 = _mm_packus_epi16(col1, col3);
 			_mm_stream_si128((__m128i *)(d + 4), col1);
 			//_mm_storeu_si128((__m128i *restrict)(d + 4), col1);
 
@@ -250,6 +243,7 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 
 		__m128i col1, col2, col3, col4, v1, v2, v1s, v2s;
 
+		//FIXME: these might not be aligned for 64 bit read properly, use more correct load
 		col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[0]/256u)));
 		col2 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[1]/256u)));
 		v1   = pb32_load_v(s+0);
@@ -265,8 +259,6 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 		col1 = _mm_mullo_epi16(col1, v1s);
 		col1 = _mm_add_epi16(col1, col2);
 		col1 = _mm_srli_epi16(col1, 8);
-
-		col1 = _mm_packus_epi16(col1, zero);
 
 
 		col3 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[2]/256u)));
@@ -285,14 +277,13 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 		col3 = _mm_add_epi16(col3, col4);
 		col3 = _mm_srli_epi16(col3, 8);
 
-		col3 = _mm_packus_epi16(col3, zero);
 
-		col1 = _mm_unpacklo_epi64(col1, col3);
+		col1 = _mm_packus_epi16(col1, col3);
 		_mm_stream_si128((__m128i *)(d + 0), col1);
 
 		if(w-(x+4)) { // should be the same as 4-dp
 		//if(4-dp) {
-			const __m128i move_mask = _mm_cmplt_epi32(mvcmp, _mm_set1_epi32(w-(x+4)));
+			const __m128i move_mask = _mm_cmplt_epi32(_mm_setr_epi32(0, 1, 2, 3), _mm_set1_epi32(w-(x+4)));
 			//const __m128i move_mask = _mm_cmplt_epi32(_mm_setr_epi32(0, 1, 2, 3), _mm_set1_epi32(4-dp));
 
 			col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[4]/256u)));
@@ -311,8 +302,6 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			col1 = _mm_add_epi16(col1, col2);
 			col1 = _mm_srli_epi16(col1, 8);
 
-			col1 = _mm_packus_epi16(col1, zero);
-
 
 			col3 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[6]/256u)));
 			col4 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[7]/256u)));
@@ -330,16 +319,15 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			col3 = _mm_add_epi16(col3, col4);
 			col3 = _mm_srli_epi16(col3, 8);
 
-			col3 = _mm_packus_epi16(col3, zero);
 
-			col1 = _mm_unpacklo_epi64(col1, col3);
+			col1 = _mm_packus_epi16(col1, col3);
 			_mm_maskmoveu_si128(col1, move_mask, (char *restrict)(d + 4));
 		}
 	}
 #if !__x86_64__
 	_mm_empty();
 #endif
-	_mm_sfence(); // needed because of the non-temporal stores.
+	_mm_mfence(); // needed because of the non-temporal stores.
 }
 #else
 
@@ -407,6 +395,7 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 		}
 	}
 	_mm_empty();
+	_mm_mfence(); // needed because of the non-temporal stores.
 }
 #endif
 

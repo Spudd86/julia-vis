@@ -6,23 +6,6 @@
 #include "sdlhelp.h"
 #include "software/pixmisc.h"
 
-void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal)
-{
-	const unsigned int src_stride = w;
-	w = IMIN(w, dst->w);
-	h = IMIN(h, dst->h);
-
-	if((SDL_MUSTLOCK(dst) && SDL_LockSurface(dst) < 0) || w < 0 || h < 0) return;
-	if(dst->format->BitsPerPixel == 32) pallet_blit32(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
-	else if(dst->format->BitsPerPixel == 16) pallet_blit565(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
-	else if(dst->format->BitsPerPixel == 15) pallet_blit555(dst->pixels, dst->pitch, src, src_stride, w, h, pal);
-	else if(dst->format->BitsPerPixel == 8) { // need to set surface's pallet
-		pallet_blit8(dst->pixels, dst->pitch, src, src_stride, w, h);
-		SDL_SetColors(dst, (void *)pal, 0, 256);
-	}
-	if(SDL_MUSTLOCK(dst)) SDL_UnlockSurface(dst);
-}
-
 SDL_Surface* render_string(const char *str);
 void DrawText(SDL_Surface* screen, const char* text)
 {

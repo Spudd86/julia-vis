@@ -4,6 +4,8 @@
 AC_PREREQ([2.61])
 AC_INIT([julia-vis], [0.1], [BUG-REPORT-ADDRESS], [julia-vis], [http://github.com/Spudd86/julia-vis])
 AC_CONFIG_SRCDIR([src/optproc.c])
+AC_CONFIG_AUX_DIR([build-aux])
+
 AC_PROG_CC_STDC
 AC_USE_SYSTEM_EXTENSIONS
 AC_SYS_LARGEFILE
@@ -11,23 +13,25 @@ AC_CONFIG_HEADERS([config.h])
 
 m4_include([m4/ax_check_gl.m4])
 m4_include([m4/ax_check_glu.m4])
+m4_include([m4/ax_pthread.m4])
 
-AC_USE_SYSTEM_EXTENSIONS
 USE_LANGUAGES=gnu11
 
-AC_ARG_ENABLE([mmx], AS_HELP_STRING([--enable-mmx], [enable use of mmx instructions (default: disabled)]))
+AX_PTHREAD
+
+AC_ARG_ENABLE([mmx], AS_HELP_STRING([--enable-mmx], [enable use of mmx instructions (default: automatic)]))
 if test "x$enable_mmx" = xyes; then
 	CFLAGS="$CFLAGS -mmmx"
 fi
-AC_ARG_ENABLE([sse], AS_HELP_STRING([--enable-sse], [enable use of sse instructions (default: disabled)]))
+AC_ARG_ENABLE([sse], AS_HELP_STRING([--enable-sse], [enable use of sse instructions (default: automatic)]))
 if test "x$enable_sse" = xyes; then
 	CFLAGS="$CFLAGS -mmmx -msse"
 fi
-AC_ARG_ENABLE([sse2], AS_HELP_STRING([--enable-sse2], [enable use of sse2 instructions (default: disabled)]))
+AC_ARG_ENABLE([sse2], AS_HELP_STRING([--enable-sse2], [enable use of sse2 instructions (default: automatic)]))
 if test "x$enable_sse2" = xyes; then
 	CFLAGS="$CFLAGS -mmmx -msse -msse2"
 fi
-AC_ARG_ENABLE([3dnow], AS_HELP_STRING([--enable-3dnow], [enable use of 3dnow instructions (default: disabled)]))
+AC_ARG_ENABLE([3dnow], AS_HELP_STRING([--enable-3dnow], [enable use of 3dnow instructions (default: automatic)]))
 if test "x$enable_3dnow" = xyes; then
 	CFLAGS="$CFLAGS -mmmx -m3dnow"
 fi
@@ -139,7 +143,22 @@ AC_SUBST(GL_LIBS)
 AC_SUBST(GLU_CFLAGS)
 AC_SUBST(GLU_LIBS)
 
-AC_ARG_ENABLE([kms], AS_HELP_STRING([--disable-kms], [enable kms/dri opengl based version (default: disabled)]))
+AC_ARG_ENABLE([x11], AS_HELP_STRING([--enable-x11], [enable x11 opengl based versions (default: enabled)]))
+AS_IF([ test "x$enable_x11" != xno ], [
+	PKG_CHECK_MODULES([X11], [x11], [have_x11=yes], [have_x11=no])
+])
+AS_IF([ test "x$enable_x11" = xyes && test "x$have_x11" = xno ], [
+	AC_MSG_FAILURE([--enable-x11 was given, but test for x11 failed])
+])
+AS_IF([ test "x$have_x11" = xyes], [
+	AC_DEFINE([HAVE_X11], [1], [Define if X is enabled])
+	enable_x11=yes
+])
+AC_SUBST(X11_LIBS)
+AC_SUBST(X11_CFLAGS)
+AC_SUBST(enable_x11)
+
+AC_ARG_ENABLE([kms], AS_HELP_STRING([--enable-kms], [enable kms/dri opengl based version (default: disabled)]))
 if test "x$enable_kms" != xyes; then
 	enable_kms=no
 fi

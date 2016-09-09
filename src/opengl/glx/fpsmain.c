@@ -11,13 +11,13 @@
 #include <X11/Xatom.h>
 #include <X11/keysym.h>
 
-#include "glmisc.h"
+#include "opengl/glmisc.h"
 #include "glx_gen.h"
 
 #include "audio/audio.h"
-#include "fpsservo/fpsservo.h"
+#include "opengl/fpsservo/fpsservo.h"
 
-#define USE_GLX_INTEL_swap_event 1
+//#define USE_GLX_INTEL_swap_event 1
 
 #ifndef GLX_INTEL_swap_event
 # define GLX_INTEL_swap_event 1
@@ -71,7 +71,7 @@ static const int fbattrib[] = {
 
 int arm_timer(int tfd, int64_t time);
 
-int gcd(int a, int b) {
+static int gcd(int a, int b) {
 	while(b != 0) {
 		int t = b;
 		b = a % b;
@@ -84,9 +84,6 @@ static Bool WaitForNotify(Display *d, XEvent *e, char *arg) {
 	return (e->type == MapNotify) && (e->xmap.window == (Window)arg);
 }
 
-#define HIST_LEN 128
-static int delayhist_total = 0;
-static int delayhist[HIST_LEN];
 static int framecnt = 0;
 
 static struct fps_period swap_period;
@@ -250,8 +247,6 @@ int main(int argc, char **argv)
 	else if(opts.h < 0) opts.h = opts.w;
 	w = opts.w; h = opts.h;
 	
-	memset(delayhist, 0, sizeof(delayhist));
-	
 	XEvent event;
 	
 	dpy = XOpenDisplay( NULL );
@@ -302,7 +297,8 @@ int main(int argc, char **argv)
 	attrs.background_pixel = 0;
 	attrs.border_pixel = 0;
 	attrs.colormap = XCreateColormap(dpy, root, vinfo->visual, AllocNone);
-	attrs.event_mask = StructureNotifyMask | ExposureMask | KeyPressMask;
+	//attrs.event_mask = StructureNotifyMask | ExposureMask | KeyPressMask;
+	attrs.event_mask = StructureNotifyMask | KeyPressMask;
 	unsigned long mask = CWBackPixel | CWBorderPixel | CWColormap | CWEventMask;
 	xwin = XCreateWindow(dpy, root, x, y, w, h,
 		                 0, vinfo->depth, InputOutput,
@@ -328,56 +324,58 @@ int main(int argc, char **argv)
     glxWin = glXCreateWindow(dpy, fbConfigs[0], xwin, NULL );
     
     XMapWindow(dpy, xwin);
-    //XIfEvent(dpy, &event, WaitForNotify, (XPointer) xwin);
-    
+    XIfEvent(dpy, &event, WaitForNotify, (XPointer) xwin);
+
+#if 1
     if( opts.fullscreen && haveEWMH)
     {
-            // Ask the window manager to raise and focus our window
-            // Only focused windows with the _NET_WM_STATE_FULLSCREEN state end
-            // up on top of all other windows ("Stacking order" in EWMH spec)
+		// Ask the window manager to raise and focus our window
+		// Only focused windows with the _NET_WM_STATE_FULLSCREEN state end
+		// up on top of all other windows ("Stacking order" in EWMH spec)
 
-            XEvent event;
-            memset( &event, 0, sizeof(event) );
+		XEvent event;
+		memset( &event, 0, sizeof(event) );
 
-            event.type = ClientMessage;
-            event.xclient.window = xwin;
-            event.xclient.format = 32; // Data is 32-bit longs
-            event.xclient.message_type = wmActiveWindow;
-            event.xclient.data.l[0] = 1; // Sender is a normal application
-            event.xclient.data.l[1] = 0; // We don't really know the timestamp
+		event.type = ClientMessage;
+		event.xclient.window = xwin;
+		event.xclient.format = 32; // Data is 32-bit longs
+		event.xclient.message_type = wmActiveWindow;
+		event.xclient.data.l[0] = 1; // Sender is a normal application
+		event.xclient.data.l[1] = 0; // We don't really know the timestamp
 
-            XSendEvent( dpy,
-                        root,
-                        False,
-                        SubstructureNotifyMask | SubstructureRedirectMask,
-                        &event );
+		XSendEvent( dpy,
+		            root,
+		            False,
+		            SubstructureNotifyMask | SubstructureRedirectMask,
+		            &event );
 
-        // Ask the window manager to make our window a fullscreen window
-        // Fullscreen windows are undecorated and, when focused, are kept
-        // on top of all other windows
+		// Ask the window manager to make our window a fullscreen window
+		// Fullscreen windows are undecorated and, when focused, are kept
+		// on top of all other windows
 
-        //XEvent event;
-        memset( &event, 0, sizeof(event) );
+		//XEvent event;
+		memset( &event, 0, sizeof(event) );
 
-        event.type = ClientMessage;
-        event.xclient.window = xwin;
-        event.xclient.format = 32; // Data is 32-bit longs
-        event.xclient.message_type = wmState;
-        event.xclient.data.l[0] = _NET_WM_STATE_ADD;
-        event.xclient.data.l[1] = wmStateFullscreen;
-        event.xclient.data.l[2] = 0; // No secondary property
-        event.xclient.data.l[3] = 1; // Sender is a normal application
+		event.type = ClientMessage;
+		event.xclient.window = xwin;
+		event.xclient.format = 32; // Data is 32-bit longs
+		event.xclient.message_type = wmState;
+		event.xclient.data.l[0] = _NET_WM_STATE_ADD;
+		event.xclient.data.l[1] = wmStateFullscreen;
+		event.xclient.data.l[2] = 0; // No secondary property
+		event.xclient.data.l[3] = 1; // Sender is a normal application
 
-        XSendEvent( dpy,
-                    root,
-                    False,
-                    SubstructureNotifyMask | SubstructureRedirectMask,
-                    &event );
+		XSendEvent( dpy,
+		            root,
+		            False,
+		            SubstructureNotifyMask | SubstructureRedirectMask,
+		            &event );
     }
-    
-    glXMakeContextCurrent(dpy, glxWin, glxWin, context);
+#endif
+
+	glXMakeContextCurrent(dpy, glxWin, glxWin, context);
 	
-	const GLubyte *glx_ext_str = glXQueryExtensionsString(dpy, 0);
+	const GLbyte *glx_ext_str = glXQueryExtensionsString(dpy, 0);
 	
 	bool have_glx_intel_swap_event = false;
 
@@ -390,8 +388,14 @@ int main(int argc, char **argv)
 
 	if(strstr(glx_ext_str, "GLX_EXT_swap_control")) {
 		glXSwapIntervalEXT(dpy, glxWin, 1);
+		opts.draw_rate = 300;
 	} else if(strstr(glx_ext_str, "GLX_SGI_swap_control")) {
 		glXSwapIntervalSGI(1);
+		opts.draw_rate = 300;
+	} else if(strstr(glx_ext_str, "GLX_MESA_swap_control")) {
+		PFNGLXSWAPINTERVALMESAPROC swap_interval = glXGetProcAddressARB("glXSwapIntervalMESA");
+		swap_interval(1);
+		opts.draw_rate = 300;
 	}
 
 	init_gl(&opts, w, h);
@@ -441,8 +445,6 @@ int main(int argc, char **argv)
 				now = uget_ticks();
 				glXGetSyncValuesOML(dpy, glxWin, &ust, &msc, &sbc);
 				int delay = swap_complete(fps_data, now, msc, sbc);
-				delayhist_total -= delayhist[framecnt%HIST_LEN];
-				delayhist_total += (delayhist[framecnt%HIST_LEN] = delay);
 				framecnt++;
 
 				//TODO: if delay is 0 arrange to poll X events once and then immediately start next frame
@@ -462,9 +464,6 @@ int main(int argc, char **argv)
 
 				int64_t now = uget_ticks();
 				int delay = swap_complete(fps_data, now, swap_event->msc, swap_event->sbc);
-							
-				delayhist_total -= delayhist[framecnt%HIST_LEN];
-				delayhist_total += (delayhist[framecnt%HIST_LEN] = delay);
 				framecnt++;
 
 				arm_timer(tfd, now+delay); // schedule next frame
@@ -513,15 +512,22 @@ static void gl_hline(float y, float x1, float x2) {
 	glVertex2f(x1, y); glVertex2f(x2, y);
 }
 
-//TODO: add hotkey to turn this on and off
+//TODO: make this faster, it uses quite a bit of time, probably
+// because Mesa has to do a bunch of work to fiddle with state
+// for all the line drawing
+// probably use draw arrays or something
+// maybe put all the stuff that doesn't change in a display list?
 void render_fps_hist(void)
 {
-	int64_t fpstotal, swaptotal, slacktotal, fpsdelaytotal, fpslen;
+	int swap_interval = fps_get_cur_swap_interval(fps_data);
+	int64_t fpstotal, swaptotal, slacktotal, fpsdelaytotal, tot_frametime_sum, fpslen;
+	const int *fpstotal_frametimes = NULL;
 	const int *fpsworktimes = NULL;
 	const int *fpsframetimes = NULL;
 	const int *fpsdelays = NULL;
 	const int *fpsslacks = NULL;
 	fpslen = fps_get_hist_len(fps_data);
+	fps_get_total_frametimes(fps_data, &tot_frametime_sum, &fpstotal_frametimes);
 	fps_get_worktimes(fps_data, &fpstotal, &fpsworktimes);
 	fps_get_frametimes(fps_data, &swaptotal, &fpsframetimes);
 	fps_get_delays(fps_data, &fpsdelaytotal, &fpsdelays);
@@ -531,56 +537,137 @@ void render_fps_hist(void)
 	int frame_int = (int)(swap_period.d*INT64_C(1000000)/swap_period.n);
 	
 	int max_worktime = 0;
-	int totslen = MIN(fpslen, HIST_LEN);
-	int tots[MAX(fpslen, HIST_LEN)];
+	int totslen = fpslen;
+	int tots[fpslen];
 	for(int i=0; i < totslen; i++) {
 		tots[totslen - i - 1] = fpsdelays[fpslen-i-1] + fpsworktimes[fpslen-i-1];
 		max_worktime = MAX(max_worktime, fpsworktimes[fpslen-i-1]);
 	}
-	
-	glColor3f(1.0f, 1.0f, 1.0f);
-	char buf[256];
-	sprintf(buf,
-	        "AVG delay %7.1f\n"
-	        "    delay %7.1f\n"
-	        "    slack %7.1f\n"
-	        "    swap  %7.1f\n"
-	        " worktime %7.1f\n"
-	        "  wrk max %d\n",
-	        (float)delayhist_total/HIST_LEN,
-	        (float)fpsdelaytotal/fpslen,
-	        (float)slacktotal/fpslen,
-	        (float)swaptotal/fpslen,
-	        (float)fpstotal/fpslen,
-	        max_worktime);
-	draw_string(buf); DEBUG_CHECK_GL_ERR;
 
 	// draw the nice big graph
 	glPushMatrix();
-	//glScalef(1.0f, 0.25f, 1.0f); glTranslatef(0, -4, 0);
+
 	glScalef(1.0f, 0.5f, 1.0f); glTranslatef(0, -2, 0);
 	
 	float px = 1.0f/(opts.h*0.5f);
+
+#if 1
+	float danger_zone_quad[] = {
+	//    r     g     b      x          y
+		0.4f, 0.2f, 0.2f, -10*px, (frame_int-2000)*scl,
+		0.4f, 0.2f, 0.2f,   1.0f, (frame_int-2000)*scl,
+		1.0f, 0.4f, 0.4f, -10*px,     1.0f,
+		1.0f, 0.4f, 0.4f,   1.0f,     1.0f,
+	};
+	
+	float grid_lines[10*2][5];
+	for(int lnpos = frame_int-4000, i = 0; lnpos >= 0; lnpos -= 2000, i++) {
+		//gl_hline(lnpos*scl, -10*px, 1.0f)
+		grid_lines[i*2+0][0] = 0.4f; // red
+		grid_lines[i*2+0][1] = 0.4f; // green
+		grid_lines[i*2+0][2] = 0.4f; // blue
+		grid_lines[i*2+0][3] = -10*px; // x
+		grid_lines[i*2+0][4] = lnpos*scl; // y
+
+		grid_lines[i*2+1][0] = 0.4f; // red
+		grid_lines[i*2+1][1] = 0.4f; // green
+		grid_lines[i*2+1][2] = 0.4f; // blue
+		grid_lines[i*2+1][3] = 1.0f; // x
+		grid_lines[i*2+1][4] = lnpos*scl; // y
+	}
+
+	float avg_marks[] = {
+		1.0f, 0.0f, 1.0f,   -px, (scl*(frame_int - slacktotal/fpslen))/swap_interval,
+		1.0f, 0.0f, 1.0f, -9*px, (scl*(frame_int - slacktotal/fpslen))/swap_interval,
+
+		0.0f, 1.0f, 0.0f,   -px, (fpsdelaytotal*scl/fpslen)/swap_interval,
+		0.0f, 1.0f, 0.0f, -7*px, (fpsdelaytotal*scl/fpslen)/swap_interval,
+
+		1.0f, 1.0f, 0.0f,   -px, (fpstotal*scl/fpslen)/swap_interval,
+		1.0f, 1.0f, 0.0f, -7*px, (fpstotal*scl/fpslen)/swap_interval,
+
+		0.0f, 1.0f, 1.0f,   -px, (fpsdelaytotal*scl/fpslen + fpstotal*scl/fpslen)/swap_interval,
+		0.0f, 1.0f, 1.0f, -5*px, (fpsdelaytotal*scl/fpslen + fpstotal*scl/fpslen)/swap_interval,
+	};
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_COLOR_ARRAY);
+
+	glColorPointer( 3, GL_FLOAT, sizeof(float)*5, (float *)danger_zone_quad);
+	glVertexPointer(2, GL_FLOAT, sizeof(float)*5, (float *)danger_zone_quad + 3);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+	glColorPointer( 3, GL_FLOAT, sizeof(float)*5, (float *)grid_lines);
+	glVertexPointer(2, GL_FLOAT, sizeof(float)*5, (float *)grid_lines + 3);
+	glDrawArrays(GL_LINES, 0, 7*2);
+
+	glColorPointer( 3, GL_FLOAT, sizeof(float)*5, (float *)avg_marks);
+	glVertexPointer(2, GL_FLOAT, sizeof(float)*5, (float *)avg_marks + 3);
+	glDrawArrays(GL_LINES, 0, 8);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+	glDisableClientState(GL_COLOR_ARRAY);
+	glColor3f(1.0f, 1.0f, 1.0f);
+#else
 	glBegin(GL_QUADS);
 	glColor3f(1.0f, 0.4f, 0.4f);gl_hline(1.0, 1.0f, -10*px);
 	glColor3f(0.4f, 0.2f, 0.2f);gl_hline((frame_int-2000)*scl, -10*px, 1.0f);
 	glEnd();
 	glBegin(GL_LINES);
-	//glColor3f(1.0f, 0.6f, 0.6f); gl_hline((frame_int-2000)*scl, -10*px, 1.0f);
+	//glColor3f(1.0f, 0.0f, 0.0f); gl_hline((frame_int-2000)*scl, -10*px, 1.0f);
 	glColor3f(0.4f, 0.4f, 0.4f);
 	for(int lnpos = frame_int-4000; lnpos >= 0; lnpos -= 2000) 
 		gl_hline(lnpos*scl, -10*px, 1.0f);
 	glColor3f(1.0f, 0.0f, 1.0f); gl_hline(scl*(frame_int - slacktotal/fpslen), -px, -9*px);
-	glColor3f(0.0f, 1.0f, 0.0f); gl_hline(delayhist_total*scl/HIST_LEN, -px, -7*px);
+	glColor3f(0.0f, 1.0f, 0.0f); gl_hline(fpsdelaytotal*scl/fpslen, -px, -7*px);
 	glColor3f(1.0f, 1.0f, 0.0f); gl_hline(fpstotal*scl/fpslen, -px, -5*px);
 	glEnd();
+#endif
 	
-	draw_hist_array_col(framecnt, scl, delayhist, HIST_LEN, 0.0f, 1.0f, 0.0f);
-	draw_hist_array_col(framecnt, scl, fpsworktimes, fpslen, 1.0f, 1.0f, 0.0f);
-	draw_hist_array_xlate(framecnt, -scl, frame_int*scl, fpsslacks, fpslen, 1.0f, 0.0f, 1.0f);
-	draw_hist_array_col(framecnt, scl, tots, totslen, 0.0f, 1.0f, 1.0f);
+	draw_hist_array_col(framecnt, scl/swap_interval, fpsdelays, fpslen, 0.0f, 1.0f, 0.0f);
+	draw_hist_array_col(framecnt, scl/swap_interval, fpsworktimes, fpslen, 1.0f, 1.0f, 0.0f);
+	draw_hist_array_xlate(framecnt, -scl/swap_interval, frame_int*scl, fpsslacks, fpslen, 1.0f, 0.0f, 1.0f);
+	draw_hist_array_col(framecnt, scl/swap_interval, tots, totslen, 0.0f, 1.0f, 1.0f);
 	glPopMatrix();
-	
+
+#if 1
+	// draw the others	
+	glColor3f(1.0f, 1.0f, 1.0f);
+	glPushMatrix();
+	glScalef(0.5f, 0.25f, 1.0f); glTranslatef(-2, -3, 0);
+	glColor3f(0.6f, 0.6f, 0.6f); glBegin(GL_LINES); gl_hline(0.5f, 0.0f, 1.05f); glEnd();
+	draw_hist_array_xlate(framecnt, scl/2, 0.5f, fpsframetimes, fpslen, 1.0f,0.0f,1.0f);
+	glPopMatrix();
+
+	glPushMatrix();
+	glScalef(0.5f, 0.25f, 1.0f); glTranslatef(-2, -2, 0);
+	glColor3f(0.6f, 0.6f, 0.6f); glBegin(GL_LINES); gl_hline(0.5f, 0.0f, 1.05f); glEnd();
+	float fps_scl_avg = fpslen*0.5f/MAX(fpstotal, fpslen);
+	draw_hist_array_col(framecnt, fps_scl_avg, fpsworktimes, fpslen, 0.0f,1.0f,0.0f);
+	glPopMatrix();
+#endif
+
+#if 1
+	glColor3f(1.0f, 1.0f, 1.0f);
+	char buf[256];
+	sprintf(buf,
+	        "AVG delay %7.1f\n"
+	        "    slack %7.1f\n"
+	        "    swap  %7.1f\n"
+	        " worktime %7.1f\n"
+	        "  wrk max %5d\n"
+	        "      FPS %7.1f\n"
+	        "\n"
+	        "interval  %5d\n",
+	        (float)fpsdelaytotal/fpslen,
+	        (float)slacktotal/fpslen,
+	        (float)swaptotal/fpslen,
+	        (float)fpstotal/fpslen,
+	        max_worktime,
+	        (float)fpslen*1000000.0f/tot_frametime_sum,
+	        swap_interval);
+	draw_string(buf); DEBUG_CHECK_GL_ERR;
+
 	glColor3f(0.0f, 1.0f, 0.0f);
 	glRasterPos2f(0.0f, -0.5f);// - 20.0f/(opts.h*0.5f));
 	draw_string("delay"); DEBUG_CHECK_GL_ERR;
@@ -596,43 +683,16 @@ void render_fps_hist(void)
 	glColor3f(0.0f, 1.0f, 1.0f);
 	glRasterPos2f(0.0f, -0.5f); 
 	draw_string("                       wkt+delay"); DEBUG_CHECK_GL_ERR;
-	
-	// draw the others
 
-/*	glPushMatrix();*/
-/*	glScalef(0.5, 0.25, 1); glTranslatef(-2, -4, 0);*/
-/*	draw_hist_array_xlate(framecnt, -scl, frame_int*scl, fpsslacks, fpslen, 1.0f, 0.0f, 0.0f);*/
-/*	draw_hist_array_col(framecnt, scl, fpsdelays, fpslen, 0.0f, 1.0f, 0.0f);*/
-/*	//for(int i=0; i < fpslen; i++) tots[i] = fpsdelays[i] + fpsworktimes[i];*/
-/*	draw_hist_array_col(framecnt, scl, tots, fpslen, 0.0f, 1.0f, 1.0f);*/
-/*	glPopMatrix();*/
-/*	glColor3f(0.0f, 1.0f, 1.0f);*/
-/*	glRasterPos2f(-1, -0.8); draw_string("wkt+delay"); DEBUG_CHECK_GL_ERR;*/
-/*	glColor3f(1.0f, 0.0f, 0.0f);*/
-/*	glRasterPos2f(-1, -0.8); draw_string("          -slack"); DEBUG_CHECK_GL_ERR;*/
-	
-	glColor3f(1.0f, 1.0f, 1.0f);
-	glPushMatrix();
-	glScalef(0.5f, 0.25f, 1.0f); glTranslatef(-2, -3, 0);
-	glColor3f(0.6f, 0.6f, 0.6f); glBegin(GL_LINES); gl_hline(0.5f, 0.0f, 1.05f); glEnd();
-	draw_hist_array_xlate(framecnt, scl/2, 0.5f, fpsframetimes, fpslen, 1.0f,0.0f,1.0f);
-	glPopMatrix();
-	
 	glColor3f(1.0f, 0.0f, 1.0f);
 	glRasterPos2f(-1, -0.75);
 	draw_string("swaptimes"); DEBUG_CHECK_GL_ERR;
 
-	glPushMatrix();
-	glScalef(0.5, 0.25, 1); glTranslatef(-2, -2, 0);
-	glColor3f(0.6f, 0.6f, 0.6f); glBegin(GL_LINES); gl_hline(0.5f, 0.0f, 1.05f); glEnd();
-	float fps_scl_avg = fpslen*0.5f/MAX(fpstotal, fpslen);
-	draw_hist_array_col(framecnt, fps_scl_avg, fpsworktimes, fpslen, 0.0f,1.0f,0.0f);
-	glPopMatrix();
-	
 	glColor3f(0.0f, 1.0f, 0.0f);
 	glRasterPos2f(-1, -0.25);
 	draw_string("worktimes"); DEBUG_CHECK_GL_ERR;
-	
+#endif
+
 	glColor3f(1.0f, 1.0f, 1.0f);
 }
 
@@ -641,34 +701,12 @@ void render_debug_overlay(void)
 	if(show_fps_hist) render_fps_hist();
 }
 
-#if 1
 void swap_buffers(void)
 {
 	int64_t targetmsc = 0;
 	if(fps_data) targetmsc = swap_begin(fps_data, uget_ticks());
 	glXSwapBuffersMscOML(dpy, glxWin, targetmsc, 0, 0);
 }
-#elif 0 && !USE_GLX_INTEL_swap_event
-void swap_buffers(void)
-{
-	int64_t targetmsc = 0;
-	if(fps_data) targetmsc = swap_begin(fps_data, uget_ticks());
-
-	int64_t targetsbc = glXSwapBuffersMscOML(dpy, glxWin, targetmsc, 0, 0);
-
-	int64_t ust, msc, sbc;
-	//glXWaitForMscOML(dpy, glxWin, targetmsc, 0, 0, &ust, &msc, &sbc); // the msc we get back from this function seems to be insane
-	//glXGetSyncValuesOML(dpy, glxWin, &ust, &msc, &sbc);
-	glXWaitForSbcOML(dpy, glxWin, targetsbc, &ust, &msc, &sbc);
-	int64_t now = uget_ticks();
-	int delay = swap_complete(fps_data, now, msc, sbc);
-	delayhist_total -= delayhist[framecnt%HIST_LEN];
-	delayhist_total += (delayhist[framecnt%HIST_LEN] = delay);
-	framecnt++;
-	arm_timer(timer_fd, now+delay);
-}
-#endif
-
 
 #define NSECS_IN_SEC INT64_C(1000000000)
 static int timespec_subtract(struct timespec *result, struct timespec x, struct timespec y)
@@ -716,6 +754,7 @@ uint64_t uget_ticks(void) {
 }
 
 void udodelay(uint64_t us) {
+	(void)us;
 	//usleep(us);
 }
 
@@ -724,6 +763,7 @@ uint32_t get_ticks(void) {
 }
 
 void dodelay(uint32_t ms) {
+	(void)ms;
 	//usleep(ms*1000);
 }
 

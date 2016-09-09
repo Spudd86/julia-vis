@@ -42,11 +42,12 @@ static void maxblend_dispatch(void *restrict dest, const void *restrict src, int
 
 #if !defined(__x86_64__)
 	if(feat & X86FEAT_MMX) blend = maxblend_mmx;
-	if(feat & X86FEAT_MMXEXT) blend = maxblend_sse; // AMD added the extra mmx instructions without doing all of sse, we only need the ones in both places
-	if(feat & X86FEAT_SSE) blend = maxblend_sse;
+	if(feat & X86FEAT_MMXEXT) blend = maxblend_3dnow;
 #endif
+	if(feat & X86FEAT_SSE) blend = maxblend_sse;
 	if(feat & X86FEAT_SSE2) blend = maxblend_sse2;
 	if(feat & X86FEAT_SSE4_1) blend = maxblend_sse4_1;
+	if(feat & X86FEAT_AVX2) blend = maxblend_avx2;
 
 	blend(dest, src, w, h);
 }

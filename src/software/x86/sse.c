@@ -8,6 +8,7 @@
 #include "../pixmisc.h"
 #include <mmintrin.h>
 #include <xmmintrin.h>
+#include <immintrin.h>
 
 #if 0 //defined(__3dNOW__)
 //TODO: work out how to do this more properly
@@ -68,6 +69,7 @@ void maxblend_sse(void *restrict dest, const void *restrict src, int w, int h)
 		mbdst[3]=v4;
 	}
 	_mm_empty();
+	_mm_sfence(); // needed because of the non-temporal stores.
 }
 
 #include "palblit_mmxsse.h"

@@ -119,12 +119,17 @@ extern "C" {
 
 extern int glx_ext_OML_sync_control;
 extern int glx_ext_ARB_create_context;
+extern int glx_ext_EXT_swap_control;
+extern int glx_ext_SGI_swap_control;
 
 #define GLX_CONTEXT_DEBUG_BIT_ARB 0x00000001
 #define GLX_CONTEXT_FLAGS_ARB 0x2094
 #define GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB 0x00000002
 #define GLX_CONTEXT_MAJOR_VERSION_ARB 0x2091
 #define GLX_CONTEXT_MINOR_VERSION_ARB 0x2092
+
+#define GLX_MAX_SWAP_INTERVAL_EXT 0x20F2
+#define GLX_SWAP_INTERVAL_EXT 0x20F1
 
 #ifndef GLX_OML_sync_control
 #define GLX_OML_sync_control 1
@@ -145,6 +150,18 @@ extern Bool (CODEGEN_FUNCPTR *_ptrc_glXWaitForSbcOML)(Display *, GLXDrawable, in
 extern GLXContext (CODEGEN_FUNCPTR *_ptrc_glXCreateContextAttribsARB)(Display *, GLXFBConfig, GLXContext, Bool, const int *);
 #define glXCreateContextAttribsARB _ptrc_glXCreateContextAttribsARB
 #endif /*GLX_ARB_create_context*/ 
+
+#ifndef GLX_EXT_swap_control
+#define GLX_EXT_swap_control 1
+extern void (CODEGEN_FUNCPTR *_ptrc_glXSwapIntervalEXT)(Display *, GLXDrawable, int);
+#define glXSwapIntervalEXT _ptrc_glXSwapIntervalEXT
+#endif /*GLX_EXT_swap_control*/ 
+
+#ifndef GLX_SGI_swap_control
+#define GLX_SGI_swap_control 1
+extern int (CODEGEN_FUNCPTR *_ptrc_glXSwapIntervalSGI)(int);
+#define glXSwapIntervalSGI _ptrc_glXSwapIntervalSGI
+#endif /*GLX_SGI_swap_control*/ 
 
 enum glx_LoadStatus
 {
