@@ -32,10 +32,14 @@
 #define FPS_HIST_LEN 128
 #define USEC 1
 
+#define MINFPS 20 // if period*interval goes over this number give up and run as fast as possible
+
 #if USEC
+#define ONE_SECOND INT64_C(1000000)
 #define BASE_SLACK 500
 #define MIN_SLACK 1500
 #else
+#define ONE_SECOND 1000
 #define BASE_SLACK 1
 #define MIN_SLACK 2
 #endif
@@ -55,14 +59,20 @@ struct fps_data {
 	uint64_t msc;
 	
 	int interval; ///< how many swap periods between our swaps
+	int max_interval;
 	
 	int count;
 	
-	struct runstat *workstat, *swapstat, *delaystat, *slackstat;
+	struct runstat *workstat, *swapstat, *delaystat, *slackstat, *tot_frametime;
 };
 
 int fps_get_hist_len(struct fps_data *self) { (void)self;
 	return FPS_HIST_LEN;
+}
+
+void fps_get_total_frametimes(struct fps_data *self, int64_t *total, const int **worktimes) {
+	if(total) *total = self->tot_frametime->sum;
+	if(worktimes) *worktimes = self->tot_frametime->data;
 }
 
 void fps_get_worktimes(struct fps_data *self, int64_t *total, const int **worktimes) {
@@ -89,8 +99,22 @@ int fps_get_cur_slack(struct fps_data *self) {
 	return self->slack;
 }
 
+int fps_get_cur_swap_interval(struct fps_data *self) {
+	return self->interval;
+}
+
 int64_t fps_get_target_msc(struct fps_data *self) {
 	return self->msc;
+}
+
+
+static uint64_t gcd(uint64_t a, uint64_t b) {
+	while(b != 0) {
+		uint64_t t = b;
+		b = a % b;
+		a = t;
+	}
+	return a;
 }
 
 /**
@@ -102,33 +126,34 @@ int64_t fps_get_target_msc(struct fps_data *self) {
 static void init(struct fps_data *self, struct fps_period freq, uint64_t init_msc, uint64_t now)
 {
 	memset(self, 0, sizeof(*self));
-#if USEC
-	self->period.n = freq.d*INT64_C(1000000);
+	self->period.n = freq.d*ONE_SECOND;
 	self->period.d = freq.n;
-#else
-	self->period.n = freq.d*1000;
-	self->period.d = freq.n;
-#endif
+
+	uint64_t tmp = gcd(self->period.n, self->period.d);
+	self->period.n /= tmp, self->period.d /= tmp;
 	
+	self->max_interval = MAX(freq.n/(freq.d*MINFPS), 1);
 
 	// try about 15% of period for initial slack value
 	self->slack = MAX((self->period.n*15)/(100*self->period.d), MIN_SLACK);
 	
 	printf("freq %d (%d/%d) period %" PRId64 "/%" PRId64 "\n",
 	       freq.n/freq.d, freq.n, freq.d, self->period.n, self->period.d);
+	printf("max interval %d\n", self->max_interval);
 	printf("slack = %d\n", self->slack);
 	printf("init msc = %" PRId64 "\n", init_msc);
 	
 	self->last_swap_time = now;
 	self->msc = init_msc;
 	self->interval = 1;
-	//self->interval = 2; self->period.n *=2;
+	//self->interval = 2;
 
 	int worktime = (self->period.n)/(self->period.d*4);
 	self->workstat = runstat_new(worktime, FPS_HIST_LEN);
 	self->swapstat = runstat_new(0, FPS_HIST_LEN);
 	self->delaystat = runstat_new(0, FPS_HIST_LEN);
 	self->slackstat = runstat_new(self->slack, FPS_HIST_LEN);
+	self->tot_frametime = runstat_new(self->period.n/self->period.d, FPS_HIST_LEN);
 }
 
 struct fps_data *fps_data_new(struct fps_period rate, uint64_t init_msc, uint64_t now)
@@ -159,7 +184,7 @@ void frame_start(struct fps_data *self, int64_t now)
 int64_t swap_begin(struct fps_data *self, int64_t now)
 {
 	// compute our target value of 'now'
-	int64_t expected = ((self->last_swap_time - self->slack)*self->period.d + self->period.n)/self->period.d;
+	int64_t expected = ((self->last_swap_time - self->slack)*self->period.d + self->interval*self->period.n)/self->period.d;
 	self->slack_diff = expected - now;
 	
 	runstat_insert(self->workstat, self->count, now - (self->frame_start));
@@ -167,9 +192,31 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	//printf("now %" PRId64 " expected %" PRId64 "\n", now, expected);
 	//printf("slackdiff %" PRId64 "\n", self->slack_diff);
 	
-	int period = self->period.n/self->period.d;
+	int period = (self->period.n*self->interval)/self->period.d;
 	int avgworktime = runstat_average(self->workstat);
 	int wktime_stdev = runstat_stddev(self->workstat);
+
+#if 0
+	if(self->count > FPS_HIST_LEN) {
+		//TODO: after changing interval need a cooldown before it can change in the other direction to avoid hysteresis
+		// (ie: after it goes from 1 to 2 it can go to 3 on the next frame but it can't go back to 1 for a while)
+
+		uint64_t req_time = avgworktime + wktime_stdev*31/10 + abs(runstat_average(self->swapstat)) + MIN_SLACK;
+
+		// if probably can't meet our deadlines, increment interval
+		if(req_time*self->period.d > (self->interval*self->period.n)) {
+			self->interval = (req_time*self->period.d)/self->period.n;
+			self->delay = 0;
+		}
+
+		if(req_time*self->period.d < (self->interval*self->period.n*3)/4) {
+			self->interval = (req_time*self->period.d)/self->period.n;
+			//self->delay = 0;
+		}
+
+		self->interval = MIN(self->max_interval+1, MAX(self->interval, 1));
+	}
+#endif
 	
 	int slack_target = BASE_SLACK;
 	
@@ -177,22 +224,28 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	//       want x s.t. p[t_wk > x] <= 0.002
 	// x = -ln(0.002)/lambda = -ln(0.002)*wktime_stdev ~= 6.2*wktime_stdev
 	// the distribution is shifted
-	//slack_target += (wktime_stdev*60)/10;
+	//slack_target += (wktime_stdev*62)/10;
 	slack_target += (wktime_stdev*31)/10;
 	
-	slack_target += runstat_stddev(self->swapstat) + MAX(runstat_average(self->swapstat), 0);
+	// even if swap is usually negative it represents uncertainty in our measurements and latency in the window system
+	// so it should contribute to slack
+	slack_target += runstat_stddev(self->swapstat) + abs(runstat_average(self->swapstat));
 	
-	slack_target = MIN((int)((self->period.n*3)/(self->period.d*4)), MAX(slack_target, MIN_SLACK));
+	slack_target = MIN((int)((self->period.n*self->interval*3)/(self->period.d*4)), MAX(slack_target, MIN_SLACK));
 	
 	if(self->slack > slack_target) self->slack = (self->slack*7 + slack_target)/8;
 	else self->slack = slack_target;
+
+	self->slack = MIN(self->slack, (self->period.n*self->interval*3)/(self->period.d*4));
 	
 	if(self->slack_diff < 0) {
 		//self->delay += MIN(self->slack_diff, -MIN_SLACK/2);
 		//self->delay = self->delay*3/4;
-		self->delay = (self->delay/4 > -self->slack_diff/2) ? self->delay*3/4 : self->delay + self->slack_diff/2;
+		//self->delay = (self->delay/4 > -self->slack_diff/2) ? self->delay*5/6 : self->delay + self->slack_diff/3;
+		//self->delay += self->slack_diff/2;
+		self->delay = self->delay*9/10 + self->slack_diff/2;
 	} else {
-		self->delay += MAX(self->slack_diff/4, 1);
+		self->delay += self->slack_diff/4;
 	}
 	
 	self->delay = MAX(self->delay, 0);
@@ -202,9 +255,9 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 		self->delay = MAX(newdelay, 0);
 	}
 	
-	self->count++;
-	
 	runstat_insert(self->slackstat, self->count, self->slack);
+
+	if(self->interval > self->max_interval) return 0; // give up, run as fast as possible
 	
 	self->msc += self->interval;
 
@@ -235,26 +288,32 @@ int swap_complete(struct fps_data *self, int64_t now, uint64_t msc, uint64_t sbc
 	// to the estimate, then let the estimate try to track the real times so
 	// we don't drift off and end up thinking we are at frame start when we are
 	// really somewhere in the middle
+
+	else runstat_insert(self->tot_frametime, self->count, now - self->last_swap_time);
 	
-	int64_t expected = (self->last_swap_time*self->period.d + self->period.n)/self->period.d;
+	int64_t expected = (self->last_swap_time*self->period.d + self->interval*self->period.n)/self->period.d;
 	int timediff = now - expected;
-	runstat_insert(self->swapstat, self->count, timediff%(self->period.n/self->period.d));
+	runstat_insert(self->swapstat, self->count, timediff);//%((self->interval*self->period.n)/self->period.d));
 	self->last_swap_time = now;
 
-	if(timediff*self->period.d > self->period.n) printf("after expected swap by %d (we must have missed it!)\n", timediff);
+	if(timediff*self->period.d > self->period.n*self->interval) printf("after expected swap by %d (we must have missed it!)\n", timediff);
 
 	// compute our delay, update counters and stuff
 	//TODO: be more useful about this
-	if(timediff*self->period.d > self->period.n) {
+	if(timediff*self->period.d > self->period.n*self->interval) {
 		self->delay = 0;
 	} else if(timediff > 0) {	
-		self->delay = MAX(self->delay - timediff/2, 0);
+		self->delay = MAX(self->delay - timediff/3, 0);
 	}
 	
-	runstat_insert(self->delaystat, self->count + 1, self->delay);
-	
-	if(self->count < FPS_HIST_LEN) return 0;
-	return self->delay;
+	int res = self->delay;
+	if(self->count < FPS_HIST_LEN || self->interval > self->max_interval) {
+		res = 0;
+	}
+
+	runstat_insert(self->delaystat, self->count, res);
+	self->count++;
+	return res;
 }
 
 

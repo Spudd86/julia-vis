@@ -13,12 +13,14 @@ struct fps_data;
 struct fps_data *fps_data_new(struct fps_period rate, uint64_t init_msc, uint64_t now);
 
 int fps_get_hist_len(struct fps_data *self);
+void fps_get_total_frametimes(struct fps_data *self, int64_t *total, const int **worktimes);
 void fps_get_worktimes(struct fps_data *self, int64_t *total, const int **worktimes);
 void fps_get_frametimes(struct fps_data *self, int64_t *total, const int **frametimes);
 void fps_get_delays(struct fps_data *self, int64_t *total, const int **delays);
 void fps_get_slacks(struct fps_data *self, int64_t *total, const int **slacktimes);
 int fps_get_cur_slack(struct fps_data *self);
 int64_t fps_get_target_msc(struct fps_data *self);
+int fps_get_cur_swap_interval(struct fps_data *self);
 
 
 void frame_start(struct fps_data *self, int64_t now);
