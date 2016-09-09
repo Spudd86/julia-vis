@@ -125,7 +125,8 @@ static inline void block_interp_bilin(uint16_t *restrict out, uint16_t *restrict
 	}
 }
 #else
-static inline void block_interp_bilin(uint16_t *restrict out, uint16_t *restrict in, int w, int h, int xd, int yd, float x00, float y00, float x01, float y01, float x10, float y10, float x11, float y11)
+__attribute__((hot))
+static void block_interp_bilin(uint16_t *restrict out, uint16_t *restrict in, int w, int h, int xd, int yd, float x00, float y00, float x01, float y01, float x10, float y10, float x11, float y11)
 {
 	//TODO: probably don't want to use this on 32bit x86 because of how expensive
 	// float -> int conversion is there
@@ -150,7 +151,6 @@ static inline void block_interp_bilin(uint16_t *restrict out, uint16_t *restrict
 
 	uint16_t *restrict out_line = out + yd*w + xd;
 	for(int yt=0; yt<BLOCK_SIZE; yt++, out_line+=w, u0+=du0dy, v0+=dv0dy, dudx+=dudxdy, dvdx+=dvdxdy) {
-		__builtin_prefetch(out_line, 1, 0); // write prefetch, non-temporal
 		int_fast32_t u = u0;
 		int_fast32_t v = v0;
 		int_fast32_t idudx = dudx;
@@ -202,11 +202,15 @@ static inline void block_interp_bilin(uint16_t *restrict out, uint16_t *restrict
  * @param w width of image (needs power of 2)
  * @param h height of image (needs divisable by ?)
  */
-MAP_FUNC_ATTR void soft_map(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
+void soft_map_task(size_t work_item_id, size_t span, uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
+	const int ystart = work_item_id * span * BLOCK_SIZE;
+	const int yend   = IMIN(ystart + span * BLOCK_SIZE, (unsigned int)h);
+	out += ystart * w;
+
 	const float xstep = 2.0f/w, ystep = 2.0f/h;
 	const float x0 = (pd->p[0]-0.5f)*0.25f + 0.5f, y0=pd->p[1]*0.25f + 0.5f;
-	for(int yd = 0; yd < h; yd++) {
+	for(int yd = ystart; yd < yend; yd++) {
 		float v = yd*ystep - 1.0f;
 		for(int xd = 0; xd < w; xd++) {
 			float u = xd*xstep - 1.0f;
@@ -218,15 +222,17 @@ MAP_FUNC_ATTR void soft_map(uint16_t *restrict out, uint16_t *restrict in, int w
 	}
 }
 
-#if 1
 __attribute__((hot))
-MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
+static void soft_map_interp_task(size_t work_item_id, size_t span, uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
+	const int ystart = work_item_id * span * BLOCK_SIZE;
+	const int yend   = IMIN(ystart + span * BLOCK_SIZE, (unsigned int)h);
+
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
 	const float cx0 = (pd->p[0]-0.5f)*0.25f + 0.5f, cy0=pd->p[1]*0.25f + 0.5f;
 
-	float v0 = -1.0f;
-	for(int yd = 0; yd < h; yd+=BLOCK_SIZE) {
+	float v0 = -1.0f + work_item_id * span * vstep;
+	for(int yd = ystart; yd < yend; yd+=BLOCK_SIZE) {
 		const float v1 = v0+vstep;
 
 		float y00 = -2.0f*v0 + cy0;
@@ -242,6 +248,7 @@ MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in
 			const float x11 = u*u - v1*v1 + cx0;
 
 			block_interp_bilin(out, in, w, h, xd, yd, x00, y00, x01, y01, x10, y10, x11, y11);
+			//block_interp_bilin_sse(out, in, w, h, xd, yd, x00, y00, x01, y01, x10, y10, x11, y11);
 
 			y00 = y01; y10 = y11;
 			x00 = x01; x10 = x11;
@@ -249,15 +256,19 @@ MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in
 		v0=v1;
 	}
 }
-#endif
 
-MAP_FUNC_ATTR void soft_map_butterfly(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
+__attribute__((hot))
+void soft_map_butterfly_task(size_t work_item_id, size_t span, uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
+	const int ystart = work_item_id * span * BLOCK_SIZE;
+	const int yend   = IMIN(ystart + span * BLOCK_SIZE, (unsigned int)h);
+	out += ystart * w;
+
 	const float xstep = 2.0f/w, ystep = 2.0f/h;
 	const float sm = sqrtf(2.5f)/2.5f;
 	const float cx0 = pd->p[0]*1.5f/2.5f, cy0 = pd->p[1]*1.5f/2.5f;
 
-	for(int yd = 0; yd < h; yd++) {
+	for(int yd = ystart; yd < yend; yd++) {
 		float v = yd*ystep - 1.0f;
 		for(int xd = 0; xd < w; xd++) {
 			float u = xd*xstep -1.0f;
@@ -272,13 +283,17 @@ MAP_FUNC_ATTR void soft_map_butterfly(uint16_t *restrict out, uint16_t *restrict
 	}
 }
 
-MAP_FUNC_ATTR void soft_map_butterfly_interp(uint16_t *restrict out, uint16_t *restrict __attribute__ ((aligned (16))) in, int w, int h, const struct point_data *pd)
+__attribute__((hot))
+void soft_map_butterfly_interp_task(size_t work_item_id, size_t span, uint16_t *restrict out, uint16_t *restrict __attribute__ ((aligned (16))) in, int w, int h, const struct point_data *pd)
 {
+	const int ystart = work_item_id * span * BLOCK_SIZE;
+	const int yend   = IMIN(ystart + span * BLOCK_SIZE, (unsigned int)h);
+
 	const float ustep = 2.0f/w, vstep = 2.0f/h;
 	const float sm = sqrtf(2.5f)/2.5f;
 	const float cx0 = pd->p[0]*1.5f/2.5f, cy0 = pd->p[1]*1.5f/2.5f;
 
-	for(int yd = 0; yd < h; yd+=BLOCK_SIZE) {
+	for(int yd = ystart; yd < yend; yd+=BLOCK_SIZE) {
 		float v0 = yd*vstep - 1.0f;
 		float v1 = v0+vstep;
 
@@ -308,13 +323,17 @@ MAP_FUNC_ATTR void soft_map_butterfly_interp(uint16_t *restrict out, uint16_t *r
 	}
 }
 
-MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
+void soft_map_rational_task(size_t work_item_id, size_t span, uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
+	const int ystart = work_item_id * span * BLOCK_SIZE;
+	const int yend   = IMIN(ystart + span * BLOCK_SIZE, (unsigned int)h);
+	out += ystart * w;
+
 	const float xoom = 3.0f, moox = 1.0f/xoom;
 	float xstep = 2.0f/w, ystep = 2.0f/h;
 	const float cx0 = pd->p[0], cy0 = pd->p[1], cx1 = pd->p[2]*2, cy1 = pd->p[3]*2;
 
-	for(int yd = 0; yd < h; yd++) {
+	for(int yd = ystart; yd < yend; yd++) {
 		float v = yd*ystep - 1.0f;
 		for(int xd = 0; xd < w; xd++) {
 			float u = xd*xstep -1.0f;
@@ -335,13 +354,16 @@ MAP_FUNC_ATTR void soft_map_rational(uint16_t *restrict out, uint16_t *restrict 
 
 #define infs(a, b) ((isfinite(a))?(a):(b))
 
-MAP_FUNC_ATTR void soft_map_rational_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
+void soft_map_rational_interp_task(size_t work_item_id, size_t span, uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
+	const int ystart = work_item_id * span * BLOCK_SIZE;
+	const int yend   = IMIN(ystart + span * BLOCK_SIZE, (unsigned int)h);
+
 	const float cx0 = pd->p[0], cy0 = pd->p[1], cx1 = pd->p[2]*2, cy1 = pd->p[3]*2;
 	const float xoom = 3.0f, moox = 1.0f/xoom;
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
-	float v0 = -1.0f;
-	for(int yd = 0; yd < h; yd+=BLOCK_SIZE) {
+	float v0 = -1.0f + work_item_id * span * vstep;
+	for(int yd = ystart; yd < yend; yd+=BLOCK_SIZE) {
 		float v1 = v0+vstep;
 
 		float a,b,c,d,sa,sb, cdivt, x, y;
@@ -390,201 +412,52 @@ MAP_FUNC_ATTR void soft_map_rational_interp(uint16_t *restrict out, uint16_t *re
 	}
 }
 
-#if 0
-typedef struct vec2f {
-	float x, y;
-} vec2f_t;
+#if NO_PARATASK
 
-__attribute__((hot))
-void span_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const vec2f_t *restrict grid, int gw, int gh)
+#define GEN_TASK_FN_NAME_(name) name##_task
+#define GEN_TASK_FN_NAME(name) GEN_TASK_FN_NAME_(name)
+#define DO_TASK_WRAP(name) \
+	void name(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd) { \
+		GEN_TASK_FN_NAME(name)(0, h/BLOCK_SIZE, out, in, w, h, pd); \
+	}
+
+#else
+
+#define GEN_TASK_FN_NAME_(name) name##_task
+#define GEN_TASK_FN_NAME(name) GEN_TASK_FN_NAME_(name)
+#define DO_TASK_WRAP(name) \
+	void name(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd) { \
+		int span = 2; \
+		struct softmap_work_args args = { \
+			GEN_TASK_FN_NAME(name), \
+			out, in, \
+			pd, \
+			span, \
+			w, h \
+		}; \
+		paratask_call(paratask_default_instance(), 0, h/(span*BLOCK_SIZE), paratask_func, &args); \
+	}
+
+#include "paratask/paratask.h"
+struct softmap_work_args {
+	void (*soft_map_task_fn)(size_t work_item_id, size_t span, uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd);
+	uint16_t *restrict out;
+	uint16_t *restrict in;
+	const struct point_data *pd;
+	size_t span;
+	int w, h;
+};
+static void paratask_func(size_t work_item_id, void *arg_)
 {
-	struct {
-		int_fast32_t lastx;
-		float u0, v0;
-
-		float dudx, dvdx;
-		float du0dy, dv0dy;
-		float dudxdy, dvdxdy;
-		//bool is_edge_span; // if set this span was created for clipping purposes and just fills the output with 1 pixel
-	} active_spans[gw-1];
-
-	const uint_fast32_t clamph = (h-1)*w;
-
-	// TODO: if a span end is outside of the source split it into a span that
-	// has u0, v0 set to the edge pixel and dudx, dvdx, du0dy, du0dy, dudxdy, dudxdy all 0
-	// so that for the entire run it just uses the value of the edge pixel
-	// have to do this for both ends of the span, so potentially every span could end up
-	// split in 3
-	// Want to do this because it doesn't distort the mapping for spans that need clipping
-	// like the current code does. (current code clips before computing dudx and friends
-	// so the map function is distorted across the entire block)
-
-	// maybe just include a flag in the span that it's an edge span so we can just totally
-	// skip the bilinear interpolation and increments
-	// the if should wind up being fairly cheap since we're effectively just picking between
-	// two possible loops, basically it's just one extra branch per span
-
-
-	const vec2f_t *grid_line = grid;
-	for(int gx = 0; gx < gw-1; gx++) {
-		float x00 = grid_line[gx].x;
-		float y00 = grid_line[gx].y;
-		float x01 = grid_line[gx + 1].x;
-		float y01 = grid_line[gx + 1].y;
-		float x10 = grid_line[gw + gx].x;
-		float y10 = grid_line[gw + gx].y;
-		float x11 = grid_line[gw + gx + 1].x;
-		float y11 = grid_line[gw + gx + 1].y;
-
-#if 1
-		float u00 = fmaxf(fminf(x00, 1.0f-FLT_EPSILON), 0.0f)*(w*256);
-		float v00 = fmaxf(fminf(y00, 1.0f-FLT_EPSILON), 0.0f)*(h*256);
-		float u01 = fmaxf(fminf(x01, 1.0f-FLT_EPSILON), 0.0f)*(w*256);
-		float v01 = fmaxf(fminf(y01, 1.0f-FLT_EPSILON), 0.0f)*(h*256);
-		float u10 = fmaxf(fminf(x10, 1.0f-FLT_EPSILON), 0.0f)*(w*256);
-		float v10 = fmaxf(fminf(y10, 1.0f-FLT_EPSILON), 0.0f)*(h*256);
-		float u11 = fmaxf(fminf(x11, 1.0f-FLT_EPSILON), 0.0f)*(w*256);
-		float v11 = fmaxf(fminf(y11, 1.0f-FLT_EPSILON), 0.0f)*(h*256);
-
-		float du0dy = ((u10 - u00)*(gh-1))/h;
-		float dv0dy = ((v10 - v00)*(gh-1))/h;
-		float dudxdy = ((((u11 - u10)*(gw-1))/w - ((u01 - u00)*(gw-1))/w)*(gh-1))/h;
-		float dvdxdy = ((((v11 - v10)*(gw-1))/w - ((v01 - v00)*(gw-1))/w)*(gh-1))/h;
-#else
-		// somehow need to force truncation to be round towards 0
-		// even for negative numbers
-		// otherwise we step too far when stepping towards 0 and end up with
-		// either u or v < 0
-		int u00 = IMIN(IMAX((int)(x00*w*256), 0), w*256-1);
-		int v00 = IMIN(IMAX((int)(y00*h*256), 0), h*256-1);
-		int u01 = IMIN(IMAX((int)(x01*w*256), 0), w*256-1);
-		int v01 = IMIN(IMAX((int)(y01*h*256), 0), h*256-1);
-		int u10 = IMIN(IMAX((int)(x10*w*256), 0), w*256-1);
-		int v10 = IMIN(IMAX((int)(y10*h*256), 0), h*256-1);
-		int u11 = IMIN(IMAX((int)(x11*w*256), 0), w*256-1);
-		int v11 = IMIN(IMAX((int)(y11*h*256), 0), h*256-1);
-
-		int du0dy = ((u10 - u00)*(gh-1))/h;
-		int dv0dy = ((v10 - v00)*(gh-1))/h;
-		int du1dy = ((u11 - u10)*(gh-1))/h;
-		int dv1dy = ((v11 - v10)*(gh-1))/h;
-		int dudxdy = ((((u11 - u10)*(gw-1))/w - ((u01 - u00)*(gw-1))/w)*(gh-1))/h;
-		int dvdxdy = ((((v11 - v10)*(gw-1))/w - ((v01 - v00)*(gw-1))/w)*(gh-1))/h;
-#endif
-
-			active_spans[gx].lastx = ((gx+1)*w)/(gw-1);
-			active_spans[gx].u0    = u00;
-			active_spans[gx].v0    = v00;
-			//active_spans[gx].u1    = u01;
-			//active_spans[gx].v1    = v01;
-			active_spans[gx].dudx  = (u01 - u00)*(gw-1)/w;
-			active_spans[gx].dvdx  = (v01 - v00)*(gw-1)/w;
-			active_spans[gx].du0dy = du0dy;
-			active_spans[gx].dv0dy = dv0dy;
-			//active_spans[gx].du1dy = du1dy;
-			//active_spans[gx].dv1dy = dv1dy;
-			active_spans[gx].dudxdy = dudxdy;
-			active_spans[gx].dvdxdy = dvdxdy;
-	}
-
-	for(int y = 0; y < h/(gh-1); y++) {
-		uint16_t *restrict out_line = __builtin_assume_aligned(out + y*w, 32); // w%16 == 0, 2 bytes per pixel
-
-		for(int x = 0, curspan = 0; x < w; curspan++) {
-			assert(curspan < gw-1);
-
-			uint_fast32_t u   = active_spans[curspan].u0;
-			uint_fast32_t v   = active_spans[curspan].v0;
-			int_fast32_t dudx = active_spans[curspan].dudx;
-			int_fast32_t dvdx = active_spans[curspan].dvdx;
-			//int_fast32_t dudx = ((active_spans[curspan].u1 - active_spans[curspan].u0)*(gw-1))/w;
-			//int_fast32_t dvdx = ((active_spans[curspan].v1 - active_spans[curspan].v0)*(gw-1))/w;
-
-			// assume a span is smaller than a cache line
-			// and prefetch just the start of it.
-			// this should work just fine because most cachelines these days
-			// are at least 32 bytes or 16 of our pixels
-			__builtin_prefetch(out_line, 1, 0); // write prefetch, non-temporal
-			// TODO: maybe add more prefetching if we have really big spans
-
-			//if(__builtin_expect(!active_spans[curspan].is_edge_span, 1)) {
-				for(; x < active_spans[curspan].lastx; x++, u+=dudx, v+=dvdx) {
-					assert(u >= 0); assert((uint_fast32_t)(u)>>8 < w); assert(u < w*256); // in debug builds make sure rounding hasn't messed us up
-					assert(v >= 0); assert((uint_fast32_t)(v)>>8 < h); assert(v < h*256);
-					assert(x < w);
-
-					uint_fast32_t xs, ys, xf, yf;
-					uint_fast32_t xi1, xi2, yi1, yi2;
-
-					xs=(uint_fast32_t)(u) >> 8, ys=(uint_fast32_t)(v) >> 8;
-					xf=(uint_fast32_t)(u)&0xFF, yf=(uint_fast32_t)(v)&0xFF;
-
-					xi1 = xs, yi1 = ys*w;
-					xi2 = IMIN(xi1+1, w-1u);
-					yi2 = IMIN(yi1+w, clamph);
-
-#if 0 // TODO: use top version if we don't have fast 64bit ints
-					uint_fast32_t o = ((in[yi1 + xi1]*(256u - xf) + in[yi1 + xi2]*xf)*(256u-yf) +
-					                   (in[yi2 + xi1]*(256u - xf) + in[yi2 + xi2]*xf)*yf) >> 16u;
-					o = (o*((256u*97u)/100u)) >> 8u; // now that we have fixed bilinear interp need a fade here
-#else
-					uint_fast64_t o = ((in[yi1 + xi1]*(256u - xf) + in[yi1 + xi2]*xf)*(256u-yf) +
-					                   (in[yi2 + xi1]*(256u - xf) + in[yi2 + xi2]*xf)*yf);
-					o = (o*((256u*97u)/100u)) >> 24u; // now that we have fixed bilinear interp need a fade here
-#endif
-					*(out_line++) = o;
-				}
-#if 0
-			} else {
-				uint_fast32_t xs, ys;
-				xs=(uint_fast32_t)(u) >> 8, ys=(uint_fast32_t)(v) >> 8;
-				uint16_t o = in[ys*w + xs];
-				for(; x < active_spans[curspan].lastx; x++) {
-					*(out_line++) = o;
-				}
-			}
-#endif
-
-			// step so that we are ready for the next line in the block
-			active_spans[curspan].u0   += active_spans[curspan].du0dy;
-			active_spans[curspan].v0   += active_spans[curspan].dv0dy;
-			//active_spans[curspan].u1   += active_spans[curspan].du1dy;
-			//active_spans[curspan].v1   += active_spans[curspan].dv1dy;
-			active_spans[curspan].dudx += active_spans[curspan].dudxdy;
-			active_spans[curspan].dvdx += active_spans[curspan].dvdxdy;
-		}
-	}
+	struct softmap_work_args *a = arg_;
+	a->soft_map_task_fn(work_item_id, a->span, a->out, a->in, a->w, a->h, a->pd);
 }
 
-__attribute__((hot))
-MAP_FUNC_ATTR void soft_map_interp(uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
-{
-	const int gh = h/BLOCK_SIZE + 1, gw = w/BLOCK_SIZE + 1;
-	vec2f_t grid[gh*gw];
+#endif // NO_PARATASK
 
-	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
-	const float cx0 = (pd->p[0]-0.5f)*0.25f + 0.5f, cy0=pd->p[1]*0.25f + 0.5f;
-
-	vec2f_t *grid_line = grid;
-	float u = -1.0f;
-	for(int xd = 0; xd < gw; xd++, u+=ustep) {
-		const float y = -2*u + cy0;
-		const float x = u*u - 1 + cx0;
-		grid_line[xd].x = x;
-		grid_line[xd].y = y;
-	}
-
-	float v = vstep - 1.0f;
-	for(int yd = 1; yd < gh; yd++, v+=vstep) {
-		u = -1.0f;
-		grid_line = grid + yd*gw;
-		for(int xd = 0; xd < gw; xd++, u+=ustep) {
-			const float y = 2*u*v + cy0;
-			const float x = u*u - v*v + cx0;
-			grid_line[xd].x = x;
-			grid_line[xd].y = y;
-		}
-		span_interp(out + (yd-1)*w*BLOCK_SIZE, in, w, h, grid_line - gw, gw, gh);
-	}
-}
-#endif
+DO_TASK_WRAP(soft_map_interp)
+DO_TASK_WRAP(soft_map)
+DO_TASK_WRAP(soft_map_butterfly)
+DO_TASK_WRAP(soft_map_butterfly_interp)
+DO_TASK_WRAP(soft_map_rational)
+DO_TASK_WRAP(soft_map_rational_interp)
