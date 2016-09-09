@@ -17,7 +17,6 @@
 #define PNT_RADIUS 1.0f
 
 //#define USE_VBO 1
-#define USE_TRIANGLE_STRIP 1
 
 static uint16_t *setup_point_16(int w, int h)
 {
@@ -52,8 +51,7 @@ struct glscope_ctx {
 	float pw, ph;
 
 	GLfloat sco_verts[128*8*4];
-	uint16_t sco_ind[128*3*6];
-	// uint16_t sco_ind[8*128 + 2*(128-1)];
+	uint16_t sco_ind[8*128 + 2*(128-1)];
 };
 
 struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean force_fixed)
@@ -63,8 +61,6 @@ struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean
 	ctx->pw = PNT_RADIUS*fmaxf(1.0f/24, 8.0f/width), ctx->ph = PNT_RADIUS*fmaxf(1.0f/24, 8.0f/height);
 	ctx->samp = num_samp;
 
-	//GLint oldtex;
-	//glGetIntegerv(GL_TEXTURE_BINDING_2D, &oldtex);
 	if(!force_fixed) { // compile succeed
 		ctx->shader_prog = compile_program_defs("#version 110\n", pnt_vtx_shader, pnt_shader_src);
 		printf("scope shader compiled\n");
@@ -100,7 +96,6 @@ struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean
 		sco_verts[(i*8+7)*4+0] = 2; sco_verts[(i*8+7)*4+1] = 0;
 	}
 
-#if USE_TRIANGLE_STRIP
 	// Now build the index data
 	int nstrips = ctx->samp;
 	int ndegenerate = 2 * (nstrips - 1);
@@ -119,19 +114,6 @@ struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean
 			idx_buf[offset++] = i*verts_per_strip + (verts_per_strip - 1);
 		}
 	}
-#else
-	GLushort *sco_ind = ctx->sco_ind;
-	for(int i=0; i<ctx->samp; i++) {
-		sco_ind[(i*6+0)*3+0] = i*8+0; sco_ind[(i*6+0)*3+1] = i*8+1; sco_ind[(i*6+0)*3+2] = i*8+3;
-		sco_ind[(i*6+1)*3+0] = i*8+0; sco_ind[(i*6+1)*3+1] = i*8+3; sco_ind[(i*6+1)*3+2] = i*8+2;
-
-		sco_ind[(i*6+2)*3+0] = i*8+2; sco_ind[(i*6+2)*3+1] = i*8+4; sco_ind[(i*6+2)*3+2] = i*8+5;
-		sco_ind[(i*6+3)*3+0] = i*8+2; sco_ind[(i*6+3)*3+1] = i*8+5; sco_ind[(i*6+3)*3+2] = i*8+3;
-
-		sco_ind[(i*6+4)*3+0] = i*8+4; sco_ind[(i*6+4)*3+1] = i*8+6; sco_ind[(i*6+4)*3+2] = i*8+7;
-		sco_ind[(i*6+5)*3+0] = i*8+4; sco_ind[(i*6+5)*3+1] = i*8+7; sco_ind[(i*6+5)*3+2] = i*8+5;
-	}
-#endif
 	CHECK_GL_ERR;
 
 	return ctx;
@@ -202,11 +184,7 @@ void render_scope(struct glscope_ctx *ctx, float R[3][3], const float *data, int
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts);
 	glVertexPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts + 2);
-#if USE_TRIANGLE_STRIP
 	glDrawRangeElements(GL_TRIANGLE_STRIP, 0, samp*8, 8*samp + 2*(samp-1), GL_UNSIGNED_SHORT, ctx->sco_ind); // core since GL 1.2
-#else
-	glDrawRangeElements(GL_TRIANGLES, 0, samp*8, samp*3*6, GL_UNSIGNED_SHORT, ctx->sco_ind); // core since GL 1.2
-#endif
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
