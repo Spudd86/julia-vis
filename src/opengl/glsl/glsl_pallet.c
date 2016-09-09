@@ -4,13 +4,14 @@
 #include "opengl/glmisc.h"
 #include "opengl/glpallet.h"
 
-#if 0
+#if 1
 static const char *vtx_shader =
 	"#version 110\n"
+	"attribute vec4 vertex;\n"
 	"varying vec2 uv;\n"
 	"void main() {\n"
-	"	uv = gl_MultiTexCoord0.xy;\n"
-	"	gl_Position = gl_Vertex;\n"
+	"	uv = vertex.xy;\n"
+	"	gl_Position = vec4(vertex.zw, 0.0f, 1.0f);\n"
 	"}";
 
 static const char *pal_frag_mix =
@@ -56,8 +57,8 @@ static void start_switch(struct glpal_ctx *ctx, int next)
 	struct priv_ctx *self = (struct priv_ctx *)ctx;
 	if(next<0) return;
 	if(self->pallet_changing) return; // haven't finished the last one
-	next = next % self->pals->numpals;
-	if(next == self->curpal) next = (next+1) % self->pals->numpals;
+	next = next % self->numpal;
+	if(next == self->curpal) next = (next+1) % self->numpal;
 	self->nextpal = next;
 	self->pallet_changing = true;
 }
@@ -66,15 +67,26 @@ static bool step(struct glpal_ctx *ctx, uint8_t step) {
 	struct priv_ctx *self = (struct priv_ctx *)ctx;
 	if(!self->pallet_changing) return false;
 	self->palpos += step;
-	if(self->palpos >=256) {
+	if(self->palpos >= 256) {
 		self->pallet_changing = self->palpos = 0;
 		self->curpal = self->nextpal;
 	}
 	return true;
 }
 
+static bool changing(struct glpal_ctx *ctx) {
+	struct priv_ctx *self = (struct priv_ctx *)ctx;
+	return self->pallet_changing;
+}
+
 static void render(struct glpal_ctx *ctx, GLuint draw_tex)
 {DEBUG_CHECK_GL_ERR;
+	static const float verts[] = {
+		0, 0 , -1, -1,
+		1, 0 ,  1, -1,
+		0, 1 , -1,  1,
+		1, 1 ,  1,  1
+	};
 	struct priv_ctx *priv = (struct priv_ctx *)ctx;
 
 	glPushAttrib(GL_TEXTURE_BIT);
@@ -84,23 +96,27 @@ static void render(struct glpal_ctx *ctx, GLuint draw_tex)
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, draw_tex);
-	glActiveTexture(GL_TEXTURE1;
+	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_1D, priv->pal_tex[priv->curpal]);
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_1D, priv->pal_tex[priv->nextpal]);
 
-	glBegin(GL_TRIANGLES); //TODO: scale for aspect ration correction
-		glTexCoord2d( 0, 0); glVertex2d(-1, -1);
-		glTexCoord2d( 1, 0); glVertex2d( 1, -1);
-		glTexCoord2d( 0, 1); glVertex2d(-1,  1);
-		glTexCoord2d( 1, 1); glVertex2d( 1,  1);
-	glEnd();
+	glEnableVertexAttribArrayARB(0);
+	glVertexAttribPointerARB(0, 4, GL_FLOAT, GL_FALSE, sizeof(float)*4, verts);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
 	glUseProgramObjectARB(0);
+	glDisableVertexAttribArrayARB(0);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_1D, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
 	glPopAttrib();
 	DEBUG_CHECK_GL_ERR;
 }
 
-static struct glpal_ctx * pal_init_glsl(GLboolean float_packed_pixels)
+struct glpal_ctx * pal_init_glsl(GLboolean float_packed_pixels)
 {CHECK_GL_ERR;
 	printf("Compiling pallet shader:\n");
 	GLint prog = 0;
@@ -109,13 +125,16 @@ static struct glpal_ctx * pal_init_glsl(GLboolean float_packed_pixels)
 	else
 		prog = compile_program(vtx_shader, pal_frag_mix);
 
-	if(!priv->prog) return NULL;
+	if(!prog) return NULL;
 
-	struct pal_lst *pals = pallet_get_pallets();
-	struct priv_ctx *ctx = malloc(sizeof(*ctx) + sizeof(*ctx->pal_tex)*pals->numpal);
-	priv->render = render;
+	struct pal_lst *pals = pallet_get_palettes();
+	struct priv_ctx *priv = malloc(sizeof(*priv) + sizeof(*priv->pal_tex)*pals->numpals);
+	priv->pubctx.render = render;
+	priv->pubctx.step = step;
+	priv->pubctx.start_switch = start_switch;
+	priv->pubctx.changing = changing;
 	priv->prog = prog;
-	priv->num_pal = pals->numpal;
+	priv->numpal = pals->numpals;
 	priv->curpal = priv->nextpal = 0;
 	priv->palpos = 0;
 
@@ -123,15 +142,15 @@ static struct glpal_ctx * pal_init_glsl(GLboolean float_packed_pixels)
 	glUniform1iARB(glGetUniformLocationARB(prog, "src"), 0);
 	glUniform1iARB(glGetUniformLocationARB(prog, "pal1"), 1);
 	glUniform1iARB(glGetUniformLocationARB(prog, "pal2"), 2);
-	priv->palpos_loc = glGetUniformLocationARB(prog, "pal2");
+	priv->palpos_loc = glGetUniformLocationARB(prog, "palpos");
 	glUniform1fARB(priv->palpos_loc, 0.0f);
 	glUseProgramObjectARB(0);
 	printf("Pallet shader compiled\n");
 
-	glGenTextures(num_pal, priv->pal_tex);
+	glGenTextures(pals->numpals, priv->pal_tex);
 
 	glPushAttrib(GL_TEXTURE_BIT);
-	for(int i=0; i<pals->numpal; i++) {
+	for(int i=0; i<pals->numpals; i++) {
 		glBindTexture(GL_TEXTURE_1D, priv->pal_tex[i]);
 		glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, pals->pallets[i]);
 		glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -174,10 +193,28 @@ static const char *pal_frag_shader =
 
 struct priv_ctx {
 	struct glpal_ctx pubctx;
+	struct pal_ctx *pal;
+
+	int cnt;
 
 	GLuint prog;
-	GLuint texture;
+	GLuint tex[2];
 };
+
+static int pal_step(struct glpal_ctx *ctx, int step) {
+	struct priv_ctx *priv = (struct priv_ctx *)ctx;
+	return pal_ctx_step(priv->pal, step);
+}
+
+static void start_switch(struct glpal_ctx *ctx, int next) {
+	struct priv_ctx *priv = (struct priv_ctx *)ctx;
+	pal_ctx_start_switch(priv->pal, next);
+}
+
+static bool changing(struct glpal_ctx *ctx) {
+	struct priv_ctx *priv = (struct priv_ctx *)ctx;
+	return pal_ctx_changing(priv->pal);
+}
 
 static void render(struct glpal_ctx *ctx, GLuint draw_tex)
 {DEBUG_CHECK_GL_ERR;
@@ -189,18 +226,24 @@ static void render(struct glpal_ctx *ctx, GLuint draw_tex)
 	};
 	struct priv_ctx *priv = (struct priv_ctx *)ctx;
 
+	
+
 	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
 	glUseProgramObjectARB(priv->prog);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, draw_tex);
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_1D, priv->texture);
+	glBindTexture(GL_TEXTURE_1D, priv->tex[priv->cnt]);
+
+	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, pal_ctx_get_active(priv->pal));
+
+	priv->cnt = (priv->cnt+1)%2;
+
+	glBindTexture(GL_TEXTURE_1D, priv->tex[priv->cnt]);
 
 	glEnableVertexAttribArrayARB(0);
 	glVertexAttribPointerARB(0, 4, GL_FLOAT, GL_FALSE, sizeof(float)*4, verts);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, pal_ctx_get_active(ctx->pal));
 
 	glUseProgramObjectARB(0);
 	glDisableVertexAttribArrayARB(0);
@@ -233,12 +276,23 @@ struct glpal_ctx *pal_init_glsl(GLboolean float_packed_pixels)
 
 	struct priv_ctx *priv = malloc(sizeof(*priv));
 	priv->pubctx.render = render;
-	priv->pubctx.pal = pal_ctx_new(0);
+	priv->pubctx.step = pal_step;
+	priv->pubctx.start_switch = start_switch;
+	priv->pubctx.changing = changing;
+	priv->pal = pal_ctx_new(0);
 	priv->prog = prog;
+	priv->cnt = 0;
 
-	glGenTextures(1, &priv->texture);
-	glBindTexture(GL_TEXTURE_1D, priv->texture);
-	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, pal_ctx_get_active(priv->pubctx.pal));
+	glGenTextures(2, &priv->tex);
+	glBindTexture(GL_TEXTURE_1D, priv->tex[0]);
+	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, pal_ctx_get_active(priv->pal));
+	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBindTexture(GL_TEXTURE_1D, 0);
+
+	glBindTexture(GL_TEXTURE_1D, priv->tex[1]);
+	glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 256, 0, GL_BGRA, GL_UNSIGNED_BYTE, pal_ctx_get_active(priv->pal));
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

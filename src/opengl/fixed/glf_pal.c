@@ -4,10 +4,14 @@
 #include "opengl/glmisc.h"
 #include "opengl/glpallet.h"
 
+//TODO: maybe see if we can do something with the EXT_color_table
+// stuff, (can use un-suffixed names since it's in GL 1.2)
+
 #define PALLET_OFFSCREEN_TEMP 1
 
 struct priv_ctx {
 	struct glpal_ctx pubctx;
+	struct pal_ctx *pal;
 	int im_w, im_h;
 	GLuint dstpbos[2], srcpbos[2];
 	GLuint disp_texture;
@@ -23,13 +27,31 @@ struct priv_ctx {
 #endif
 };
 
+static int pal_step(struct glpal_ctx *ctx, int step) {
+	struct priv_ctx *priv = (struct priv_ctx *)ctx;
+	return pal_ctx_step(priv->pal, step);
+}
+
+static void start_switch(struct glpal_ctx *ctx, int next) {
+	struct priv_ctx *priv = (struct priv_ctx *)ctx;
+	pal_ctx_start_switch(priv->pal, next);
+}
+
+static bool changing(struct glpal_ctx *ctx) {
+	struct priv_ctx *priv = (struct priv_ctx *)ctx;
+	return pal_ctx_changing(priv->pal);
+}
+
 static void render(struct glpal_ctx *ctx, GLuint draw_tex);
 
 struct glpal_ctx * pal_init_fixed(int width, int height) //FIXME
 {CHECK_GL_ERR;
 	struct priv_ctx *priv = calloc(sizeof(*priv), 1);
 	priv->pubctx.render = render;
-	priv->pubctx.pal = pal_ctx_new(0);
+	priv->pubctx.step = pal_step;
+	priv->pubctx.start_switch = start_switch;
+	priv->pubctx.changing = changing;
+	priv->pal = pal_ctx_new(0);
 	
 	priv->fxddstbuf = priv->fxdsrcbuf = NULL;
 	priv->im_w = width, priv->im_h = height;
@@ -156,7 +178,7 @@ static void render(struct glpal_ctx *ctx, GLuint srctex) //FIXME
 		glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, priv->dstpbos[frm%2]);
 		void *dstdata = glMapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, GL_WRITE_ONLY_ARB);
 		const void *srcdata = glMapBufferARB(GL_PIXEL_PACK_BUFFER_ARB, GL_READ_ONLY_ARB);
-		if(dstdata && srcdata) pallet_blit32(dstdata, srcdata, vp_w, vp_h, pal_ctx_get_active(ctx->pal));
+		if(dstdata && srcdata) pallet_blit32(dstdata, srcdata, vp_w, vp_h, pal_ctx_get_active(priv->pal));
 		else printf("Failed to map a pbo\n");
 		if(srcdata) { glUnmapBufferARB(GL_PIXEL_PACK_BUFFER_ARB); }
 		if(dstdata) { glUnmapBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB); }
@@ -178,7 +200,7 @@ static void render(struct glpal_ctx *ctx, GLuint srctex) //FIXME
 		int read_buf; glGetIntegerv(GL_DRAW_BUFFER, &read_buf);
 		glReadBuffer(read_buf);
 		glReadPixels(0, 0, vp[2], vp[3], GL_BGRA, GL_UNSIGNED_BYTE, priv->fxdsrcbuf);
-		pallet_blit32(priv->fxddstbuf, priv->fxdsrcbuf, vp_w, vp_h, pal_ctx_get_active(ctx->pal));
+		pallet_blit32(priv->fxddstbuf, priv->fxdsrcbuf, vp_w, vp_h, pal_ctx_get_active(priv->pal));
 		glRasterPos2f(-1, -1);
 		glDrawPixels(vp_w, vp_h, GL_BGRA, GL_UNSIGNED_BYTE, priv->fxddstbuf);
 	}

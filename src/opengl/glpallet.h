@@ -7,8 +7,10 @@
 #define GLPALLET_H_
 
 struct glpal_ctx {
-	struct pal_ctx *pal;
 	void (*render)(struct glpal_ctx *, GLuint);
+	void (*start_switch)(struct glpal_ctx *ctx, int next);
+	bool (*step)(struct glpal_ctx *ctx, uint8_t step);
+	bool (*changing)(struct glpal_ctx *ctx);
 };
 
 struct glpal_ctx *pal_init_glsl(GLboolean float_packed_pixels);
@@ -19,15 +21,15 @@ static inline void gl_pal_render(struct glpal_ctx *ctx, GLuint srctex) {
 }
 
 static inline int gl_pal_step(struct glpal_ctx *ctx, int step) {
-	return pal_ctx_step(ctx->pal, step);
+	return ctx->step(ctx, step);
 }
 
 static inline void gl_pal_start_switch(struct glpal_ctx *ctx, int next) {
-	pal_ctx_start_switch(ctx->pal, next);
+	ctx->start_switch(ctx, next);
 }
 
 static inline bool gl_pal_changing(struct glpal_ctx *ctx) {
-	return pal_ctx_changing(ctx->pal);
+	return ctx->changing(ctx);
 }
 
 #endif /* include guard */
