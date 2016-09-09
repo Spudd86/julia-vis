@@ -190,12 +190,36 @@ struct pal_ctx {
 	 * holds the current pallet (with interpolation between changes done already).
 	 * extra element makes pallet blit much simpler (Don't have to check for last element)
 	 */
-	uint32_t active_pal[257] __attribute__((aligned(16)));
+	uint32_t active_pal[256 + 64] __attribute__((aligned(16))); // the 64 is padding for mmx/sse/etc code
 
 	uint32_t pallets32[NUM_PALLETS][256];
 };
 
 static void do_pallet_step(int pos, uint32_t * restrict active_pal, const uint8_t *restrict next, const uint8_t *restrict prev);
+
+struct pal_lst *pallet_get_palettes(void)
+{
+	struct pal_lst *res = malloc(sizeof(*res) + sizeof(uint32_t)*256*NUM_PALLETS);
+
+	res->numpals = NUM_PALLETS;
+
+	struct col_shifts shifts;
+	if(0) {
+		shifts.r =  0;
+		shifts.g =  8;
+		shifts.b = 16;
+		shifts.x = 24;
+	} else {
+		shifts.r = 16;
+		shifts.g =  8;
+		shifts.b =  0;
+		shifts.x = 24;
+	}
+	for(int p=0; p < NUM_PALLETS; p++)
+		expand_pallet(static_pallets[p], res->pallets[p], shifts);
+
+	return res;
+}
 
 struct pal_ctx *pal_ctx_new(int bswap)
 {
@@ -226,7 +250,7 @@ struct pal_ctx *pal_ctx_new(int bswap)
 //TODO: endianness?
 static const struct col_shifts format_shifts[] = {
 //	{  r,  g,  b,  x}
-#if 0
+#if ALLOW_101010_PAL
 	{  0, 10, 20, 30}, // SOFT_PIX_FMT_RGBx101010,
 	{ 20, 10,  0, 30}, // SOFT_PIX_FMT_BGRx101010,
 #else
@@ -241,8 +265,10 @@ static const struct col_shifts format_shifts[] = {
 	{  0,  8, 16, 24}, // SOFT_PIX_FMT_BGR565,
 	{ 16,  8,  0, 24}, // SOFT_PIX_FMT_RGB555,
 	{  0,  8, 16, 24}, // SOFT_PIX_FMT_BGR555,
-	{  0,  8, 16, 24}, // SOFT_PIX_FMT_8_RGB_PAL,
-	{ 16,  8,  0, 24}, // SOFT_PIX_FMT_8_BGR_PAL
+	{  8, 16, 24,  0}, // SOFT_PIX_FMT_8_xRGB_PAL,
+	{ 24, 16,  8,  0}, // SOFT_PIX_FMT_8_xBGR_PAL,
+	{  0,  8, 16, 24}, // SOFT_PIX_FMT_8_RGBx_PAL,
+	{ 16,  8,  0, 24}, // SOFT_PIX_FMT_8_BGRx_PAL,
 };
 
 struct pal_ctx *pal_ctx_pix_format_new(julia_vis_pixel_format format)
