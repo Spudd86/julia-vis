@@ -6,6 +6,8 @@
 #include "common.h"
 #include "glmisc.h"
 
+#include <assert.h>
+
 static void check_gl_obj_msg(GLhandleARB obj);
 
 static GLboolean do_shader_compile(GLhandleARB shader, int count, const char **source) {
@@ -128,41 +130,37 @@ void setup_viewport(int width, int height) {
 
 void draw_hist_array_xlate(int off, float scl, float xlate, const int *array, int len, float r, float g, float b)
 {
-	glColor3f(1.0f, 1.0f, 1.0f);
-	glBegin(GL_LINES);
-	glVertex2f(0, 1); glVertex2f(1, 1);
-	glVertex2f(0, 0); glVertex2f(1, 0);
-	glEnd();
+	float bg_lines[] = {
+		1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+		1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+		1.0f, 1.0f, 1.0f, 0.0f, 0.0f,
+		1.0f, 1.0f, 1.0f, 1.0f, 0.0f
+	};
 
-	glColor3f(r, g, b);
-
-#if 1
-	float pnts[(len - 1)*2][2];
-	for(int i=0; i<len-1; i++) {
+	float pnts[len][5];
+	for(int i=0; i<len; i++) {
 		int idx = (i + off)%len;
-		pnts[i*2][0] = ((float)i)/(len-1);
-		pnts[i*2][1] = scl*array[idx]+xlate;
-		idx = (i + 1 + off)%len;
-		pnts[i*2+1][0] = ((float)(i+1))/(len-1);
-		pnts[i*2+1][1] = scl*array[idx]+xlate;
+		pnts[i][0] = r;
+		pnts[i][1] = g;
+		pnts[i][2] = b;
+		pnts[i][3] = ((float)i)/(len-1);
+		pnts[i][4] = scl*array[idx]+xlate;
 	}
-	glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+
 	glEnableClientState(GL_VERTEX_ARRAY);
-	glVertexPointer(2, GL_FLOAT, 0, pnts);
-	glDrawArrays(GL_LINES, 0, (len - 1)*2);
-	glPopClientAttrib();
+	glEnableClientState(GL_COLOR_ARRAY);
+	
+	glColorPointer( 3, GL_FLOAT, sizeof(float)*5, bg_lines);
+	glVertexPointer(2, GL_FLOAT, sizeof(float)*5, bg_lines + 3);
+	glDrawArrays(GL_LINES, 0, 4);
+
+	glColorPointer( 3, GL_FLOAT, sizeof(float)*5, (float *)pnts);
+	glVertexPointer(2, GL_FLOAT, sizeof(float)*5, (float *)pnts + 3);
+	glDrawArrays(GL_LINE_STRIP, 0, len);
+
+	glDisableClientState(GL_COLOR_ARRAY);
+	glDisableClientState(GL_VERTEX_ARRAY);
 	DEBUG_CHECK_GL_ERR;
-#else	
-	glBegin(GL_LINES);
-	for(int i=0; i<len-1; i++) {
-		int idx = (i + off)%len;
-		glVertex2f(((float)i)/(len-1), scl*array[idx]+xlate);
-		idx = (i + 1 + off)%len;
-		glVertex2f(((float)(i+1))/(len-1), scl*array[idx]+xlate);
-	}
-	glEnd();
-	DEBUG_CHECK_GL_ERR;
-#endif
 }
 
 
@@ -214,11 +212,11 @@ void draw_string(const char *str)
 	int vpw[4]; float pos[4];
 	glGetIntegerv(GL_VIEWPORT, vpw);
 	glGetFloatv(GL_CURRENT_RASTER_POSITION, pos);
-	
-	glPushAttrib(GL_TEXTURE_BIT | GL_COLOR_BUFFER_BIT);
-	glEnable(GL_ALPHA_TEST);
-	glAlphaFunc(GL_GREATER, 0.5f);
-	glBindTexture(GL_TEXTURE_2D, txt_texture);
+
+	struct draw_string_quad_ {
+		float v[4*4];
+	} verts[strlen(str)];
+	size_t nstrips = 0;
 	for(const char *c = str; *c; c++) {
 		if(*c == '\n') {
 			pos[0] = 0;
@@ -229,28 +227,61 @@ void draw_string(const char *str)
 			pos[0] += 8*4;
 			continue;
 		}
+		if(*c == ' ') {
+			pos[0] += 8;
+			continue;
+		}
 	
 		int tx = (*c%16)*8, ty = (*c/16)*16;
-		float verts[] = {
+		struct draw_string_quad_ tmp = {  {
 			(tx+0)/128.0f, (ty+ 0)/256.0f, 2*(pos[0]+0)/vpw[2]-1, 2*(pos[1]+16)/vpw[3]-1,
 			(tx+8)/128.0f, (ty+ 0)/256.0f, 2*(pos[0]+8)/vpw[2]-1, 2*(pos[1]+16)/vpw[3]-1,
 			(tx+0)/128.0f, (ty+16)/256.0f, 2*(pos[0]+0)/vpw[2]-1, 2*(pos[1]- 0)/vpw[3]-1,
 			(tx+8)/128.0f, (ty+16)/256.0f, 2*(pos[0]+8)/vpw[2]-1, 2*(pos[1]- 0)/vpw[3]-1,
+			}
 		};
-		
-		glEnableClientState(GL_VERTEX_ARRAY);
-		glEnableClientState(GL_TEXTURE_COORD_ARRAY);	
-		glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, verts);
-		glVertexPointer(2, GL_FLOAT, sizeof(float)*4, verts + 2);
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		verts[nstrips] = tmp;
+		nstrips++;
 		
 		pos[0] += 8;
 	}
+
+	// Now build the index data
+	int ndegenerate = 2 * (nstrips - 1);
+	int verts_per_strip = 4;
+	int total_verts = verts_per_strip*nstrips + ndegenerate;
+	uint16_t idx_buf[total_verts];
+ 
+	for(size_t i = 0, offset = 0; i < nstrips; i++) {
+		if(i > 0) { // Degenerate begin: repeat first vertex
+			idx_buf[offset++] = i*4;
+		}
+		for(size_t j = 0; j < 4; j++) { // One part of the strip
+			idx_buf[offset++] = i*4 + j;
+		}
+		if(i < nstrips-1) { // Degenerate end: repeat last vertex
+			idx_buf[offset++] = i*4 + 3;
+		}
+
+		assert(offset <= total_verts);
+	}
+
+	glEnable(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER, 0.5f);
+	glBindTexture(GL_TEXTURE_2D, txt_texture);
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+	glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, (float *)verts);
+	glVertexPointer(2, GL_FLOAT, sizeof(float)*4, (float *)verts + 2);
+	glDrawRangeElements(GL_TRIANGLE_STRIP, 0, nstrips*verts_per_strip, total_verts, GL_UNSIGNED_SHORT, idx_buf); // core since GL 1.2
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-	glPopAttrib();
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glDisable(GL_ALPHA_TEST);
 	
-	glWindowPos2fv(pos);
+	glWindowPos2fv(pos); // core since GL 1.5
 	DEBUG_CHECK_GL_ERR;
 }
 
