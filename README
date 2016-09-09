@@ -8,7 +8,7 @@ Note:
 
 src/opengl/glx_gen.{c,h}
 was generated with glGenLoad like this:
-	lua  LoadGen.lua gen -style pointer_c -spec=glX -ext OML_sync_control -ext ARB_create_context
+	lua  LoadGen.lua gen -style pointer_c -spec=glX -ext OML_sync_control -ext ARB_create_context -ext EXT_swap_control -ext SGI_swap_control
 
 
 src/opengl/glx_gen.{c,h}

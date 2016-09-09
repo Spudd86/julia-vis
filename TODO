@@ -1,4 +1,8 @@
 
-
-- Fix the FIXMEs in autoconf.ac
 - Make Makefile.in smarter
+
+- switch pallet blit sse2 to use maskmoveu so we can simplify it's alignment code
+
+- add padding to internal image buffer allocations so that vector instructions can run past the end of the image (eg: pallet blit using maskmoveu to do stores might read up to 14 bytes past the end of the image)
+
+- switch to using the julia_vis_pixel_format based pallet init function in at least all software versions so we can freely change the resulting channel orders in the pallet to make the 16 bit blitters better.
