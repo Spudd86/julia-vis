@@ -64,9 +64,7 @@ Map *map_new(int grid_size, map_texco_cb callback)
 			row[xd].x = xd*step - 1.0f, row[xd].y = yd*step - 1.0f;
 	}
 
-	// TODO: could probably drop this check... VBOs have been in since GL 1.5
 	if(ogl_ext_ARB_vertex_buffer_object) {
-//	if(0) {
 		self->use_vbo = GL_TRUE;
 		glPushAttrib(GL_ALL_ATTRIB_BITS);
 		glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);

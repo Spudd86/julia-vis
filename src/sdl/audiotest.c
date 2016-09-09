@@ -125,7 +125,7 @@ int main(int argc, char **argv)
 			if(oldbc != beat_count)
 				draw_line(voice_print, vpx, im_h/4-5, vpx, im_h/4+5, 0xffffffff);
 
-			beat_throb = beat_throb*(0.996f) + (oldbc != beat_count);
+			beat_throb = beat_throb*(0.997f) + (oldbc != beat_count);
 			oldbc = beat_count;
 			ovpx = vpx;
 		}
