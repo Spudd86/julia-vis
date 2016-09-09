@@ -8,20 +8,25 @@ static struct glscope_ctx *glscope = NULL;
 static int scr_w = 0, scr_h = 0;
 
 void init_gl(const opt_data *opt_data, int width, int height)
-{ CHECK_GL_ERR;
+{
 	scr_w = width; scr_h = height;
+
+	if(!ogl_LoadFunctions()) {
+		fprintf(stderr, "ERROR: Failed to load GL extensions\n");
+		exit(EXIT_FAILURE);
+	}
+	CHECK_GL_ERR;
+	if(!(ogl_GetMajorVersion() > 1 || ogl_GetMinorVersion() >= 4)) {
+		fprintf(stderr, "ERROR: Your OpenGL Implementation is too old\n");
+		exit(EXIT_FAILURE);
+	}
 
 	setup_viewport(scr_w, scr_h); CHECK_GL_ERR;
 	glClear(GL_COLOR_BUFFER_BIT); CHECK_GL_ERR;
 	glEnable(GL_TEXTURE_2D); CHECK_GL_ERR;
 	glHint(GL_GENERATE_MIPMAP_HINT, GL_NICEST); CHECK_GL_ERR;
 	
-	if(!GLEE_EXT_blend_minmax) {
-		printf("missing required gl extension EXT_blend_minmax!\n");
-		exit(1);
-	}
-	
-	glscope = gl_scope_init(width, height, 8, false);CHECK_GL_ERR;
+	glscope = gl_scope_init(width, height, 2, false);CHECK_GL_ERR;
 }
 
 static int frm = 0;
