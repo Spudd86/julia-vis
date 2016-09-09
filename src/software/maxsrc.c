@@ -7,11 +7,6 @@
 #include <float.h>
 #include <assert.h>
 
-#if defined(__SSE__) //TODO: runtime detect
-#include <mmintrin.h>
-#include <xmmintrin.h>
-#endif
-
 typedef struct {
 	uint16_t *restrict data;
 	uint16_t w,h;
@@ -19,7 +14,7 @@ typedef struct {
 
 static void point_init(MxSurf *res, int w, int h);
 static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3]);
-static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, float px, float py);
+static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, int npnts, const uint32_t *pnts);
 
 struct maxsrc {
 	void *buf;
@@ -42,7 +37,7 @@ struct maxsrc *maxsrc_new(int w, int h)
 	point_init(&self->pnt_src, IMAX(w/24, 8), IMAX(h/24, 8));
 	printf("maxsrc using %i %dx%d points\n", self->samp, self->pnt_src.w, self->pnt_src.h);
 
-	self->prev_src = self->buf = aligned_alloc(64, 2 * w * h * sizeof(uint16_t));
+	self->prev_src = self->buf = aligned_alloc(64, 2 * w * h * sizeof(uint16_t) + 64); // add extra padding for vector instructions to be able to run past the end
 	memset(self->prev_src, 0, 2*w*h*sizeof(uint16_t));
 	self->next_src = self->prev_src + w*h;
 
@@ -61,6 +56,8 @@ void maxsrc_delete(struct maxsrc *self)
 const uint16_t *maxsrc_get(struct maxsrc *self) {
 	return self->prev_src;
 }
+
+//void list_pnt_blit_sse(void *restrict dest, int iw, uint16_t *restrict pnt, int pw, int ph, int samp, const uint32_t *pnts);
 
 // MUST NOT be called < frame of consumer apart (only uses double buffering)
 // if it's called too soon consumer may be using the frame we are modifying
@@ -86,11 +83,23 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 
 	zoom(dst, self->prev_src, iw, ih, R);
 
+	uint32_t pnts[samp*2]; // TODO: if we do dynamically choose number of points based on spacing move allocating this into context object
+
 	for(int i=0; i<samp; i++) {
+		//TODO: maybe change the spacing of the points depending on
+		// the rate of change so that the distance in final x,y coords is
+		// approximately constant?
+		// maybe step with samples spaced nicely for for the straight line and
+		// let it insert up to n extra between any two?
+		// might want initial spacing to be a little tighter, probably need to tweak 
+		// that and max number of extra to insert.
+		// also should check spacing post transform
+		// probably want to shoot for getting about 3 pixels apart at 512x512
 		float s = getsamp(audio, audiolen, i*audiolen/(samp-1), audiolen/96);
 
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
+		// xt ∈ [-0.5, 0.5] ∀∃∄∈∉⊆⊈⊂⊄
 		float xt = (float)i/(float)(samp - 1) - 0.5f; // (i - (samp-1)/2.0f)*(1.0f/(samp-1));
 		float yt = 0.2f*s;
 		float zt = 0.0f;
@@ -102,8 +111,12 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 
 		float xi = x*zvd*iw+(iw - self->pnt_src.w)/2.0f;
 		float yi = y*zvd*ih+(ih - self->pnt_src.h)/2.0f;
-		draw_point(dst, self->iw, self->ih, &self->pnt_src, xi, yi);
+
+		pnts[i*2+0] = xi*256;
+		pnts[i*2+1] = yi*256;
 	}
+	draw_points(dst, self->iw, self->ih, &self->pnt_src, samp, pnts);
+
 	self->next_src = self->prev_src;
 	self->prev_src = dst;
 
@@ -113,12 +126,12 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 static void point_init(MxSurf *res, int w, int h)
 {
 	res->w = w; res->h = h;
-	uint16_t *buf = xmalloc((w+1) * (h+1) * sizeof(uint16_t));
+	uint16_t *buf = xmalloc((w+1) * (h+1) * sizeof(uint16_t) + 64); // add extra padding for vector instructions to be able to run past the end
 	memset(buf, 0, (w+1)*(h+1)*sizeof(uint16_t));
 	int stride = w+1;
 	for(int y=0; y < h; y++)  {
 		for(int x=0; x < w; x++) {
-			float u = 1.25f*((2*x+1.0f)/(w-1) - 1), v = 1.25f*((2*y+1.0f)/(h-1) - 1);
+			float u = 1.0f*((2*x+1.0f)/(w-1) - 1), v = 1.0f*((2*y+1.0f)/(h-1) - 1);
 			buf[y*stride + x] = (uint16_t)(expf(-4.5f*0.5f*log2f((u*u+v*v) + 1.0f))*(UINT16_MAX));
 		}
 	}
@@ -126,76 +139,39 @@ static void point_init(MxSurf *res, int w, int h)
 	res->data = buf;
 }
 
-static void draw_point(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, float px, float py)
-{(void)ih;
-	const uint32_t ipx = px*256, ipy = py*256;
-	uint32_t yf = ipy&0xff, xf = ipx&0xff;
-	uint32_t a00 = (yf*xf);
-	uint32_t a01 = (yf*(256-xf));
-	uint32_t a10 = ((256-yf)*xf);
-	uint32_t a11 = ((256-yf)*(256-xf));
-
-	uint32_t off = (ipy/256u)*iw + ipx/256u;
-
+static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, int npnts, const uint32_t *pnts)
+{
+#if 0 //__SSE__
+	list_pnt_blit_sse(dst, iw, pnt_src->data, pnt_src->w, pnt_src->h, npnts, pnts);
+#else
 	const int pnt_stride = pnt_src->w+1;
 
-#if defined(__SSE__) //TODO: runtime detect
-	if(pnt_src->w % 4 == 0) {
-		const __m64 w00 = _mm_set1_pi16(a00);
-		const __m64 w01 = _mm_set1_pi16(a01);
-		const __m64 w10 = _mm_set1_pi16(a10);
-		const __m64 w11 = _mm_set1_pi16(a11);
+	for(int i=0; i<npnts; i++) {
+		const uint32_t ipx = pnts[i*2+0], ipy = pnts[i*2+1];
+		const uint32_t yf = ipy&0xff, xf = ipx&0xff;
 
-		const __m64 max_off = _mm_set1_pi16(0x8000);
+		uint32_t a00 = (yf*xf);
+		uint32_t a01 = (yf*(256-xf));
+		uint32_t a10 = ((256-yf)*xf);
+		uint32_t a11 = ((256-yf)*(256-xf));
+
+		uint32_t off = (ipy/256u)*iw + ipx/256u;
+
+		const uint16_t *s0 = pnt_src->data;
+		const uint16_t *s1 = pnt_src->data + pnt_stride;
 		for(int y=0; y < pnt_src->h; y++) {
 			uint16_t *restrict dst_line = (uint16_t *restrict)dest + off + iw*y;
-			const uint16_t *s0 = pnt_src->data + y*pnt_stride;
-			const uint16_t *s1 = s0 + pnt_stride;
-			_mm_prefetch(dst_line, _MM_HINT_NTA);
-			for(int x=0; x < pnt_src->w; x+=4, dst_line+=4, s0+=4, s1+=4) {
-				_mm_prefetch(dst_line + 4, _MM_HINT_NTA);
-				__m64 p00 = *(const __m64 *)(s0);
-				__m64 p01 = *(const __m64 *)(s0 + 1);
-				__m64 p10 = *(const __m64 *)(s1);
-				__m64 p11 = *(const __m64 *)(s1 + 1);
-
-				p00 = _mm_mulhi_pu16(p00, w00);
-				p01 = _mm_mulhi_pu16(p01, w01);
-				p10 = _mm_mulhi_pu16(p10, w10);
-				p11 = _mm_mulhi_pu16(p11, w11);
-
-				__m64 oa = _mm_add_pi16(p00, p01);
-				__m64 ob = _mm_add_pi16(p10, p11);
-				__m64 res = _mm_add_pi16(oa, ob);
-				// no need to shift because when we did the multiplication we
-				// only got the high 16 bits
-
-				__m64 dp = *(__m64 *)(dst_line);
-				dp  = _mm_add_pi16(dp,  max_off);
-				res = _mm_add_pi16(res, max_off);
-				res = _mm_max_pi16(res, dp);
-				res = _mm_sub_pi16(res, max_off);
-
-				*(__m64 *)(dst_line) = res;
+			for(int x=0; x < pnt_src->w; x++) {
+				uint16_t res = (s0[x]*a00 + s0[x+1]*a01
+				              + s1[x]*a10 + s1[x+1]*a11)>>16;
+				res = IMAX(res, dst_line[x]);
+				dst_line[x] = res;
 			}
+			s0 += pnt_stride;
+			s1 += pnt_stride;
 		}
-		_mm_empty();
-		return;
 	}
 #endif
-	const uint16_t *s0 = pnt_src->data;
-	const uint16_t *s1 = pnt_src->data + pnt_stride;
-	for(int y=0; y < pnt_src->h; y++) {
-		uint16_t *restrict dst_line = (uint16_t *restrict)dest + off + iw*y;
-		for(int x=0; x < pnt_src->w; x++) {
-			uint16_t res = (s0[x]*a00 + s0[x+1]*a01
-			              + s1[x]*a10 + s1[x+1]*a11)>>16;
-			res = IMAX(res, dst_line[x]);
-			dst_line[x] = res;
-		}
-		s0 += pnt_stride;
-		s1 += pnt_stride;
-	}
 }
 
 #define BLOCK_SIZE 8
