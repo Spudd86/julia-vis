@@ -160,7 +160,7 @@ int main(int argc, char **argv)
 	if(strstr(glXQueryExtensionsString(dpy, 0), "GLX_MESA_swap_control")) {
 		PFNGLXSWAPINTERVALMESAPROC swap_interval = glXGetProcAddressARB("glXSwapIntervalMESA");
 		swap_interval(1);
-		opts.draw_rate = 300;
+		opts.draw_rate = 600;
 	}
 	
 	if(strstr(glXQueryExtensionsString(dpy, 0), "GLX_INTEL_swap_event")) {
@@ -291,7 +291,6 @@ void udodelay(uint64_t us) {
 
 uint32_t get_ticks(void) {
 	return uget_ticks() / 1000;
-	//return (uint32_t)(tv.tv_sec*1000 + tv.tv_usec/1000);
 }
 
 void dodelay(uint32_t ms) {
