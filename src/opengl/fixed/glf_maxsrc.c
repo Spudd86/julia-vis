@@ -32,7 +32,7 @@ static void update(struct glmaxsrc_ctx *ctx, const float *audio, int audiolen);
 
 struct glmaxsrc_ctx *maxsrc_new_fixed(int width, int height)
 {
-	int samp = MIN(MIN(width/2, height/2), 128);
+	int samp = MIN(MIN(width/8, height/8), 128);
 	printf("maxsrc using %i points\n", samp);	
 	struct priv_ctx *priv = calloc(sizeof(*priv), 1);
 	priv->pubctx.update = update;
