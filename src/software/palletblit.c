@@ -56,6 +56,8 @@ static inline float a_dither_flt(float input, uint32_t x, uint32_t y, int c, uin
 }
 #endif
 
+#if ADITHER_16
+
 static inline uint8_t a_dither4(uint8_t input, uint32_t x, uint32_t y, int c, uint16_t bits)
 {
 	// dither_line = (c*67*119 + y*236*119) ;
@@ -65,6 +67,11 @@ static inline uint8_t a_dither4(uint8_t input, uint32_t x, uint32_t y, int c, ui
 	uint8_t mask = ((x+c*67) + y * 236) * 119 & 255;
 	return MIN( (uint16_t)input + (mask>>bits), UINT8_MAX );
 
+	// what would be awesome to do is this:
+	//uint16_t v = input;
+	//v = (v << (8-bits)) + mask;
+	//v = v + ((v >> 1) & (1 << (7-bits))); // round to even
+	//return MIN( v >> (8-bits), UINT8_MAX);
 }
 
 void pallet_blit565_fallback(uint8_t * restrict dest, unsigned int dst_stride,
@@ -110,6 +117,132 @@ void pallet_blit555_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 		}
 	}
 }
+
+#else
+
+void pallet_blit565_fallback(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal)
+{
+	// dither tables from // http://stackoverflow.com/a/17438757
+	static const uint8_t dither_thresh_r[] = {
+		1, 7, 3, 5, 0, 8, 2, 6,
+		7, 1, 5, 3, 8, 0, 6, 2,
+		3, 5, 0, 8, 2, 6, 1, 7,
+		5, 3, 8, 0, 6, 2, 7, 1,
+		0, 8, 2, 6, 1, 7, 3, 5,
+		8, 0, 6, 2, 7, 1, 5, 3,
+		2, 6, 1, 7, 3, 5, 0, 8,
+		6, 2, 7, 1, 5, 3, 8, 0
+	};
+
+	static const uint8_t dither_thresh_g[] = {
+		1, 3, 2, 2, 3, 1, 2, 2,
+		2, 2, 0, 4, 2, 2, 4, 0,
+		3, 1, 2, 2, 1, 3, 2, 2,
+		2, 2, 4, 0, 2, 2, 0, 4,
+		1, 3, 2, 2, 3, 1, 2, 2,
+		2, 2, 0, 4, 2, 2, 4, 0,
+		3, 1, 2, 2, 1, 3, 2, 2,
+		2, 2, 4, 0, 2, 2, 0, 4
+	};
+
+	static const uint8_t dither_thresh_b[] = {
+		5, 3, 8, 0, 6, 2, 7, 1,
+		3, 5, 0, 8, 2, 6, 1, 7,
+		8, 0, 6, 2, 7, 1, 5, 3,
+		0, 8, 2, 6, 1, 7, 3, 5,
+		6, 2, 7, 1, 5, 3, 8, 0,
+		2, 6, 1, 7, 3, 5, 0, 8,
+		7, 1, 5, 3, 8, 0, 6, 2,
+		1, 7, 3, 5, 0, 8, 2, 6
+	};
+
+	for(size_t y = 0; y < h; y++) {
+		const uint16_t *restrict s = src + y*src_stride;
+		uint16_t *restrict d = (uint16_t *restrict)(dest + y*dst_stride);
+		
+		const uint8_t *line_dith_r = dither_thresh_r + (y%8)*8;
+		const uint8_t *line_dith_g = dither_thresh_b + (y%8)*8;
+		const uint8_t *line_dith_b = dither_thresh_g + (y%8)*8;
+
+		for(size_t x = 0; x < w; x++, s++, d++) {
+			uint32_t p = pal[s[0] >> 8];
+			//uint32_t p = pal[a_dither1(s[0], x, y, 8) >> 8];
+			//uint16_t b = p, g = p >> 8, r = p>>16;
+			uint16_t b = MIN(((p>>0)&0xff) + line_dith_b[x%8], UINT8_MAX), g = MIN(((p>>8)&0xff) + line_dith_g[x%8], UINT8_MAX), r = MIN(((p>>16)&0xff) + line_dith_r[x%8], UINT8_MAX);
+			b = b >> 3;
+			g = g << 3;
+			r = r << 8;
+			uint16_t px = (r&0xf800) + (g&0x07e0) + (b&0x001f);
+			*d = px;
+		}
+	}
+}
+
+void pallet_blit555_fallback(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal)
+{
+	static const uint8_t dither_thresh_r[] = {
+		0, 5, 1, 7, 0, 6, 2, 7,
+		2, 4, 3, 5, 2, 4, 3, 5,
+		0, 6, 1, 6, 1, 6, 1, 6,
+		2, 4, 3, 4, 3, 4, 3, 5,
+		0, 5, 1, 7, 0, 5, 2, 7,
+		2, 4, 3, 5, 2, 4, 3, 5,
+		1, 6, 1, 6, 1, 6, 1, 6,
+		2, 4, 3, 4, 2, 4, 3, 5
+	};
+
+	// TODO: find a better table for this green
+	static const uint8_t dither_thresh_g[] = {
+		2, 4, 3, 4, 2, 4, 3, 5,
+		6, 1, 6, 1, 6, 1, 6, 1,
+		3, 5, 2, 4, 3, 5, 2, 4,
+		7, 1, 5, 0, 7, 2, 5, 0,
+		3, 4, 3, 5, 2, 4, 3, 4,
+		6, 1, 6, 1, 6, 0, 6, 1,
+		3, 5, 2, 4, 3, 5, 2, 4,
+		7, 2, 6, 0, 7, 1, 5, 0
+	};
+
+	static const uint8_t dither_thresh_b[] = {
+		5, 1, 4, 0, 4, 1, 4, 0,
+		3, 6, 2, 5, 3, 6, 2, 5,
+		4, 1, 5, 2, 4, 0, 5, 1,
+		2, 6, 3, 7, 2, 6, 3, 7,
+		4, 1, 4, 0, 5, 1, 4, 0,
+		3, 6, 2, 5, 3, 6, 2, 6,
+		4, 1, 5, 1, 4, 1, 5, 2,
+		2, 6, 3, 7, 3, 6, 3, 7
+	};
+
+	for(size_t y = 0; y < h; y++) {
+		const uint16_t *restrict s = src + y*src_stride;
+		uint16_t *restrict d = (uint16_t *restrict)(dest + y*dst_stride);
+
+		const uint8_t *line_dith_r = dither_thresh_r + (y%8)*8;
+		const uint8_t *line_dith_g = dither_thresh_b + (y%8)*8;
+		const uint8_t *line_dith_b = dither_thresh_g + (y%8)*8;
+
+		for(size_t x = 0; x < w; x++, s++, d++) {
+			uint32_t p = pal[s[0] >> 8];
+			//uint32_t p = pal[a_dither1(s[0], x, y, 8) >> 8];
+			//uint16_t b = p, g = p >> 8, r = p>>16;
+			uint16_t b = MIN(((p>>0)&0xff) + line_dith_b[x%8], UINT8_MAX), g = MIN(((p>>8)&0xff) + line_dith_g[x%8], UINT8_MAX), r = MIN(((p>>16)&0xff) + line_dith_r[x%8], UINT8_MAX);
+			b = b >> 3;
+			g = g << 2;
+			r = r << 7;
+			uint16_t px = (r&0x7c00) + (g&0x03e0) + (b&0x001f);
+			*d = px;
+		}
+	}
+}
+
+#endif
 
 void pallet_blit8_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
