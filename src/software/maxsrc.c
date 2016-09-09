@@ -176,11 +176,15 @@ static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_s
 
 #define BLOCK_SIZE 8
 
-static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3])
+__attribute__((hot))
+static void zoom_task(size_t work_item_id, size_t span, uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3])
 {
+	const int ystart = work_item_id * span * BLOCK_SIZE;
+	const int yend   = IMIN(ystart + span * BLOCK_SIZE, (unsigned int)h);
+
 	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
-	float v0 = -1.0f;
-	for(int yd = 0; yd < h; yd+=BLOCK_SIZE) {
+	float v0 = -1.0f + work_item_id * span * vstep;
+	for(int yd = ystart; yd < yend; yd+=BLOCK_SIZE) {
 		float v1 = v0+vstep;
 
 		float x, y;
@@ -195,8 +199,8 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 			x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
 			y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
 		}
-		float x0 = fmaxf(fminf(x, 1.0f-FLT_EPSILON), 0.0f)*w*256;
-		float y0 = fmaxf(fminf(y, 1.0f-FLT_EPSILON), 0.0f)*h*256;
+		float x0 = fmaxf(fminf(x, 1.0f-FLT_EPSILON*2), 0.0f)*w*256;
+		float y0 = fmaxf(fminf(y, 1.0f-FLT_EPSILON*2), 0.0f)*h*256;
 
 		{	const float u = -1.0f, v = v1;
 			const float d = 0.95f + 0.053f*hypotf(u,v);
@@ -208,8 +212,8 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 			x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
 			y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
 		}
-		float x0s = (fmaxf(fminf(x, 1.0f-FLT_EPSILON), 0.0f)*w*256 - x0)/BLOCK_SIZE;
-		float y0s = (fmaxf(fminf(y, 1.0f-FLT_EPSILON), 0.0f)*h*256 - y0)/BLOCK_SIZE;
+		float x0s = (fmaxf(fminf(x, 1.0f-FLT_EPSILON*2), 0.0f)*w*256 - x0)/BLOCK_SIZE;
+		float y0s = (fmaxf(fminf(y, 1.0f-FLT_EPSILON*2), 0.0f)*h*256 - y0)/BLOCK_SIZE;
 
 		float u1 = -1.0f;
 		for(int xd = 0; xd < w; xd+=BLOCK_SIZE) {
@@ -225,8 +229,8 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 				x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
 				y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
 			}
-			const float x1 = fmaxf(fminf(x, 1.0f-FLT_EPSILON), 0.0f)*w*256;
-			const float y1 = fmaxf(fminf(y, 1.0f-FLT_EPSILON), 0.0f)*h*256;
+			const float x1 = fmaxf(fminf(x, 1.0f-FLT_EPSILON*2), 0.0f)*w*256;
+			const float y1 = fmaxf(fminf(y, 1.0f-FLT_EPSILON*2), 0.0f)*h*256;
 
 
 			{	const float u = u1, v = v1;
@@ -239,8 +243,8 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 				x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
 				y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
 			}
-			const float x1s = (fmaxf(fminf(x, 1.0f-FLT_EPSILON), 0.0f)*w*256 - x1)/BLOCK_SIZE;
-			const float y1s = (fmaxf(fminf(y, 1.0f-FLT_EPSILON), 0.0f)*h*256 - y1)/BLOCK_SIZE;
+			const float x1s = (fmaxf(fminf(x, 1.0f-FLT_EPSILON*2), 0.0f)*w*256 - x1)/BLOCK_SIZE;
+			const float y1s = (fmaxf(fminf(y, 1.0f-FLT_EPSILON*2), 0.0f)*h*256 - y1)/BLOCK_SIZE;
 
 			const float xsts = (x1s - x0s)/BLOCK_SIZE;
 			const float ysts = (y1s - y0s)/BLOCK_SIZE;
@@ -261,16 +265,10 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 					const uint32_t xi2 = IMIN(xi1+1,(uint32_t)(w-1));
 					const uint32_t yi2 = IMIN(yi1+w, (uint32_t)((h-1)*w));
 
-#if 0 // TODO: use top version if we don't have fast 64bit ints
 					// it is critical that this entire calculation be done as uint32s to avoid overflow
 					uint32_t tmp = ((in[yi1 + xi1]*(256u - xf) + in[yi1 + xi2]*xf)*(256u-yf) +
 								    (in[yi2 + xi1]*(256u - xf) + in[yi2 + xi2]*xf)*yf) >> 16u;
 					tmp = (tmp*((256u*97u)/100u)) >> 8u;
-#else
-					uint64_t tmp = ((in[yi1 + xi1]*(256u - xf) + in[yi1 + xi2]*xf)*(256u-yf) +
-								    (in[yi2 + xi1]*(256u - xf) + in[yi2 + xi2]*xf)*yf);
-					tmp = (tmp*((256u*97u)/100u)) >> 24u;
-#endif
 
 					out_line[xt] = (uint16_t)tmp;
 				}
@@ -282,3 +280,40 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 	}
 }
 
+#if NO_PARATASK
+
+__attribute__((hot))
+static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3]) {
+	zoom_task(0, h/BLOCK_SIZE, out, in, w, h, R);
+}
+
+#else
+
+#include "paratask/paratask.h"
+struct softmap_work_args {
+	void (*task_fn)(size_t work_item_id, size_t span, uint16_t *restrict out, uint16_t *restrict in, int w, int h, const float R[3][3]);
+	uint16_t *restrict out;
+	uint16_t *restrict in;
+	const float (*R)[3];
+	size_t span;
+	int w, h;
+};
+static void paratask_func(size_t work_item_id, void *arg_)
+{
+	struct softmap_work_args *a = arg_;
+	a->task_fn(work_item_id, a->span, a->out, a->in, a->w, a->h, a->R);
+}
+
+static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3])
+{
+	int span = 2;
+	struct softmap_work_args args = {
+		zoom_task,
+		out, in,
+		R,
+		span,
+		w, h
+	};
+	paratask_call(paratask_default_instance(), 0, h/(span*BLOCK_SIZE), paratask_func, &args);
+}
+#endif
