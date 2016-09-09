@@ -36,6 +36,7 @@ vis/software/x86/mmx.c \
 vis/software/x86/sse.c \
 vis/software/x86/sse2.c \
 vis/software/x86/sse4_1.c \
+vis/software/x86/avx2.c \
 vis/software/x86/palblit_mmxsse.h \
 vis/software/pixmisc.c \
 vis/software/pixmisc.h \
