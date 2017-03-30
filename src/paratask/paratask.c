@@ -7,10 +7,6 @@
 #include <malloc.h>
 #include <assert.h>
 
-#if defined(__linux__)
-#include <sys/prctl.h>
-#endif
-
 #include "paratask.h"
 
 // if we have c11 and gcc is new enough that it's not lying about thread support
@@ -27,7 +23,7 @@
 #	if __GNUC__ >= 4 && __GNUC_MINOR__ >= 7
 		// use the gcc built in equivelents of stdatomic funcs since we have them
 		typedef int memory_order;
-		typedef volatile size_t atomic_size_t;
+		typedef size_t atomic_size_t;
 #		define memory_order_relaxed __ATOMIC_RELAXED
 #		define memory_order_consume __ATOMIC_CONSUME
 #		define memory_order_acquire __ATOMIC_ACQUIRE
@@ -35,25 +31,20 @@
 #		define memory_order_acq_rel __ATOMIC_ACQ_REL
 #		define memory_order_seq_cst __ATOMIC_SEQ_CST
 #		define atomic_init(obj, v) __atomic_store_n(obj, v, __ATOMIC_SEQ_CST)
-#		define atomic_store(obj, v) __atomic_store(obj, v)
-#		define atomic_load(v) __atomic_load_n(v, __ATOMIC_SEQ_CST)
-#		define atomic_load_explicit(v, o) __atomic_load_n(v, o)
 #		define atomic_fetch_add_explicit(v, a, o) __atomic_fetch_add(v, a, o)
 #		pragma message "Using GCC memory model aware atomics"
 #	else
-	typedef volatile size_t atomic_size_t;
-	typedef enum {
-		memory_order_relaxed,
-		memory_order_consume,
-		memory_order_acquire,
-		memory_order_release,
-		memory_order_acq_rel,
-		memory_order_seq_cst
-	} memory_order;
+		typedef volatile size_t atomic_size_t;
+		typedef enum {
+			memory_order_relaxed,
+			memory_order_consume,
+			memory_order_acquire,
+			memory_order_release,
+			memory_order_acq_rel,
+			memory_order_seq_cst
+		} memory_order;
 #		define atomic_fetch_add_explicit(obj, arg, order) __sync_fetch_and_add((obj), (arg))
-#		define atomic_init(obj, init) do { *(obj) = (init); } while(0)
-#		define atomic_store(obj, v) do { *(obj) = (init); __sync_synchronize(); } while(0)
-#		define atomic_load_explicit(obj, order) *(obj)
+#		define atomic_init(obj, init) do { *(obj) = (init); __sync_synchronize(); } while(0)
 #		pragma message "Using GCC atomics (no memory model)"
 #	endif
 #else
@@ -88,16 +79,17 @@ struct paratask_task
 struct paratask_ctx
 {
 	int nthreads;       ///< number of threads in our pool
+	bool set_affinity;
 
 	mtx_t queue_mtx;
-	cnd_t queue_cnd;
+	cnd_t queue_cnd;    ///< used to signal worker threads to grab work, must hold queue_mtx
 
-	cnd_t shutdown_cnd;
-	int shutting_down;
-	int nthreads_alive;
-	
-	struct paratask_task *next_task;
-	struct paratask_task *last_task;
+	cnd_t shutdown_cnd; ///< used for signalling that worker threads have finished exiting
+	int shutting_down;  ///< if set worker threads should exit instead of grabbing work
+	int nthreads_alive; ///< number of worker threads that are currently active, unless we are starting up or shutting down should be equal to nthreads
+
+	struct paratask_task *next_task; ///< head of task queue
+	struct paratask_task *last_task; ///< tail of task queue
 
 	thrd_t threads[];   ///< all the threads in our pool
 };
@@ -114,7 +106,7 @@ struct paratask_ctx
  *       - would need some way to clean up first job properly in async case
  *
  * Maybe add support for 3 dimensional work item ids
- * 
+ *
  * If we detect number of cpus and have that many work threads we should
  * have each thread try to bind itself to a specific CPU
  *
@@ -141,18 +133,24 @@ static int default_thread_count(void);
 
 struct paratask_ctx *paratask_new(int nthreads)
 {
+	bool set_affinity = false;
 	if(nthreads == 0) {
 		nthreads = default_thread_count();
+		set_affinity = true;
 	} else if(nthreads < 0) {
 		nthreads = -nthreads;
 		int dflt = default_thread_count();
-		if(nthreads > dflt) nthreads = dflt;
+		if(nthreads > dflt) {
+			nthreads = dflt;
+			set_affinity = true;
+		}
 	}
 
-	struct paratask_ctx *self = malloc(sizeof(*self) + sizeof(thrd_t)*nthreads);
+	struct paratask_ctx *self = malloc(sizeof(*self) + sizeof(self->threads[0])*nthreads);
 	if(!self) return NULL;
 
 	self->nthreads = nthreads;
+	self->set_affinity = set_affinity;
 
 	mtx_init(&self->queue_mtx, mtx_plain);
 	cnd_init(&self->queue_cnd);
@@ -187,12 +185,12 @@ void paratask_delete(struct paratask_ctx *self)
 	// to keep paratask_wait() from having to walk it every time it runs...
 	// but if the number of tasks isn't too large that's probably not a problem
 	// would need to do something to deal with tasks from paratask_call() since it'll
-	// clean them up itself... and  we'll run into problems with it thinking 
+	// clean them up itself... and  we'll run into problems with it thinking
 
 
 	// NOTE:
 	// Could set task->work_complete to -1 on all tasks in queue, any active ones
-	// should finish before the thread running them exists anyway
+	// should finish before the thread running them exits anyway
 	// then we have paratask_call() and paratask_wait() return an error code
 	// that indicates the pool shut down and their work wasn't done.
 
@@ -329,7 +327,7 @@ static void clear_task(struct paratask_task *task)
 static size_t next_work_item(struct paratask_task *task)
 {
 	size_t work_item_id;
-	
+
 #if PARATASK_NO_ATOMICS
 	mtx_lock(&task->work_id_mtx);
 	work_item_id = task->next_work_id++;
@@ -340,19 +338,19 @@ static size_t next_work_item(struct paratask_task *task)
 	return work_item_id;
 }
 
+static void set_thread_name(int thread_num);
+static void paratsk_set_thread_affinity(int thread_num);
+
 static int task_thread(void *ctx)
 {
 	struct paratask_ctx *self = ctx;
 	mtx_lock(&self->queue_mtx);
-	self->nthreads_alive++;
+	int thread_num = self->nthreads_alive++;
 
-	char thread_name[16];
-	sprintf(thread_name, "paratsk-%04d", self->nthreads_alive);
-#if defined(__linux__)
-	prctl(PR_SET_NAME, thread_name);
-//#elif defined(__APPLE__) && defined(__MACH__)
-//	pthread_setname_np(thread_name);
-#endif
+	set_thread_name(thread_num);
+
+	if(self->set_affinity)
+		paratsk_set_thread_affinity(thread_num);
 
 	while(1) {
 		while(!self->next_task && !self->shutting_down) {
@@ -400,7 +398,7 @@ static int task_thread(void *ctx)
 		if(thrd_success != cnd_signal(&self->shutdown_cnd)) abort(); // failure here will almost certainly stall the main thread
 	}
 	mtx_unlock(&self->queue_mtx);
-	
+
 	return 0;
 }
 
@@ -409,14 +407,55 @@ static int task_thread(void *ctx)
 # include <windows.h>
 #elif defined(__linux__)
 #include <sched.h>
+#include <sys/prctl.h>
 #elif defined(__NetBSD__)
 #include <sched.h>
 #include <sys/param.h>
 #endif
 
-//TODO: add setting affinity mask in worker threads so that they all
-// stick to just one CPU, but only if nthreads was set to default to number
-// of cores
+static void set_thread_name(int thread_num)
+{
+	char thread_name[16];
+	sprintf(thread_name, "paratsk-%04d", thread_num);
+#if defined(__linux__)
+	prctl(PR_SET_NAME, thread_name);
+
+//#elif defined(__APPLE__) && defined(__MACH__)
+//	pthread_setname_np(thread_name);
+#endif
+}
+
+static void paratsk_set_thread_affinity(int thread_num)
+{
+#if (defined(_WIN32) || defined(__WIN32__)) && !defined(__CYGWIN__)
+	DWORD_PTR process_mask;
+	DWORD_PTR system_mask;
+	if(GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask)) {
+		DWORD_PTR mask = process_mask;
+		//FIXME: write windows support
+	}
+#elif defined(__linux__) //exists in glibc >= 2.3.4 and in musl, Linux specific syscalls
+	cpu_set_t set; //NOTE: will fail on systems with a huge number of cores (>1024), but this probably won't scale to that anyway
+	if(sched_getaffinity(0, sizeof(set), &set) == 0) {
+		int count = 0;
+		for(size_t i=0; i<CPU_SETSIZE; i++) {
+			if(CPU_ISSET(i, &set)) {
+				if(count == thread_num) {
+					cpu_set_t newset;
+					CPU_ZERO(&newset);
+					CPU_SET(i, &newset);
+					sched_setaffinity(0, sizeof(newset), &newset); // we can't really do anything if this fails so just ignore that
+					return;
+				}
+				count++;
+			}
+		}
+	}
+//#elif defined(__NetBSD__)
+	//TODO: NetBSD >= 5 support via sched_getaffinity_np
+#endif
+}
+
 static int default_thread_count(void)
 {
 #if (defined(_WIN32) || defined(__WIN32__)) && !defined(__CYGWIN__)
@@ -430,7 +469,7 @@ static int default_thread_count(void)
 		return count;
 	}
 #elif defined(__linux__) //exists in glibc >= 2.3.4 and in musl, Linux specific syscalls
-	cpu_set_t set; //NOTE: will fail on systems with a huge number of cores
+	cpu_set_t set; //NOTE: will fail on systems with a huge number of cores (>1024), but this probably won't scale to that anyway
 	if(sched_getaffinity(0, sizeof(set), &set) == 0) {
 #ifdef CPU_COUNT
 		return CPU_COUNT(&set);
@@ -448,6 +487,6 @@ static int default_thread_count(void)
 	int count = sysconf(_SC_NPROCESSORS_ONLN);
 	return count;
 #endif
-   return 1; // if we can't get anything just guess
+   return 2; // if we can't get anything just guess
 }
 
