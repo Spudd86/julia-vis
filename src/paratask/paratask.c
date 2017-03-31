@@ -114,6 +114,24 @@ struct paratask_ctx
  * thread.
  */
 
+/* TODO: pair the task->idle_cnd condition variable with a new mutex that lives
+ * inside the task, this would have to be held when modifying task->work_complete and task->nthreads_working
+ * because those are used in the loop around the wait()
+ * This means that during shut-down we have to walk the queue, and for each task
+ * lock it's mutex, set work_complete to something non-zero, and unlock the task's
+ * mutex. 
+ * 
+ * This would mean that paratask_wait() could work without touching the main context.
+ * The downside is that we have to be careful about lock orders, anything that might need
+ * the queue_mtx would have to grab it before locking the task and there aren't many places
+ * you could release the queue mutex first.
+ * The massive upside is that we don't have to clean up tasks, either the caller leaks them or
+ * calls paratask_wait() and they get cleaned up then.
+ *
+ * We may also need to keep a list of 'retired' but not yet collected tasks somewhere
+ * this would be annoying because it would have to be a double linked list
+ */
+
 once_flag default_instance_once_flag = ONCE_FLAG_INIT;
 static struct paratask_ctx *default_instance = NULL;
 static void create_default_instance(void) { default_instance = paratask_new(0); }
@@ -216,17 +234,15 @@ void paratask_delete(struct paratask_ctx *self)
 
 int paratask_call(struct paratask_ctx *self, size_t work_offset, size_t work_size, paratask_task_fn fn, void *arg)
 {
-	// NOTE: this is not actually conformant to C11, C11 doesn't require that
-	// you have a full shared address space so things that live on the call stack
-	// are allowed to not be addressable on other threads.
-	// Maybe fix that, maybe not, since I don't know of any implementation
-	// that actually doesn't allow you to address another thread's stack
-	struct paratask_task task;
+	struct paratask_task *task = malloc(sizeof(*task));
+	if(!task) return -1;
 
 	mtx_lock(&self->queue_mtx);
-	launch_task(self, &task, work_offset, work_size, fn, arg);
-	task_wait(&task);
+	launch_task(self, task, work_offset, work_size, fn, arg);
+	task_wait(task);
 	mtx_unlock(&self->queue_mtx);
+
+	free(task);
 
 	return 0;
 }
@@ -286,6 +302,7 @@ static void launch_task(struct paratask_ctx *self, struct paratask_task *task, s
 		assert(self->last_task == NULL);
 		self->next_task = self->last_task = task;
 	} else {
+		assert(self->last_task);
 		self->last_task->next_task = task;
 		self->last_task = task;
 	}
@@ -370,12 +387,12 @@ static int task_thread(void *ctx)
 
 		task->nthreads_working++;
 
+		mtx_unlock(&self->queue_mtx);
+
 		size_t global_work_offset = task->work_offset;
 		size_t global_work_size = task->work_size;
 		paratask_task_fn work_func = task->func;
 		void *work_fn_arg = task->fn_arg;
-
-		mtx_unlock(&self->queue_mtx);
 
 		while(1) {
 			size_t work_item_id = next_work_item(task);
