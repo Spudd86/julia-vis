@@ -1,4 +1,4 @@
-#if (__x86_64__ || __i386__)
+#if (__x86_64__ || __i386__)  && !defined(DISABLE_X86_INTRIN)
 
 #include "common.h"
 #include "x86_features.h"
@@ -38,14 +38,14 @@ int cpuid(unsigned int level, unsigned int *eax, unsigned int *ebx, unsigned int
 static inline unsigned long read_cr0(void)
 {
 	unsigned long val;
-	asm volatile ( "mov %%cr0, %0" : "=r"(val) );
+	__asm__ volatile ( "mov %%cr0, %0" : "=r"(val) );
 	return val;
 }
 
 static inline unsigned long read_cr4(void)
 {
     unsigned long val;
-    asm volatile ( "mov %%cr4, %0" : "=r"(val) );
+    __asm__ volatile ( "mov %%cr4, %0" : "=r"(val) );
     return val;
 }
 #endif
@@ -56,16 +56,18 @@ uint64_t x86feat_get_features(void)
 
 	//TODO: environment variable to force disable detecting various features
 	//TODO: detect OS support for features (mostly newer ones...)
-	bool os_xsave = false, os_fxsr = false;
+	bool os_xsave = false;
 	unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
-    if (!cpuid (1, &eax, &ebx, &ecx, &edx)) return 0;
+	if (!cpuid (1, &eax, &ebx, &ecx, &edx)) return 0;
 
-    // check OSFXSR, MP and EM flags, need OSFXSR and MP to be 1 and EM to be 0 or sse instructions will cause illegal instruction
-    os_xsave = !!(ecx & (1 << 27)); // os using the XSAVE to save context
+	// check OSFXSR, MP and EM flags, need OSFXSR and MP to be 1 and EM to be 0 or sse instructions will cause illegal instruction
+	// unfortunately there doesn't seem to be a way to get at any of that information outside ring 0
 
-    if(edx & (1 << 23)) features |= X86FEAT_MMX;
-    if(edx & (1 << 25)) features |= X86FEAT_MMXEXT; // MMXEXT is a subset of SSE, AMD only though
-    if(edx & (1 << 24)) { // fxsr
+	os_xsave = !!(ecx & (1 << 27)); // os using the XSAVE to save context
+
+	if(edx & (1 << 23)) features |= X86FEAT_MMX;
+	if(edx & (1 << 25)) features |= X86FEAT_MMXEXT; // MMXEXT is a subset of SSE, AMD only though
+	if(edx & (1 << 24)) { // fxsr os support needed
 	    if(edx & (1 << 25)) features |= X86FEAT_SSE;
 	    if(edx & (1 << 26)) features |= X86FEAT_SSE2;
 	    if(ecx & (1 <<  0)) features |= X86FEAT_SSE3;

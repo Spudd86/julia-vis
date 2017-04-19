@@ -126,7 +126,7 @@ void optproc(int argc, char **argv, opt_data *res)
 			case 'b':
 				res->backend_opts = strdup(optarg);
 				break;
-#ifdef USE_GL
+#if 1// USE_GL
 			case 'g':
 				res->gl_opts = strdup(optarg);
 				break;

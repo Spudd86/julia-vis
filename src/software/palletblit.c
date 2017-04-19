@@ -18,6 +18,55 @@
 //TODO: find a way to do approximate gamma correct colour interpolation
 // http://chilliant.blogspot.ca/2012/08/srgb-approximations-for-hlsl.html
 
+
+void pallet_blit_101010_fallback(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal)
+{
+#if ALLOW_101010_PAL
+	for(unsigned int y = 0; y < h; y++) {
+		uint32_t * restrict d = (uint32_t *restrict)(dest + y*dst_stride);
+		const uint16_t *restrict s = src + y*src_stride;
+		for(unsigned int x = 0; x < w; x++) {
+			uint16_t v = *(s++);
+			const uint32_t *p = (pal + (v>>8));
+			const uint32_t p0 = (p[0] >>  0) & 0x3ff;
+			const uint32_t p1 = (p[0] >> 10) & 0x3ff;
+			const uint32_t p2 = (p[0] >> 20) & 0x3ff;
+			const uint32_t p4 = (p[1] >>  0) & 0x3ff;
+			const uint32_t p5 = (p[1] >> 10) & 0x3ff;
+			const uint32_t p6 = (p[1] >> 20) & 0x3ff;
+
+			v = v & 0xff;
+
+			const uint32_t db0 = (p0*(256-v) + p4*v) >> 8;
+			const uint32_t db1 = (p1*(256-v) + p5*v) >> 8;
+			const uint32_t db2 = (p2*(256-v) + p6*v) >> 8;
+
+			*(d++) = (db0 <<  0) + (db1 << 10) + (db2 << 20);
+		}
+	}
+#else
+	for(unsigned int y = 0; y < h; y++) {
+		uint32_t * restrict d = (uint32_t *restrict)(dest + y*dst_stride);
+		const uint16_t *restrict s = src + y*src_stride;
+		for(unsigned int x = 0; x < w; x++) {
+			uint16_t v = *(s++);
+			const uint8_t *p = (const uint8_t *)(pal + (v>>8));
+
+			v = v & 0xff;
+
+			const uint32_t db0 = ((uint16_t)p[0]*(256-v) + (uint16_t)p[4]*v) >> 8;
+			const uint32_t db1 = ((uint16_t)p[1]*(256-v) + (uint16_t)p[5]*v) >> 8;
+			const uint32_t db2 = ((uint16_t)p[2]*(256-v) + (uint16_t)p[6]*v) >> 8;
+
+			*(d++) = (db0 <<  0) + (db1 << 10) + (db2 << 20);
+		}
+	}
+#endif
+}
+
 void pallet_blit32_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h,
@@ -256,7 +305,7 @@ void pallet_blit8_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 	}
 }
 
-#if (__x86_64__ || __i386__)
+#if (__x86_64__ || __i386__) && !defined(DISABLE_X86_INTRIN)
 
 #include "x86/x86_features.h"
 
@@ -349,7 +398,8 @@ static void pallet_blit32_dispatch(uint8_t * restrict dest, unsigned int dst_str
 #endif
 	if(feat & X86FEAT_SSE) pallet_blit32 = pallet_blit32_sse;
 	if(feat & X86FEAT_SSE2) pallet_blit32 = pallet_blit32_sse2;
-	if(feat & X86FEAT_AVX2) pallet_blit32 = pallet_blit32_avx2;
+	//if(feat & X86FEAT_SSSE3) pallet_blit32 = pallet_blit32_ssse3; // interpolates backwards right now, needs fixing
+	//if(feat & X86FEAT_AVX2) pallet_blit32 = pallet_blit32_avx2;
 
 	pallet_blit32(dest, dst_stride, src, src_stride, w, h, pal);
 }

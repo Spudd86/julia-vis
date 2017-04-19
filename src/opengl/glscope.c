@@ -5,6 +5,8 @@
  * reflects where this whole thing came from (the "superscope" from AVS)
  */
 
+//TODO: maybe pass through a Polyline Decimation before generating vertices http://geomalgorithms.com/a16-_decimate-1.html
+
 #include "common.h"
 #include "audio/audio.h"
 #include "glmisc.h"
@@ -50,8 +52,10 @@ struct glscope_ctx {
 	int samp;
 	float pw, ph;
 
-	GLfloat sco_verts[128*8*4];
-	uint16_t sco_ind[8*128 + 2*(128-1)];
+	GLfloat *sco_verts;
+
+	size_t nidx;
+	uint16_t *sco_ind;
 };
 
 struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean force_fixed)
@@ -83,8 +87,7 @@ struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean
 		CHECK_GL_ERR;
 	}
 
-
-	GLfloat *sco_verts = ctx->sco_verts;
+	GLfloat *sco_verts = ctx->sco_verts = malloc(sizeof(*sco_verts)*ctx->samp*8*4);
 	for(int i=0; i<ctx->samp; i++) {
 		sco_verts[(i*8+0)*4+0] = 0; sco_verts[(i*8+0)*4+1] = 2;
 		sco_verts[(i*8+1)*4+0] = 0; sco_verts[(i*8+1)*4+1] = 0;
@@ -97,12 +100,12 @@ struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean
 	}
 
 	// Now build the index data
-	int nstrips = ctx->samp;
-	int ndegenerate = 2 * (nstrips - 1);
-	int verts_per_strip = 8;
-	int total_verts = verts_per_strip*nstrips + ndegenerate;
+	size_t nstrips = ctx->samp;
+	size_t ndegenerate = 2 * (nstrips - 1);
+	size_t verts_per_strip = 8;
+	size_t total_verts = ctx->nidx = verts_per_strip*nstrips + ndegenerate;
 
- 	uint16_t *idx_buf = ctx->sco_ind;
+ 	uint16_t *idx_buf = ctx->sco_ind = malloc(sizeof(*idx_buf)*total_verts);
 	for(size_t i = 0, offset = 0; i < nstrips; i++) {
 		if(i > 0) { // Degenerate begin: repeat first vertex
 			idx_buf[offset++] = i*verts_per_strip;
@@ -122,8 +125,8 @@ struct glscope_ctx *gl_scope_init(int width, int height, int num_samp, GLboolean
 void render_scope(struct glscope_ctx *ctx, float R[3][3], const float *data, int len)
 {
 	// do the rotate/project ourselves because the GL matrix won't do the right
-	// thing if we just send it our verticies, we want wour tris to always be
-	// parrallel to the view plane, because we're actually drawing a fuzzy line
+	// thing if we just send it our vertices, we want our tris to always be
+	// parallel to the view plane, because we're actually drawing a fuzzy line
 	// not a 3D object
 	// also it makes it easier to match the software implementation
 
@@ -184,7 +187,7 @@ void render_scope(struct glscope_ctx *ctx, float R[3][3], const float *data, int
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	glTexCoordPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts);
 	glVertexPointer(2, GL_FLOAT, sizeof(float)*4, sco_verts + 2);
-	glDrawRangeElements(GL_TRIANGLE_STRIP, 0, samp*8, 8*samp + 2*(samp-1), GL_UNSIGNED_SHORT, ctx->sco_ind); // core since GL 1.2
+	glDrawRangeElements(GL_TRIANGLE_STRIP, 0, samp*8, ctx->nidx, GL_UNSIGNED_SHORT, ctx->sco_ind); // core since GL 1.2
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 

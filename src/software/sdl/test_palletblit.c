@@ -51,8 +51,8 @@ int main(int argc, char **argv)
 	}
 	uint16_t fillstep = UINT16_MAX/im_h;
 	uint16_t fillcur = 0;
-	for(size_t y = 0; y < im_h; y++, fillcur+=fillstep) {
-		for(size_t x = 0; x < im_w; x++) {
+	for(int y = 0; y < im_h; y++, fillcur+=fillstep) {
+		for(int x = 0; x < im_w; x++) {
 			blit_srcs[0][y*im_w + x] = fillcur - ((x*fillcur)/im_w);
 			blit_srcs[1][y*im_w + x] = (x*UINT16_MAX)/im_w;
 			blit_srcs[2][y*im_w + x] = (y*UINT16_MAX)/im_h;
@@ -108,7 +108,7 @@ int main(int argc, char **argv)
 			else if(event.key.keysym.sym==SDLK_RIGHT && !lastframe_key) cur_pal = (cur_pal + 1) % NUM_PAL;
 			else if(event.key.keysym.sym==SDLK_DOWN && !lastframe_key) cur_src = (cur_src + NUM_SRC-1) % NUM_SRC;
 			else if(event.key.keysym.sym==SDLK_UP && !lastframe_key) cur_src = (cur_src + 1) % NUM_SRC;
-			else if(event.key.keysym.sym=SDLK_F1 && !lastframe_key) show_info = !show_info;
+			else if(event.key.keysym.sym==SDLK_F1 && !lastframe_key) show_info = !show_info;
 			lastframe_key = 1;
 		} else {
 			lastframe_key = 0;

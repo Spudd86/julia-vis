@@ -168,11 +168,13 @@ void optproc(int argc, char **argv, opt_data *res);
 
 static inline void *xmalloc(size_t s) { void *res = malloc(s); if(!res) abort(); return res; }
 
+#if 0
 #define pbattr restrict __attribute__((aligned (16)))
 typedef uint16_t * restrict __attribute__ ((aligned (16)))  pixbuf_t;
 
 typedef struct {
 	uint16_t w, h;
 } ivec;
+#endif
 
 #endif

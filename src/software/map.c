@@ -1,5 +1,7 @@
 //#pragma GCC optimize "inline-functions,unsafe-loop-optimizations,merge-all-constants,fast-math,associative-math,reciprocal-math,no-signed-zeros"
+#ifndef DEBUG
 #pragma GCC optimize "3,inline-functions,fast-math,associative-math,reciprocal-math,no-signed-zeros"
+#endif
 
 #include "common.h"
 #include "map.h"
@@ -7,6 +9,12 @@
 #include <float.h>
 #include <assert.h>
 
+// thee asserts in this file really are slow because they are on the inner loop
+#ifdef DEBUG
+#define map_assert(a) assert(a)
+#else
+#define map_assert(a)
+#endif
 #define BLOCK_SIZE 8
 
 // could probably make map fly with AVX2
@@ -26,6 +34,7 @@
 
 //TODO: streaming writes?
 
+__attribute__((hot))
 static inline uint16_t bilin_samp(uint16_t *restrict in, int w, int h, float x, float y)
 {
 	// Conversion to int truncates, which in this case is exactly what we want

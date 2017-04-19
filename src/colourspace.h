@@ -1,7 +1,7 @@
 #ifndef COLOURSPACE_H__
 #define COLOURSPACE_H__ 1
 
-static float linearize(float c)
+static inline float linearize(float c)
 {
 	c = c/255.0f; // normalise range
 	if(c <= 0.04045f) c = c/12.92f;
@@ -10,7 +10,7 @@ static float linearize(float c)
 	return c;
 }
 
-static float gamma_curve(float c)
+static inline float gamma_curve(float c)
 {
 	//c = c/255.0f; // normalise range
 	if(c <= 0.0031308f) c *= 12.92f;
@@ -34,7 +34,7 @@ typedef union {
 	float v[3];
 } colourf;
 
-static colourf rgb2xyz(colourf col)
+static inline colourf rgb2xyz(colourf col)
 {
 	static const float m[3][3] = {
 		{0.412383f, 0.357585f, 0.18048f},
@@ -51,7 +51,7 @@ static colourf rgb2xyz(colourf col)
 	return r;
 }
 
-static colourf xyz2rgb(colourf col)
+static inline colourf xyz2rgb(colourf col)
 {
 	static const float m[3][3] = {
 		{ 3.24103f,  -1.53741f, -0.49862f},
@@ -69,7 +69,7 @@ static colourf xyz2rgb(colourf col)
 	return r;
 }
 
-static colourf xyz2Lab(colourf col)
+static inline colourf xyz2Lab(colourf col)
 {
 	colourf r;
 	float X = col.x / 95.047f;
@@ -90,7 +90,7 @@ static colourf xyz2Lab(colourf col)
 	return r;
 }
 
-static colourf Lab2xyz(colourf col)
+static inline colourf Lab2xyz(colourf col)
 {
 	colourf r;
 	float Y = (col.L + 16.0f)/116.0f;
@@ -111,7 +111,7 @@ static colourf Lab2xyz(colourf col)
 	return r;
 }
 
-static colourf xyz2luv(colourf col)
+static inline colourf xyz2luv(colourf col)
 {
 	//const float uref = 4*0.31271f/(-2*0.31271f - 12*0.32902f + 3);
 	//const float vref = 9*0.32902f/(-2*0.31271f - 12*0.32902f + 3);
@@ -138,7 +138,7 @@ static colourf xyz2luv(colourf col)
 	return r;
 }
 
-static colourf luv2xyz(colourf col)
+static inline colourf luv2xyz(colourf col)
 {
 	//const float uref = 4*0.31271f/(-2*0.31271f - 12*0.32902f + 3);
 	//const float vref = 9*0.32902f/(-2*0.31271f - 12*0.32902f + 3);
@@ -163,35 +163,35 @@ static colourf luv2xyz(colourf col)
 	return r;
 }
 
-static colourf rgb2luv(colourf c)
+static inline colourf rgb2luv(colourf c)
 {
 	c = rgb2xyz(c);
 	c = xyz2luv(c);
 	return c;
 }
 
-static colourf luv2rgb(colourf c)
+static inline colourf luv2rgb(colourf c)
 {
 	c = luv2xyz(c);
 	c = xyz2rgb(c);
 	return c;
 }
 
-static colourf rgb2Lab(colourf c)
+static inline colourf rgb2Lab(colourf c)
 {
 	c = rgb2xyz(c);
 	c = xyz2Lab(c);
 	return c;
 }
 
-static colourf Lab2rgb(colourf c)
+static inline colourf Lab2rgb(colourf c)
 {
 	c = Lab2xyz(c);
 	c = xyz2rgb(c);
 	return c;
 }
 
-static colourf make_linear(uint8_t r, uint8_t g, uint8_t b)
+static inline colourf make_linear(uint8_t r, uint8_t g, uint8_t b)
 {
 	colourf c;
 	c.r = linearize(r);

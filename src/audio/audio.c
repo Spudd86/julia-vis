@@ -77,12 +77,13 @@ static float *fft_tmp = NULL;
 
 static tribuf *samp_tb = NULL;
 
-static beat_ctx *gbl_beat_ctx = NULL;
+static struct beat_ctx *gbl_beat_ctx = NULL;
 
 int audio_get_buf_count(void) {
 	return buf_count;
 }
 int beat_get_count(void) {
+	//FIXME: not thread safe...
 	return beat_ctx_count(gbl_beat_ctx);
 }
 
@@ -128,7 +129,6 @@ static float *do_fft(float *in1, float *in2)
 	return fft;
 }
 
-// TODO: double check correctness
 void audio_update(const float *in, int n)
 {
 	static int bufp = 0;

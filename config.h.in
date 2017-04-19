@@ -1,5 +1,11 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
+/* Define to 1 if debug code should be enabled */
+#undef DEBUG
+
+/* Define to 1 to disable use x86 vector intrinsics */
+#undef DISABLE_X86_INTRIN
+
 /* Define if we have egl */
 #undef HAVE_EGL
 
@@ -89,6 +95,9 @@
 
 /* Define to 1 if the system has the type `_Bool'. */
 #undef HAVE__BOOL
+
+/* Define to 1 if assertions should be disabled. */
+#undef NDEBUG
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT

@@ -49,14 +49,9 @@
 #if __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_ATOMICS__) && !defined(TB_NO_ATOMIC)
 #	define TB_STDATOMIC 1
 #	include <stdatomic.h>
-// use relaxed order for when the exchange fails
-#	define tb_comp_xchng(a, e, n, order) \
-		atomic_compare_exchange_weak_explicit(a, e, n, \
-			       order, \
-			       memory_order_relaxed)
-#	define tb_atomic_inc(x) do { atomic_fetch_add_explicit(a, 1, memory_order_relaxed); } while(0)
+#	pragma message "Using C11 atomics"
 #elif defined(__GNUC__) && !defined(TB_NO_ATOMIC)
-#	if __GNUC__ >= 4 && __GNUC_MINOR__ >= 7
+#	if 0 //__GNUC__ >= 4 && __GNUC_MINOR__ >= 7
 		// use the gcc built in equivelents of stdatomic funcs since we have them
 		typedef int memory_order;
 		typedef uint_fast16_t atomic_uint_fast16_t;
@@ -70,9 +65,8 @@
 #		define atomic_init(obj, v) __atomic_store_n(obj, v, __ATOMIC_SEQ_CST)
 #		define atomic_load(v) __atomic_load_n(v, __ATOMIC_SEQ_CST)
 #		define atomic_load_explicit(v, o) __atomic_load_n(v, o)
-#		define tb_comp_xchng(a, e, n, order) \
-			__atomic_compare_exchange_n(a, e, n, 1, order, __ATOMIC_RELAXED)
-#		define tb_atomic_inc(x) __atomic_fetch_add(x, 1, __ATOMIC_RELAXED)
+#		define atomic_compare_exchange_weak_explicit(a, e, n, order, order2) __atomic_compare_exchange_n((a), (e), (n), 1, (order), (order2))
+#		pragma message "Using gcc __atomic_* builtins for atomic ops"
 #	else
 		typedef enum {
 			memory_order_relaxed,
@@ -82,27 +76,16 @@
 			memory_order_acq_rel,
 			memory_order_seq_cst
 		} memory_order;
-		typedef uint_fast16_t atomic_uint_fast16_t;
-		typedef uint_fast32_t atomic_uint_fast32_t;
+
+		typedef volatile uint_fast16_t atomic_uint_fast16_t;
+		typedef volatile uint_fast32_t atomic_uint_fast32_t;
 
 		//TODO: something that works off x86
-#		define atomic_init(obj, v) do { *obj = v; } while(0)
+#		define atomic_init(obj, v) do { *(obj) = (v); } while(0)
 #		define atomic_load(v) (*(v))
 #		define atomic_load_explicit(v, o) (*(v))
-		//#	define tb_comp_xchng(a, e, n, o) __sync_bool_compare_and_swap(a, *e, n)
-		static inline bool tb_comp_xchng(uint_fast16_t *a, uint_fast16_t *e, uint_fast16_t n, memory_order o)
-		{
-			(void)o;
-		//	return __sync_bool_compare_and_swap(a, *e, n);
-			uint_fast16_t t = __sync_val_compare_and_swap(a, *e, n);
-			if(t != *e) {
-				*e = t;
-				return 0;
-			}
-			return 1;
-		}
-#		define tb_atomic_inc(x) do { __sync_add_and_fetch(x, 1); } while(0)
-#		warning "Using gcc __sync_* builtins for atomic ops"
+#		define atomic_compare_exchange_weak_explicit(a, e, n, order, order2) __sync_bool_compare_and_swap(a, *(e), n)
+#		pragma message "Using gcc __sync_* builtins for atomic ops"
 #	endif
 #else
 #	define atomic_init(obj, v) do { *(obj) = (v); } while(0)
@@ -112,8 +95,11 @@
 #	endif
 #endif
 
+
+// if we have c11 and gcc is new enough that it's not lying about thread support
+// use real C11 threads
 #if defined(TB_DEBUG_USER) || defined(TB_NO_ATOMIC)
-# if __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_THREADS__) && !defined(TB_NO_STDC_THREADS)
+# if (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__) && (defined(__clang__) || !(defined(__GNUC__) && defined(__GNUC_MINOR__) && (((__GNUC__ << 8) | __GNUC_MINOR__) >= ((4 << 8) | 9))))
 #	include <threads.h>
 	typedef mtx_t tb_mutex;
 	static inline void tb_lock(tb_mutex *m) {
@@ -146,14 +132,14 @@
 	static inline void tb_lock(tb_mutex *m) {
 		int r = pthread_mutex_lock(m);
 		if(r) {
-			error(0, r, "TRIBUF LOCK FAILED!");
+			//error(0, r, "TRIBUF LOCK FAILED!");
 			abort();
 		}
 	}
 	static inline int tb_trylock(tb_mutex *m) {
 		int r = pthread_mutex_trylock(m);
 		if(r && r != EBUSY) {
-			error(0, r, "TRIBUF TRYLOCK FAILED!");
+			//error(0, r, "TRIBUF TRYLOCK FAILED!");
 			abort();
 		}
 		return !r;
@@ -161,7 +147,7 @@
 	static inline void tb_unlock(tb_mutex *m) {
 		int r = pthread_mutex_unlock(m);
 		if(r) {
-			error(0, r, "TRIBUF UNLOCK FAILED!");
+			//error(0, r, "TRIBUF UNLOCK FAILED!");
 			abort();
 		}
 	}
@@ -344,7 +330,7 @@ void tribuf_finish_write(tribuf *tb)
 	active.v = atomic_load_explicit(&tb->active, memory_order_consume);
 	do {
 		f = do_finish_write(active);
-	} while(!tb_comp_xchng(&tb->active, &active.v, f.v, memory_order_release));
+	} while(!atomic_compare_exchange_weak_explicit(&tb->active, &active.v, f.v, memory_order_release, memory_order_relaxed));
 }
 
 void* tribuf_get_read(tribuf *tb)
@@ -353,7 +339,7 @@ void* tribuf_get_read(tribuf *tb)
 	active.v = atomic_load_explicit(&tb->active, memory_order_consume);
 	do {
 		f = do_get_read(active);
-	} while(!tb_comp_xchng(&tb->active, &active.v, f.v, memory_order_acquire));
+	} while(!atomic_compare_exchange_weak_explicit(&tb->active, &active.v, f.v, memory_order_acquire, memory_order_relaxed));
 
 	user_debug_lock(tb, read);
 

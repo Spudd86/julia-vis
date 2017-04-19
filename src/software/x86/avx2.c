@@ -1,6 +1,13 @@
-#if (__x86_64__ || __i386__)
+#if (__x86_64__ || __i386__) && !defined(DISABLE_X86_INTRIN)
 #pragma GCC target("avx2,no-avx512f")
+
+#ifndef DEBUG
 #pragma GCC optimize "3,inline-functions,merge-all-constants"
+// need to shut gcc up about casting away const in normal builds because
+// some of the intrinsics that REALLY ought to take const pointer don't
+// (mostly _mm_stream_load_si128())
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#endif
 
 #include "common.h"
 #include "../pixmisc.h"
@@ -17,7 +24,7 @@
 __attribute__((hot))
 void maxblend_avx2(void *restrict dest, const void *restrict src, int w, int h)
 {
-	__m256i * restrict mbdst = dest; const __m256i * restrict mbsrc = src;
+	__m256i * restrict mbdst = dest; __m256i * restrict mbsrc = (__m256i *)src;
 	const size_t npix = (size_t)w*(size_t)h;
 	for(size_t i=0; i < npix; i+=128, mbdst+=8, mbsrc+=8) { // can step 128 because w%16 == 0 && h%16 == 0 -> (w*h)%256 == 0 
 		_mm256_stream_si256(mbdst + 0, _mm256_max_epu16(_mm256_stream_load_si256(mbdst + 0), _mm256_stream_load_si256(mbsrc + 0)));
@@ -120,8 +127,10 @@ void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
 
 
 	for(size_t y = 0; y < h; y++) {
-		const uint16_t *restrict s = src + y*w; // for some reason actually using src_sride is a lot slower (like 10FPS) maybe because it's doing a transformation of some kind...
+		const uint16_t *restrict s = src + y*w;
 		_mm_prefetch(s, _MM_HINT_NTA);
+
+		//__m128i old_stream;
 
 		uint32_t *restrict d = (uint32_t *restrict)(dest + y*dst_stride);
 		size_t x = 0;
@@ -133,16 +142,18 @@ void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
 			__m128i col0, col1, col2, col3, ind1, ind2, v;
 			__m256i res, c0, c1, c2, c3, t, v1, v2, v1s, v2s;
 
-			v = _mm_stream_load_si128((__m128i *)s); // can stream load here because it's our buffer and the start of a line is always aligned
+			// can stream load here because it's our buffer and the start of a line is always aligned
+			v = _mm_stream_load_si128((__m128i *)s); // cast away const to suppress warning
+			// old_stream = v;
 
 			ind1 = _mm_srli_epi32(_mm_unpacklo_epi16(v, zero), 8); // look into using _mm_cvtepu16_epi32
 			ind2 = _mm_srli_epi32(_mm_unpackhi_epi16(v, zero), 8);
 
-			col0 = _mm_i32gather_epi32((int32_t *)pal, ind1, 4);
-			col1 = _mm_i32gather_epi32((int32_t *)pal + 1, ind1, 4);
+			col0 = _mm_i32gather_epi32((const int32_t *)pal, ind1, 4);
+			col1 = _mm_i32gather_epi32((const int32_t *)pal + 1, ind1, 4);
 
-			col2 = _mm_i32gather_epi32((int32_t *)pal, ind2, 4);
-			col3 = _mm_i32gather_epi32((int32_t *)pal + 1, ind2, 4);
+			col2 = _mm_i32gather_epi32((const int32_t *)pal, ind2, 4);
+			col3 = _mm_i32gather_epi32((const int32_t *)pal + 1, ind2, 4);
 
 			// unpack colours to 16 bit per channel in __m256i
 			c0 = _mm256_cvtepu8_epi16(col0); // zero pad bytes up to 16 bit ints
@@ -176,30 +187,39 @@ void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
 			x+=dp;
 			d+=dp;
 			s+=dp;
-		}
+		} // else {
+			// old_stream = _mm_stream_load_si128((__m128i *)s); // cast away const to suppress warning
+		//}
+		// old_stream = _mm_shuffle_epi8(old_stream, align_shuff);
 
 		for(; x + 8 < w; x+=8, s+=8, d+=8) {
 			_mm_prefetch(s + 8, _MM_HINT_NTA);
 			__m128i col0, col1, col2, col3, ind1, ind2, v;
 			__m256i res, c0, c1, c2, c3, t, v1, v2, v1s, v2s;
 
-			// TODO: use _mm_alignr_epi8() so we can do use _mm_stream_load_si128
+			// TODO: use _mm_alignr_epi8() so we can do use _mm_stream_load_si128 (can't alignr requires the shift to be a compile time constant)
 			// something like:
-			//   __m128i stemp = _mm_stream_load_si128((const __m128i *)s);
-			//   v = _mm_alignr_epi8(stemp, old_stream, dp);
+			//   __m128i stemp = _mm_stream_load_si128((__m128i *)s); // cast away const to suppress warning
+			//   v = _mm_alignr_epi8(stemp, old_stream, dp*4);
+			//
+			//   need to rotate stemp so that we can put the right things
+			//   in place with the permute, and so that we won't need to mess with
+			//   it when it becomes old_stream
+			//
+			//   stemp = _mm_shuffle_epi8(stemp, align_shuff);
+			//   v = _mm_blendv_epi8(old_stream, stemp, align_mask); 
 			//   old_stream = stemp
 			// and we don't add dp to s inside the if() statement above so it stays aligned
-			// 
-			v = _mm_lddqu_si128((const __m128i *)s);//_mm_stream_load_si128((const __m128i *)s);
+			v = _mm_lddqu_si128((const __m128i *)s);
 
 			ind1 = _mm_unpacklo_epi16(_mm_srli_epi16(v, 8), zero); // look into using _mm_cvtepu16_epi32
 			ind2 = _mm_unpackhi_epi16(_mm_srli_epi16(v, 8), zero);
 
-			col0 = _mm_i32gather_epi32((int32_t *)pal, ind1, 4);
-			col1 = _mm_i32gather_epi32((int32_t *)pal + 1, ind1, 4);
+			col0 = _mm_i32gather_epi32((const int32_t *)pal, ind1, 4);
+			col1 = _mm_i32gather_epi32((const int32_t *)pal + 1, ind1, 4);
 
-			col2 = _mm_i32gather_epi32((int32_t *)pal, ind2, 4);
-			col3 = _mm_i32gather_epi32((int32_t *)pal + 1, ind2, 4);
+			col2 = _mm_i32gather_epi32((const int32_t *)pal, ind2, 4);
+			col3 = _mm_i32gather_epi32((const int32_t *)pal + 1, ind2, 4);
 
 			// unpack colours to 16 bit per channel in __m256i
 			c0 = _mm256_cvtepu8_epi16(col0); // zero pad bytes up to 16 bit ints
@@ -243,11 +263,11 @@ void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
 			ind1 = _mm_srli_epi32(_mm_unpacklo_epi16(v, zero), 8);
 			ind2 = _mm_srli_epi32(_mm_unpackhi_epi16(v, zero), 8);
 
-			col0 = _mm_i32gather_epi32((int32_t *)pal, ind1, 4);
-			col1 = _mm_i32gather_epi32((int32_t *)pal + 1, ind1, 4);
+			col0 = _mm_i32gather_epi32((const int32_t *)pal, ind1, 4);
+			col1 = _mm_i32gather_epi32((const int32_t *)pal + 1, ind1, 4);
 
-			col2 = _mm_i32gather_epi32((int32_t *)pal, ind2, 4);
-			col3 = _mm_i32gather_epi32((int32_t *)pal + 1, ind2, 4);
+			col2 = _mm_i32gather_epi32((const int32_t *)pal, ind2, 4);
+			col3 = _mm_i32gather_epi32((const int32_t *)pal + 1, ind2, 4);
 
 			// unpack colours to 16 bit per channel in __m256i
 			c0 = _mm256_cvtepu8_epi16(col0); // zero pad bytes up to 16 bit ints

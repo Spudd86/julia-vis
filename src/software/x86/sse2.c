@@ -1,7 +1,7 @@
 
-#if (__x86_64__ || __i386__)
+#if (__x86_64__ || __i386__) && !defined(DISABLE_X86_INTRIN)
 #pragma GCC target("no-sse3,sse2")
-#ifdef NDEBUG
+#ifndef DEBUG
 #pragma GCC optimize "3,inline-functions,merge-all-constants"
 #endif
 
@@ -35,29 +35,29 @@ void maxblend_sse2(void *restrict dest, const void *restrict src, int w, int h)
 
 		__m128i v1, v2, t1, t2, v3, t3, v4, t4;
 
-		v1 = mbdst[0], t1 = mbsrc[0];
+		v1 = _mm_load_si128(mbdst+0), t1 = _mm_load_si128(mbsrc+0);
 		v1 = _mm_add_epi16(v1, off); t1 = _mm_add_epi16(t1, off);
 		v1 = _mm_max_epi16(v1, t1);
 		v1 = _mm_sub_epi16(v1, off);
-		mbdst[0]=v1;
+		_mm_store_si128(mbdst+0, v1);
 
-		v2 = mbdst[1], t2 = mbsrc[1];
+		v2 = _mm_load_si128(mbdst+1), t2 = _mm_load_si128(mbsrc+1);
 		v2 = _mm_add_epi16(v2, off); t2 = _mm_add_epi16(t2, off);
 		v2 = _mm_max_epi16(v2, t2);
 		v2 = _mm_sub_epi16(v2, off);
-		mbdst[1]=v2;
+		_mm_store_si128(mbdst+1, v2);
 
-		v3 = mbdst[2], t3 = mbsrc[2];
+		v3 = _mm_load_si128(mbdst+2), t3 = _mm_load_si128(mbsrc+2);
 		v3 = _mm_add_epi16(v3, off); t3 = _mm_add_epi16(t3, off);
 		v3 = _mm_max_epi16(v3, t3);
 		v3 = _mm_sub_epi16(v3, off);
-		mbdst[2]=v3;
+		_mm_store_si128(mbdst+2, v3);
 
-		v4 = mbdst[3], t4 = mbsrc[3];
+		v4 = _mm_load_si128(mbdst+3), t4 = _mm_load_si128(mbsrc+3);
 		v4 = _mm_add_epi16(v4, off); t4 = _mm_add_epi16(t4, off);
 		v4 = _mm_max_epi16(v4, t4);
 		v4 = _mm_sub_epi16(v4, off);
-		mbdst[3]=v4;
+		_mm_store_si128(mbdst+3, v4);
 	}
 	_mm_mfence(); // needed because of the non-temporal stores.
 }
@@ -100,7 +100,6 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			const __m128i move_mask = _mm_cmplt_epi32(_mm_setr_epi32(0, 1, 2, 3), _mm_set1_epi32(dp));
 			__m128i col1, col2, col3, col4, v1, v2, v1s, v2s;
 
-			//FIXME: these might not be aligned for 64 bit read properly, use more correct load
 			col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[0]/256u)));
 			col2 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[1]/256u)));
 			v1   = pb32_load_v(s+0);
@@ -150,7 +149,6 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 			_mm_prefetch(s + 8, _MM_HINT_NTA);
 			__m128i col1, col2, col3, col4, v1, v2, v1s, v2s;
 
-			//FIXME: these might not be aligned for 64 bit read properly, use more correct load
 			col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[0]/256u)));
 			col2 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[1]/256u)));
 			v1   = pb32_load_v(s+0);
@@ -243,7 +241,6 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 
 		__m128i col1, col2, col3, col4, v1, v2, v1s, v2s;
 
-		//FIXME: these might not be aligned for 64 bit read properly, use more correct load
 		col1 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[0]/256u)));
 		col2 = _mm_loadl_epi64((const __m128i *restrict)(pal+(s[1]/256u)));
 		v1   = pb32_load_v(s+0);

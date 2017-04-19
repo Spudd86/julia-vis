@@ -41,7 +41,7 @@ SDL_Surface* render_string(const char *str)
 	int x = 0;
 	while(*c) {
 
-		const uint8_t * restrict src = terminusIBM + 16 * *c;;
+		const uint8_t * restrict src = terminusIBM + 16 * *c;
 		for(int y=0; y < 16; y++) {
 			uint8_t *dst = ((uint8_t*)surf->pixels) + surf->pitch*y + x*8;
 			uint8_t line = *src++;

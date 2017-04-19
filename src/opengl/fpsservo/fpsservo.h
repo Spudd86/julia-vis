@@ -3,7 +3,7 @@
 #ifndef FPSSERVO_H
 #define FPSSERVO_H
 
-struct fps_period { 
+struct fps_period {
 	int32_t n; ///< numerator
 	int32_t d; ///< denominator
 };

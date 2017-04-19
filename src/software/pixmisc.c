@@ -24,7 +24,7 @@ void maxblend(void *restrict dest, const void *restrict src, int w, int h)
 	orc_executor_run (ex);
 }
 
-#elif (__x86_64__ || __i386__)
+#elif (__x86_64__ || __i386__) && !defined(DISABLE_X86_INTRIN)
 
 #include "x86/x86_features.h"
 

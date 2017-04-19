@@ -8,15 +8,6 @@
 #include "software/sdl/sdlhelp.h"
 #include "sdlsetup.h"
 
-// TODO: switch to doing audio stuff in here directly, in our audio_update() callback
-// just feed a ring-buffer and do all the analysis in the main thread since unlike
-// the julia set visualizer we DO care about every sample.
-// So in that case most of our mainloop then becomes driven off of the audio clock
-// via the ring buffer.
-// Doing this would let us drop a bunch of #ifdef logic from audio.c and would be a
-// help into making this project build properly (ie: compile each source file individually
-// rather than compile and link in one step for each different binary)
-
 #define IM_SIZE (768)
 
 static opt_data opts;
@@ -24,12 +15,12 @@ static opt_data opts;
 void split_radix_real_complex_fft(float *x, uint32_t n);
 
 static void get_next_fft(audio_data *d);
-static int get_buf_count();
+static int get_buf_count(void);
 
 static inline void putpixel(SDL_Surface *surface, int x, int y, Uint32 pixel);
 static inline void putpixel_mono(SDL_Surface *surface, int x, int y, int bri);
 
-typedef void (*audio_drv_shutdown_t)();
+typedef void (*audio_drv_shutdown_t)(void);
 static audio_drv_shutdown_t audio_drv_shutdown = NULL;
 
 static inline float sigmoid(float x) {
@@ -60,7 +51,7 @@ int main(int argc, char **argv)
 	float frametime = 100;
 	SDL_Event	event;
 	float beat_throb = 0.0f;
-	int ovpx = -1;
+	int ovpx = 0;
 	int oldbc = 0;
 
 	const int pixbits = screen->format->BitsPerPixel;
@@ -70,11 +61,12 @@ int main(int argc, char **argv)
 	int beath[16][im_w];
 	memset(beath, 0, sizeof(beath));
 
-	beat_ctx *beat_ctx = beat_new();
+	struct beat_ctx *beat_ctx = beat_new();
 	int beat_nbands = beat_ctx_bands(beat_ctx);
 
 	uint32_t now = SDL_GetTicks();
 	audio_data d;
+	get_next_fft(&d);
 	while(SDL_PollEvent(&event) >= 0)
 	{
 		if(event.type == SDL_QUIT
@@ -302,8 +294,8 @@ int audio_init(const opt_data *od)
 
 #define MAX_SAMP 2048
 
-static int buf_count = 0;
-static int nr_samp = 0;
+static uint64_t buf_count = 0;
+static size_t nr_samp = 0;
 static float fft_tmp[MAX_SAMP];
 static float samp_bufs[2][MAX_SAMP];
 static float *prev_samp = NULL;
@@ -314,7 +306,7 @@ int audio_setup(int sr)
 {
 	nr_samp = (sr<50000)?MAX_SAMP/2:MAX_SAMP;
 
-	printf("Sample Rate %i\nUsing %i samples/buffer\n", sr, nr_samp/2);
+	printf("Sample Rate %i\nUsing %zu samples/buffer\n", sr, nr_samp/2);
 
 	for(int i=0; i<MAX_SAMP; i++) {
 		fft_tmp[i] = samp_bufs[0][i] = samp_bufs[1][i] = 0;
@@ -330,7 +322,7 @@ int audio_setup(int sr)
 
 void audio_update(const float *in, int n)
 {
-	rb_write(samp_rb, (char*)in, n*sizeof(*in));
+	rb_write(samp_rb, (const char*)in, n*sizeof(*in));
 }
 
 static int get_buf_count()

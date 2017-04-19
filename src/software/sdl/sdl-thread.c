@@ -83,8 +83,8 @@ static int run_map_thread(tribuf *tb)
 		} else update_points(pd, now, 0);
 		beats = newbeat;
 
-		if(map_fps > 750)
-			SDL_Delay(1); // hard limit ourselves because 1500FPS is just pointless use of CPU (except of course to say that we can do it)
+		//if(map_fps > 750)
+		//	SDL_Delay(1); // hard limit ourselves because 1500FPS is just pointless use of CPU (except of course to say that we can do it)
 							// also if we run at more that 1000FPS the point motion code might blow up without the microsecond accurate timers...
 							// high threshhold because we want it high enough that we don't notice if we jitter back
 							// and fourth across it
@@ -116,7 +116,7 @@ int main(int argc, char **argv)
 	struct pal_ctx *pal_ctx = pal_ctx_new(screen->format->BitsPerPixel == 8);
 
 	uint16_t *map_surf[3];
-	void *map_surf_mem = aligned_alloc(64, 3 * im_w * im_h * sizeof(uint16_t));
+	char *map_surf_mem = aligned_alloc(256, 3 * im_w * im_h * sizeof(uint16_t));
 	for(int i=0; i<3; i++)
 		map_surf[i] = map_surf_mem + i * im_w * im_h * sizeof(uint16_t);
 	memset(map_surf_mem, 0, 3 * im_w * im_h * sizeof(uint16_t));
@@ -125,7 +125,6 @@ int main(int argc, char **argv)
 
 	int beats = 0;
 	int frmcnt = 0;
-	int lastdrawn=0;
 
 	SDL_Thread *map_thread = SDL_CreateThread((void *)&run_map_thread, map_tb);
 	SDL_Delay(100);

@@ -1,4 +1,4 @@
-#if (__i386__)
+#if (__i386__) && !defined(DISABLE_X86_INTRIN)
 
 #pragma GCC target("no-sse,athlon,3dnow")
 #pragma GCC optimize "3,inline-functions,merge-all-constants"

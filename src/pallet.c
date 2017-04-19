@@ -5,7 +5,7 @@
 #include "pallet.h"
 #include <float.h>
 
-#define NO_LINEAR_PALLET_EXPAND 1
+#define NO_GAMMA_CORRECT_PALLET_EXPAND 1
 
 struct pallet_colour {
 	uint8_t r, g, b;
@@ -176,7 +176,7 @@ static void expand_pallet(const struct pallet_colour *curpal, uint32_t *dest, st
 			uint32_t b = fmaxf(0, fminf(255, gamma_curve(c1.b)));
 #endif
 
-			dest[i] = (r << s.r) | (g << s.g) | (b << s.b) | (255 << s.x);
+			dest[i] = (r << s.r) | (g << s.g) | (b << s.b) | (255u << s.x);
 		}
 	} while(curpal[j].pos < 255);
 }

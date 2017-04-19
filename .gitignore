@@ -36,6 +36,7 @@ Makefile
 /gst/config.*
 /gst/autom4te.cache
 /gst/build-aux
+/gst/vis
 .dirstamp
 .sconsign.dblite
 *.tar.*
@@ -65,3 +66,8 @@ Makefile
 *.dirstamp
 bin/*
 build/*
+
+
+*.mkv
+*.wav
+*.mp3

@@ -18,10 +18,21 @@ struct beat_ctx {
 	float E[BANDS];
 };
 
-beat_ctx *beat_new(void)
+struct beat_ctx *beat_new(void)
 {
-	beat_ctx *self = malloc(sizeof(beat_ctx));
-	memset(self, 0, sizeof(beat_ctx));
+	struct beat_ctx *self = malloc(sizeof(*self));
+	self->hi = 0;
+	self->count = 0;
+	self->beat_count = 0;
+	self->lastbeat = 0;
+	for(size_t i = 0; i < BANDS; i++) {
+		self->beat_bands[i] = 0;
+		self->V[i] = 0.0f;
+		self->E[i] = 0.0f;
+		for(size_t j = 0; j < HIST*2; j++) {
+			self->Eh[i][j] = 0.0f;
+		}
+	}
 	return self;
 }
 
@@ -30,10 +41,10 @@ void beat_delete(struct beat_ctx *self)
 	free(self);
 }
 
-int beat_ctx_count(beat_ctx *self) { return self->beat_count; }
-int beat_ctx_bands(beat_ctx *self) {(void)self; return BANDS; }
+int beat_ctx_count(struct beat_ctx *self) { return self->beat_count; }
+int beat_ctx_bands(struct beat_ctx *self) {(void)self; return BANDS; }
 
-void beat_ctx_get_data(beat_ctx *ctx, beat_data *ad) {
+void beat_ctx_get_data(struct beat_ctx *ctx, struct beat_data *ad) {
 	ad->bands = BANDS;
 	ad->histlen = HIST;
 	ad->hi = (ctx->hi + HIST*2 - 1)%(HIST*2);
@@ -49,7 +60,7 @@ static inline float sqr(float x) { return x*x; }
  * take 1024 frames of audio and do update beat detection
  * http://www.gamedev.net/reference/programming/features/beatdetection/
  */
-void beat_ctx_update(beat_ctx *self, const float *restrict fft, int fft_len)
+void beat_ctx_update(struct beat_ctx *self, const float *restrict fft, int fft_len)
 {
 	const int hi = self->hi;
 	float *const restrict V = self->V;

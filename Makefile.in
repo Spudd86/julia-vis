@@ -1,5 +1,5 @@
 # @configure_input@
-# autoconf tutorial: 
+# autoconf tutorial:
 # http://www.galassi.org/mark//mydocs/autoconf_tutorial_2.html
 
 SHELL = /bin/sh
@@ -42,8 +42,12 @@ CFLAGS += -Wall -Wextra -Wdouble-promotion \
 	-Wcast-qual -Wwrite-strings -Wlogical-op -Waggregate-return \
 	-Wunsuffixed-float-constants \
 	-fno-strict-aliasing
-#-Wunsafe-loop-optimizations -Wconversion -Wstrict-prototypes 
-CFLAGS += -I "./src" -I "./tinycthread"
+#-Wunsafe-loop-optimizations -Wconversion -Wstrict-prototypes
+CFLAGS += -I "./src" -I "./tinycthread" -I "./nuklear"
+
+ifeq (@enable_debug@,yes)
+	DEBUG=1
+endif
 
 -include config.mk
 
@@ -51,13 +55,13 @@ ifdef DEBUG
 	CFLAGS += -ggdb3 -O0
 else
 	CFLAGS += -DNDEBUG
-	CFLAGS += -g3 -O2 
+	CFLAGS += -g3 -O2
 	#CFLAGS += -finline-functions
-	#CFLAGS += -finline-functions -maccumulate-outgoing-args -fdelete-null-pointer-checks 
+	#CFLAGS += -finline-functions -maccumulate-outgoing-args -fdelete-null-pointer-checks
 	#CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller
-	#CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear 
-	#CFLAGS += -funsafe-loop-optimizations 
-	#CFLAGS += -fgcse-las -fgcse-sm -fmodulo-sched 
+	#CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear
+	#CFLAGS += -funsafe-loop-optimizations
+	#CFLAGS += -fgcse-las -fgcse-sm -fmodulo-sched
 	#CFLAGS += -fmerge-all-constants
 
 # on gcc 4.3 set precsicion of FPU to 32 bits (can get speed up for floats)
@@ -96,13 +100,13 @@ ORC_LIBS = @ORC_LIBS@
 GL_LOADER = src/opengl/gl_14.o
 
 ALL_BINS := bin/sdl-test$(EXEEXT) bin/sdlthread-test$(EXEEXT) bin/audio-test$(EXEEXT) bin/pal-test$(EXEEXT)
-ifeq ($(ENABLE_GL),yes) 
+ifeq ($(ENABLE_GL),yes)
 	ALL_BINS += bin/gl-test$(EXEEXT)
 endif
 ifeq ($(ENABLE_X11),yes)
 	ALL_BINS += bin/glx-test$(EXEEXT)
 	#ALL_BINS += bin/fps-test$(EXEEXT)
-	ifeq ($(ENABLE_EGL),yes) 
+	ifeq ($(ENABLE_EGL),yes)
 		ALL_BINS += bin/egl-test$(EXEEXT)
 	endif
 endif
@@ -112,25 +116,26 @@ endif
 
 AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/fft.c
 
-COMMON_SRCS = src/terminusIBM.c src/isaac/isaac.c src/pallet.c src/optproc.c src/points.c
+COMMON_SRCS = src/terminusIBM.c src/isaac/isaac.c src/pallet.c src/optproc.c src/points.c tinycthread/tinycthread.c
 
-SOFT_SRCS = src/software/map.c src/software/maxsrc.c src/software/palletblit.c src/software/pixmisc.c src/paratask/paratask.c tinycthread/tinycthread.c
+SOFT_SRCS = src/software/map.c src/software/maxsrc.c src/software/palletblit.c src/software/pixmisc.c src/paratask/paratask.c
 
 SDL_SOFT_SRCS = src/software/sdl/sdl-text.c src/sdl/sdlsetup.c src/software/sdl/sdl-palblit.c
 
-X86_SOFT_SRCS = src/software/x86/cpuid.c src/software/x86/mmx.c src/software/x86/3dNOW.c src/software/x86/sse.c src/software/x86/sse2.c src/software/x86/sse4_1.c src/software/x86/avx2.c
+X86_SOFT_SRCS = src/software/x86/cpuid.c src/software/x86/mmx.c src/software/x86/3dNOW.c src/software/x86/sse.c src/software/x86/sse2.c src/software/x86/ssse3.c src/software/x86/sse4_1.c src/software/x86/avx2.c
 
 GL_COMMON_SRCS = src/opengl/glmain.c src/opengl/glmisc.c src/opengl/glscope.c src/opengl/mandelbrot.c src/opengl/offscreen.c
 
 GL_FIXED_SRCS = src/opengl/fixed/glf_maxsrc.c src/opengl/fixed/glf_pal.c src/opengl/fixed/glmap.c src/opengl/fixed/glf_fract.c
 
-GL_GLSL_SRCS =  src/opengl/glsl/glsl_maxsrc.c src/opengl/glsl/glsl_pallet.c src/opengl/glsl/glsl_fract.c 
+GL_GLSL_SRCS =  src/opengl/glsl/glsl_maxsrc.c src/opengl/glsl/glsl_pallet.c src/opengl/glsl/glsl_fract.c
 
 GL_SDL_SRCS = src/sdl/sdlglmain.c src/sdl/sdlsetup.c
 
 TRIBUF_SRCS = src/tribuf.c
 
-AUDIO_TEST_SRCS = src/audio/beat.c src/audio/fft.c src/audio/rb.c src/optproc.c src/software/sdl/sdl-text.c src/sdl/sdlsetup.c src/terminusIBM.c src/software/sdl/line.c
+#needs tinycthread just in case filedecode audio backend is enabled
+AUDIO_TEST_SRCS = src/audio/beat.c src/audio/fft.c src/audio/rb.c src/optproc.c src/software/sdl/sdl-text.c src/sdl/sdlsetup.c src/terminusIBM.c src/software/sdl/line.c tinycthread/tinycthread.c
 
 ifeq ($(ENABLE_JACK),yes)
 AUDIO_DRV_SRCS += src/audio/jack.c
@@ -143,7 +148,7 @@ AUDIO_DRV_SRCS += src/audio/portaudio.c
 endif
 ifeq ($(ENABLE_SNDFILE),yes)
 #FIXME: Avoid having tinycthread in software versions twice
-AUDIO_DRV_SRCS += src/audio/filedecode.c tinycthread/tinycthread.c
+AUDIO_DRV_SRCS += src/audio/filedecode.c
 endif
 
 AUDIO_DRV_OBJS = $(AUDIO_DRV_SRCS:.c=.o)
@@ -229,7 +234,7 @@ bin/glscope-test$(EXEEXT): $(GL_LOADER) $(GL_SDL_OBJS) src/opengl/glscope-test.o
 	$(GL_SDL_OBJS) src/opengl/glscope-test.o src/opengl/glscope.o src/opengl/glmisc.o \
 	$(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_OBJS) \
 	$(GL_LOADER) $(SDL_CFLAGS) $(AUDIO_CFLAGS) $(GL_CFLAGS) $(LDFLAGS) $(SDL_LIBS) $(AUDIO_LIBS) $(GL_LIBS) $(LIBS) -o $@
-	
+
 bin/glscopetris-test$(EXEEXT): src/opengl/glmap.o $(GL_LOADER) $(GL_SDL_OBJS) src/tess/scopetris.o src/tess/hset.o src/opengl/glmisc.o $(COMMON_OBJS) $(AUDIO_OBJS) $(TRIBUF_OBJS) Makefile config.mk
 	$(CC) $(CFLAGS) -DUSE_GL -DSCOPETRIS_TEST \
 	$(GL_SDL_OBJS) src/tess/scopetris.o src/tess/hset.o src/opengl/glmaxsrc.o src/opengl/glmisc.o \
@@ -291,10 +296,18 @@ bin/pal-test2$(EXEEXT): src/software/sdl/test_pallets.o $(SDL_SOFT_OBJS) $(COMMO
 	src/software/sdl/test_pallets.o $(SDL_SOFT_OBJS) $(COMMON_OBJS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
 	$(SDL_CFLAGS) $(LDFLAGS) $(SDL_LIBS) $(LIBS) -o $@
 
+bin/palblit-test$(EXEEXT): src/software/test/palblit.o $(COMMON_OBJS) $(SOFT_OBJS) $(X86_SOFT_OBJS) Makefile config.mk
+	$(CC) $(CFLAGS) \
+	src/software/test/palblit.o $(COMMON_OBJS) $(SOFT_OBJS) $(X86_SOFT_OBJS) \
+	$(LDFLAGS) $(LIBS) -o $@
+
 -include $(DEPS)
 
 src/opengl/gl_14.o: src/opengl/gl_14.c
-	$(CC) -g -O2 $(GL_CFLAGS) -c $< -o $@
+	$(CC) -g -O2 $(GL_CFLAGS) -w -c $< -o $@
+
+src/opengl/glx/glx_gen.o: src/opengl/glx/glx_gen.c
+	$(CC) -c $(CFLAGS) $(GL_CFLAGS) $(X11_CFLAGS) $(PP_FLAGS) -w $< -o $@
 
 src/software/x86/mmx.o: src/software/x86/mmx.c src/software/x86/palblit_mmxsse.h src/common.h src/software/pixmisc.h Makefile config.mk
 	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse -mmmx $(PP_FLAGS) $< -MF $*.dep
@@ -311,6 +324,10 @@ src/software/x86/sse.o: src/software/x86/sse.c src/software/x86/palblit_mmxsse.h
 src/software/x86/sse2.o: src/software/x86/sse2.c src/common.h src/software/pixmisc.h Makefile config.mk
 	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse3 -msse2 $(PP_FLAGS) $< -MF $*.dep
 	$(CC) -c $(CFLAGS) -mno-sse3 -msse2 $(PP_FLAGS) $< -o $@
+
+src/software/x86/ssse3.o: src/software/x86/ssse3.c src/common.h src/software/pixmisc.h Makefile config.mk
+	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse4.1 -mssse3 $(PP_FLAGS) $< -MF $*.dep
+	$(CC) -c $(CFLAGS) -mno-sse4.1 -mssse3 $(PP_FLAGS) $< -o $@
 
 src/software/x86/sse4_1.o: src/software/x86/sse4_1.c src/common.h src/software/pixmisc.h Makefile config.mk
 	@$(CC) -MM -MQ $@ $(CFLAGS) -msse4.1 $(PP_FLAGS) $< -MF $*.dep
@@ -352,10 +369,14 @@ src/opengl/egl/xegl.o: src/opengl/egl/xegl.c
 	@$(CC) -MM -MQ $@ -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(EGL_CFLAGS) $(X11_CFLAGS) $(PP_FLAGS) $< -MF src/opengl/egl/xegl.dep
 	$(CC) -c -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(EGL_CFLAGS) $(X11_CFLAGS) $(PP_FLAGS) $< -o $@
 
+src/software/x11/%.o: src/software/x11/%.c Makefile config.mk
+	@$(CC) -MM -MQ $@ $(CFLAGS) $(X11_CFLAGS) $(PP_FLAGS) $< -MF src/software/x11/$*.dep
+	$(CC) -c $(CFLAGS) $(X11_CFLAGS) $(PP_FLAGS) $< -o $@
+
 src/%.o: src/%.c Makefile config.mk
 	@$(CC) -MM -MQ $@ $(CFLAGS) $(PP_FLAGS) $< -MF src/$*.dep
 	$(CC) -c $(CFLAGS) $(PP_FLAGS) $< -o $@
-	
+
 %.s: %.c src/*.h Makefile config.mk
 	$(CC) $< $(CFLAGS) -fverbose-asm -S -o $@
 

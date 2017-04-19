@@ -6,7 +6,7 @@ AC_INIT([julia-vis], [0.1], [BUG-REPORT-ADDRESS], [julia-vis], [http://github.co
 AC_CONFIG_SRCDIR([src/optproc.c])
 AC_CONFIG_AUX_DIR([build-aux])
 
-AC_PROG_CC_STDC
+AC_PROG_CC
 AC_USE_SYSTEM_EXTENSIONS
 AC_SYS_LARGEFILE
 AC_CONFIG_HEADERS([config.h])
@@ -14,27 +14,35 @@ AC_CONFIG_HEADERS([config.h])
 m4_include([m4/ax_check_gl.m4])
 m4_include([m4/ax_check_glu.m4])
 m4_include([m4/ax_pthread.m4])
-
-USE_LANGUAGES=gnu11
+m4_include([m4/ax_check_compile_flag.m4])
 
 AX_PTHREAD
+AX_CHECK_COMPILE_FLAG([-std=gnu11], [CFLAGS+=" -std=gnu11"], [
+	AX_CHECK_COMPILE_FLAG([-std=c11], [CFLAGS+=" -std=c11"], [
+		AX_CHECK_COMPILE_FLAG([-std=gnu99], [CFLAGS+=" -std=gnu99"], [
+			AX_CHECK_COMPILE_FLAG([-std=c99], [CFLAGS+=" -std=c99"], [
+				echo "Compiler does not support a new enough C standard"
+				exit -1
+			])
+		])
+	])
+])
 
-AC_ARG_ENABLE([mmx], AS_HELP_STRING([--enable-mmx], [enable use of mmx instructions (default: automatic)]))
-if test "x$enable_mmx" = xyes; then
-	CFLAGS="$CFLAGS -mmmx"
-fi
-AC_ARG_ENABLE([sse], AS_HELP_STRING([--enable-sse], [enable use of sse instructions (default: automatic)]))
-if test "x$enable_sse" = xyes; then
-	CFLAGS="$CFLAGS -mmmx -msse"
-fi
-AC_ARG_ENABLE([sse2], AS_HELP_STRING([--enable-sse2], [enable use of sse2 instructions (default: automatic)]))
-if test "x$enable_sse2" = xyes; then
-	CFLAGS="$CFLAGS -mmmx -msse -msse2"
-fi
-AC_ARG_ENABLE([3dnow], AS_HELP_STRING([--enable-3dnow], [enable use of 3dnow instructions (default: automatic)]))
-if test "x$enable_3dnow" = xyes; then
-	CFLAGS="$CFLAGS -mmmx -m3dnow"
-fi
+#TODO: check for asm/intrinsic support
+
+AC_ARG_ENABLE([debug], AS_HELP_STRING([--enable-debug], [enable debugging code, including assertions (default: disabled)]))
+AS_IF([ test "x$enable_debug" = xyes ], [
+  AC_DEFINE(DEBUG, 1, [Define to 1 if debug code should be enabled])
+], [
+  AC_DEFINE(NDEBUG, 1, [Define to 1 if assertions should be disabled.])
+])
+AC_SUBST(enable_debug)
+
+AC_ARG_ENABLE([vector-intrinsics], AS_HELP_STRING([--enable-vector-intrinsics], [enable use of x86 vector intrinsics instructions (default: automatic)]))
+AC_SUBST(enable_vector_intrinsics)
+AS_IF([ test "x$enable_vector_intrinsics" = xno ], [
+	AC_DEFINE([DISABLE_X86_INTRIN], 1, [Define to 1 to disable use x86 vector intrinsics])
+])
 
 # Checks for programs.
 

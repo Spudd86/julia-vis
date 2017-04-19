@@ -193,7 +193,7 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	//printf("slackdiff %" PRId64 "\n", self->slack_diff);
 	
 	int period = (self->period.n*self->interval)/self->period.d;
-	int avgworktime = runstat_average(self->workstat);
+	int avgworktime = runstat_mean(self->workstat);
 	int wktime_stdev = runstat_stddev(self->workstat);
 
 #if 0
@@ -201,7 +201,7 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 		//TODO: after changing interval need a cooldown before it can change in the other direction to avoid hysteresis
 		// (ie: after it goes from 1 to 2 it can go to 3 on the next frame but it can't go back to 1 for a while)
 
-		uint64_t req_time = avgworktime + wktime_stdev*31/10 + abs(runstat_average(self->swapstat)) + MIN_SLACK;
+		uint64_t req_time = avgworktime + wktime_stdev*31/10 + abs(runstat_mean(self->swapstat)) + MIN_SLACK;
 
 		// if probably can't meet our deadlines, increment interval
 		if(req_time*self->period.d > (self->interval*self->period.n)) {
@@ -229,7 +229,7 @@ int64_t swap_begin(struct fps_data *self, int64_t now)
 	
 	// even if swap is usually negative it represents uncertainty in our measurements and latency in the window system
 	// so it should contribute to slack
-	slack_target += runstat_stddev(self->swapstat) + abs(runstat_average(self->swapstat));
+	slack_target += runstat_stddev(self->swapstat) + abs(runstat_mean(self->swapstat));
 	
 	slack_target = MIN((int)((self->period.n*self->interval*3)/(self->period.d*4)), MAX(slack_target, MIN_SLACK));
 	

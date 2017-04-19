@@ -27,7 +27,7 @@ struct priv_ctx {
 #endif
 };
 
-static int pal_step(struct glpal_ctx *ctx, int step) {
+static bool pal_step(struct glpal_ctx *ctx, uint8_t step) {
 	struct priv_ctx *priv = (struct priv_ctx *)ctx;
 	return pal_ctx_step(priv->pal, step);
 }

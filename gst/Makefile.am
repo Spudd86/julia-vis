@@ -8,6 +8,7 @@ AM_CPPFLAGS = \
 	-include ${top_builddir}/config.h \
 	-DSYSCONFDIR=\""$(sysconfdir)"\" \
 	-I${top_srcdir}/vis \
+	-I${top_srcdir}/tinycthread \
 	-I${top_srcdir}/src \
 	-I${top_srcdir}/gstreamer
 
@@ -16,7 +17,10 @@ AM_LDFLAGS = \
 	-Wl,--as-needed
 
 plugin_LTLIBRARIES = libgstjuliavis.la
-
+libgstjuliavis_la_CFLAGS = $(GST_CFLAGS)
+libgstjuliavis_la_LIBADD = $(GST_LIBS)
+libgstjuliavis_la_LDFLAGS = $(AM_LDFLAGS) $(GST_PLUGIN_LDFLAGS) -no-undefined
+libgstjuliavis_la_LIBTOOLFLAGS = --tag=disable-static
 libgstjuliavis_la_SOURCES = \
 vis/common.h \
 vis/colourspace.h \
@@ -35,6 +39,7 @@ vis/software/x86/x86_features.h \
 vis/software/x86/mmx.c \
 vis/software/x86/sse.c \
 vis/software/x86/sse2.c \
+vis/software/x86/ssse3.c \
 vis/software/x86/sse4_1.c \
 vis/software/x86/avx2.c \
 vis/software/x86/palblit_mmxsse.h \
@@ -48,13 +53,12 @@ vis/software/map.h \
 vis/software/palletblit.c \
 vis/software/simple_main.c \
 vis/software/simple_main.h \
+vis/paratask/paratask.c \
+vis/paratask/paratask.h \
+tinycthread/tinycthread.c \
+tinycthread/tinycthread.h \
 src/element2.c \
 src/element2.h \
 src/plugin2.c \
 src/gstaudiovisualizer2.c \
 src/gstaudiovisualizer2.h
-
-libgstjuliavis_la_CFLAGS = $(GST_CFLAGS) -I${top_srcdir}/gstreamer
-libgstjuliavis_la_LIBADD = $(GST_LIBS)
-libgstjuliavis_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS) -no-undefined
-libgstjuliavis_la_LIBTOOLFLAGS = --tag=disable-static

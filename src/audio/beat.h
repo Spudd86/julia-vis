@@ -1,7 +1,7 @@
 #ifndef JULIA_BEAT_H
 #define JULIA_BEAT_H
 
-typedef struct {
+typedef struct beat_data {
 	int bands;
 	int histlen;
 	int hi;
@@ -11,13 +11,11 @@ typedef struct {
 	float *stddev;
 } beat_data;
 
-typedef struct beat_ctx beat_ctx;
-
-beat_ctx *beat_new(void);
+struct beat_ctx *beat_new(void);
 void beat_delete(struct beat_ctx *self);
-int beat_ctx_count(beat_ctx *self);
-int beat_ctx_bands(beat_ctx *self);
-void beat_ctx_update(beat_ctx *self, const float *restrict fft, int fft_len);
-void beat_ctx_get_data(beat_ctx *ctx, beat_data *ad);
+int beat_ctx_count(struct beat_ctx *self);
+int beat_ctx_bands(struct beat_ctx *self);
+void beat_ctx_update(struct beat_ctx *self, const float *restrict fft, int fft_len);
+void beat_ctx_get_data(struct beat_ctx *ctx, struct beat_data *ad);
 
 #endif

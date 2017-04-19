@@ -58,7 +58,7 @@ static int runstat_stddev(const struct runstat *self) {
 	return isqrt(runstat_varience(self));
 }
 
-static int runstat_average(const struct runstat *self) {
+static int runstat_mean(const struct runstat *self) {
 	return self->sum/self->n;
 }
 

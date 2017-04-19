@@ -17,7 +17,7 @@
 #include "audio/audio.h"
 #include "opengl/fpsservo/fpsservo.h"
 
-//#define USE_GLX_INTEL_swap_event 1
+#define USE_GLX_INTEL_swap_event 1
 
 #ifndef GLX_INTEL_swap_event
 # define GLX_INTEL_swap_event 1
@@ -551,7 +551,6 @@ void render_fps_hist(void)
 	
 	float px = 1.0f/(opts.h*0.5f);
 
-#if 1
 	float danger_zone_quad[] = {
 	//    r     g     b      x          y
 		0.4f, 0.2f, 0.2f, -10*px, (frame_int-2000)*scl,
@@ -608,21 +607,6 @@ void render_fps_hist(void)
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_COLOR_ARRAY);
 	glColor3f(1.0f, 1.0f, 1.0f);
-#else
-	glBegin(GL_QUADS);
-	glColor3f(1.0f, 0.4f, 0.4f);gl_hline(1.0, 1.0f, -10*px);
-	glColor3f(0.4f, 0.2f, 0.2f);gl_hline((frame_int-2000)*scl, -10*px, 1.0f);
-	glEnd();
-	glBegin(GL_LINES);
-	//glColor3f(1.0f, 0.0f, 0.0f); gl_hline((frame_int-2000)*scl, -10*px, 1.0f);
-	glColor3f(0.4f, 0.4f, 0.4f);
-	for(int lnpos = frame_int-4000; lnpos >= 0; lnpos -= 2000) 
-		gl_hline(lnpos*scl, -10*px, 1.0f);
-	glColor3f(1.0f, 0.0f, 1.0f); gl_hline(scl*(frame_int - slacktotal/fpslen), -px, -9*px);
-	glColor3f(0.0f, 1.0f, 0.0f); gl_hline(fpsdelaytotal*scl/fpslen, -px, -7*px);
-	glColor3f(1.0f, 1.0f, 0.0f); gl_hline(fpstotal*scl/fpslen, -px, -5*px);
-	glEnd();
-#endif
 	
 	draw_hist_array_col(framecnt, scl/swap_interval, fpsdelays, fpslen, 0.0f, 1.0f, 0.0f);
 	draw_hist_array_col(framecnt, scl/swap_interval, fpsworktimes, fpslen, 1.0f, 1.0f, 0.0f);
@@ -643,7 +627,7 @@ void render_fps_hist(void)
 	glScalef(0.5f, 0.25f, 1.0f); glTranslatef(-2, -2, 0);
 	glColor3f(0.6f, 0.6f, 0.6f); glBegin(GL_LINES); gl_hline(0.5f, 0.0f, 1.05f); glEnd();
 	float fps_scl_avg = fpslen*0.5f/MAX(fpstotal, fpslen);
-	draw_hist_array_col(framecnt, fps_scl_avg, fpsworktimes, fpslen, 0.0f,1.0f,0.0f);
+	draw_hist_array_col(framecnt, fps_scl_avg, fpsworktimes, fpslen, 1.0f, 1.0f, 0.0f); //0.0f,1.0f,0.0f);
 	glPopMatrix();
 #endif
 
@@ -688,7 +672,7 @@ void render_fps_hist(void)
 	glRasterPos2f(-1, -0.75);
 	draw_string("swaptimes"); DEBUG_CHECK_GL_ERR;
 
-	glColor3f(0.0f, 1.0f, 0.0f);
+	glColor3f(1.0f, 1.0f, 0.0f);
 	glRasterPos2f(-1, -0.25);
 	draw_string("worktimes"); DEBUG_CHECK_GL_ERR;
 #endif

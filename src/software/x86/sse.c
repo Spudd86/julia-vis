@@ -1,8 +1,10 @@
 
-#if (__x86_64__ || __i386__)
+#if (__x86_64__ || __i386__) && !defined(DISABLE_X86_INTRIN)
 
 #pragma GCC target("no-sse2,sse")
+#if DEBUG
 #pragma GCC optimize "3,inline-functions,merge-all-constants"
+#endif
 
 #include "common.h"
 #include "../pixmisc.h"

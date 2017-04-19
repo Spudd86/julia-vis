@@ -21,7 +21,6 @@ AC_CONFIG_HEADERS([config.h])
 dnl check for tools (compiler etc.)
 AC_PROG_CC_STDC
 AC_USE_SYSTEM_EXTENSIONS
-USE_LANGUAGES=gnu11
 
 AC_SYS_LARGEFILE
 AC_CONFIG_MACRO_DIR([m4])
@@ -40,7 +39,6 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT16_T
 AC_TYPE_UINT8_T
 AC_HEADER_STDBOOL
-AC_HEADER_ASSERT
 
 AC_SEARCH_LIBS([sqrt], [m])
 
@@ -49,6 +47,13 @@ LT_INIT([
   shared
   pic-only
   win32-dll
+])
+
+AC_ARG_ENABLE([debug], AS_HELP_STRING([--enable-debug], [enable debugging code, including assertions (default: disabled)]))
+AS_IF([ test "x$enable_debug" = xyes ], [
+  AC_DEFINE(DEBUG, 1, [Define to 1 if debug code should be enabled])
+], [
+  AC_DEFINE(NDEBUG, 1, [Define to 1 if assertions should be disabled.])
 ])
 
 dnl give error and exit if we don't have pkgconfig

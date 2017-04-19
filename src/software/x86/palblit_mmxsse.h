@@ -136,6 +136,7 @@ void APPEND_CPUCAP(pallet_blit565)(uint8_t * restrict dest, unsigned int dst_str
 		6, 2, 7, 1, 5, 3, 8, 0
 	};
 
+#if 0
 	static const uint8_t dither_thresh_g[] = {
 		1, 3, 2, 2, 3, 1, 2, 2,
 		2, 2, 0, 4, 2, 2, 4, 0,
@@ -157,6 +158,26 @@ void APPEND_CPUCAP(pallet_blit565)(uint8_t * restrict dest, unsigned int dst_str
 		7, 1, 5, 3, 8, 0, 6, 2,
 		1, 7, 3, 5, 0, 8, 2, 6
 	};
+#else
+	static const uint8_t dither_thresh_bg[] = {
+		5, 3, 8, 0, 1, 3, 2, 2,
+		6, 2, 7, 1, 3, 1, 2, 2,
+		3, 5, 0, 8, 2, 2, 0, 4,
+		2, 6, 1, 7, 2, 2, 4, 0,
+		8, 0, 6, 2, 3, 1, 2, 2,
+		7, 1, 5, 3, 1, 3, 2, 2,
+		0, 8, 2, 6, 2, 2, 4, 0,
+		1, 7, 3, 5, 2, 2, 0, 4,
+		6, 2, 7, 1, 1, 3, 2, 2,
+		5, 3, 8, 0, 3, 1, 2, 2,
+		2, 6, 1, 7, 2, 2, 0, 4,
+		3, 5, 0, 8, 2, 2, 4, 0,
+		7, 1, 5, 3, 3, 1, 2, 2,
+		8, 0, 6, 2, 1, 3, 2, 2,
+		1, 7, 3, 5, 2, 2, 4, 0,
+		0, 8, 2, 6, 2, 2, 0, 4
+	};
+#endif
 
 	// TODO: could skip the second mask if red was in the low byte in the
 	// pallet since we don't need to mask blue because we're going to shift
@@ -173,8 +194,9 @@ void APPEND_CPUCAP(pallet_blit565)(uint8_t * restrict dest, unsigned int dst_str
 		__m64 *restrict d = (__m64 *restrict)(dest + y*dst_stride);
 
 		const __m64 *dith_r = (const __m64 *)(dither_thresh_r + ((y & 7) << 3));
-		const __m64 *dith_g = (const __m64 *)(dither_thresh_g + ((y & 7) << 3));
-		const __m64 *dith_b = (const __m64 *)(dither_thresh_b + ((y & 7) << 3));
+		//const __m64 *dith_g = (const __m64 *)(dither_thresh_g + ((y & 7) << 3));
+		//const __m64 *dith_b = (const __m64 *)(dither_thresh_b + ((y & 7) << 3));
+		const __m64 *dith_bg = (const __m64 *)(dither_thresh_bg + ((y & 7) << 3)*2);
 
 		do_prefetch((const __m64 *restrict)(s));
 		for(unsigned int x = 0; x < w; x+=8, s+=8, d+=2) {
@@ -194,7 +216,8 @@ void APPEND_CPUCAP(pallet_blit565)(uint8_t * restrict dest, unsigned int dst_str
 
 			// TODO: merge dither tables in an optimised way
 			// for this lookup
-			bg = _mm_adds_pu8(bg, _mm_unpacklo_pi32(*dith_b, *dith_g));
+			//bg = _mm_adds_pu8(bg, _mm_unpacklo_pi32(*dith_b, *dith_g));
+			bg = _mm_adds_pu8(bg, *(dith_bg + 0));
 			r  = _mm_adds_pu8(r,  *dith_r);
 
 			bg = _mm_and_si64(bg, mask); // mask off low bits we don't want
@@ -222,10 +245,10 @@ void APPEND_CPUCAP(pallet_blit565)(uint8_t * restrict dest, unsigned int dst_str
 			bg = _mm_unpacklo_pi16(c0, c1); // rg = bbbbgggg
 			r  = _mm_unpackhi_pi16(c0, c1); // r  = rrrrxxxx
 
-			// TODO: merge dither tables in an optimised way
-			// for this lookup
-			bg = _mm_adds_pu8(bg, _mm_unpackhi_pi32(*dith_b, *dith_g));
-			r  = _mm_adds_pu8(r,  _mm_srli_si64(*dith_r, 32));
+			//bg = _mm_adds_pu8(bg, _mm_unpackhi_pi32(*dith_b, *dith_g));
+			bg = _mm_adds_pu8(bg, *(dith_bg + 1));
+			r  = _mm_adds_pu8(r, _mm_srli_si64(*dith_r, 32));
+			//r  = _mm_adds_pu8(r, *(const __m64 *)((const char *)dith_r + 4));
 
 			bg = _mm_and_si64(bg, mask); // mask off low bits we don't want
 			r  = _mm_and_si64(r,  mask);

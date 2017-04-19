@@ -43,7 +43,7 @@ static void paratask_func(size_t work_item_id, void *arg_)
 
 	const int ystart = work_item_id * a->span;
 	const int yend   = IMIN(ystart + a->span, (unsigned int)a->h);
-	a->task_fn(a->dst->pixels + ystart*a->dst->pitch, a->dst->pitch, a->src + ystart*a->w, a->w, a->w, yend - ystart, a->pal);
+	a->task_fn((char *)a->dst->pixels + ystart*a->dst->pitch, a->dst->pitch, a->src + ystart*a->w, a->w, a->w, yend - ystart, a->pal);
 }
 
 void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal)

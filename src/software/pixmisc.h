@@ -57,6 +57,10 @@ void pallet_blit32_sse2(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h,
 					const uint32_t *restrict pal);
+void pallet_blit32_ssse3(uint8_t *restrict dest, unsigned int dst_stride,
+                        const uint16_t *restrict src, unsigned int src_stride,
+                        unsigned int w, unsigned int h,
+                        const uint32_t *restrict pal);
 void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
                         const uint16_t *restrict src, unsigned int src_stride,
                         unsigned int w, unsigned int h,

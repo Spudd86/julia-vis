@@ -44,6 +44,7 @@ static const int fbattrib[] = {
 };
 
 static Bool WaitForNotify(Display *d, XEvent *e, char *arg) {
+	(void)d;
 	return (e->type == MapNotify) && (e->xmap.window == (Window)arg);
 }
 
@@ -176,7 +177,7 @@ int main(int argc, char **argv)
 	while(1) {
 		if(!have_intel_swap_event) render_frame(debug_maxsrc, debug_pal, show_mandel, show_fps_hist);
 		
-		int clear_key = 1;
+		//int clear_key = 1;
 		while (XPending(dpy) > 0) 
 		{
 			XNextEvent(dpy, &event);
@@ -198,9 +199,9 @@ int main(int argc, char **argv)
 				break;*/
 				case KeyPress:
 				{
-					clear_key = 0;
-					char buffer[10];
-					int r, code;
+					//clear_key = 0;
+					//char buffer[10];
+					int code;
 					code = XLookupKeysym(&event.xkey, 0);
 					if (code == XK_F1) {
 						debug_maxsrc = !debug_maxsrc;
@@ -285,6 +286,7 @@ uint64_t uget_ticks(void) {
 }
 
 void udodelay(uint64_t us) {
+	(void)us;
 	//TODO: use clock_nanosleep so we can sleep for an absolute time?
 	//usleep(us);
 }
@@ -295,6 +297,7 @@ uint32_t get_ticks(void) {
 }
 
 void dodelay(uint32_t ms) {
+	(void)ms;
 	//usleep(ms*1000);
 }
 

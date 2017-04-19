@@ -227,16 +227,6 @@ static float *do_fft(struct simple_soft_ctx *ctx, const float *in1, const float 
 		fft[i] = ((i < nr_samp/2)?in1[i]:in2[i-nr_samp/2])*w;
 	}
 
-#if 0
-	kiss_fftr(ctx->fft_cfg, fft, ctx->fft_out);
-	const float scl = 2.0f/nr_samp;
-	for(int i=0; i < nr_samp/2 + 1; i++) {
-		float r = ctx->fft_out[i].r;
-		float i = ctx->fft_out[i].i;
-		fft[i] = sqrtf(r*r + i*i)*scl;
-	}
-#else
-
 	split_radix_real_complex_fft(ctx->fft_tmp, nr_samp);
 
 	const float scl = 2.0f/nr_samp;

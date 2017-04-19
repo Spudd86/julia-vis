@@ -68,7 +68,8 @@ static bool step(struct glpal_ctx *ctx, uint8_t step) {
 	if(!self->pallet_changing) return false;
 	self->palpos += step;
 	if(self->palpos >= 256) {
-		self->pallet_changing = self->palpos = 0;
+		self->palpos = 0;
+		self->pallet_changing = false;
 		self->curpal = self->nextpal;
 	}
 	return true;
