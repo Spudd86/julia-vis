@@ -10,9 +10,10 @@
 typedef struct {
 	uint16_t *restrict data;
 	uint16_t w,h;
+	uint16_t stride;
 } MxSurf;
 
-static void point_init(MxSurf *res, int w, int h);
+static void point_init(MxSurf *res, uint16_t w, uint16_t h);
 static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3]);
 static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, int npnts, const uint32_t *pnts);
 
@@ -29,16 +30,18 @@ struct maxsrc {
 
 struct maxsrc *maxsrc_new(int w, int h)
 {
+	//TODO: support non-square images, need to scale for aspect
 	struct maxsrc *self = calloc(sizeof(*self), 1);
 
 	self->iw = w; self->ih = h;
-	self->samp = IMIN(IMAX(w,h), 1023);
+	self->samp = (IMAX(w,h)); //IMIN(IMAX(w,h), 1023);
 
-	point_init(&self->pnt_src, IMAX(w/24, 8), IMAX(h/24, 8));
+	point_init(&self->pnt_src, (uint16_t)IMAX(w/24, 8), (uint16_t)IMAX(h/24, 8));
 	printf("maxsrc using %i %dx%d points\n", self->samp, self->pnt_src.w, self->pnt_src.h);
 
-	self->prev_src = self->buf = aligned_alloc(64, 2 * w * h * sizeof(uint16_t) + 64); // add extra padding for vector instructions to be able to run past the end
-	memset(self->prev_src, 0, 2*w*h*sizeof(uint16_t));
+	size_t bufsize = 2 * (size_t)w * (size_t)h * sizeof(uint16_t) + 128;
+	self->prev_src = self->buf = aligned_alloc(128, bufsize); // add extra padding for vector instructions to be able to run past the end
+	memset(self->prev_src, 0, bufsize);
 	self->next_src = self->prev_src + w*h;
 
 	return self;
@@ -57,14 +60,12 @@ const uint16_t *maxsrc_get(struct maxsrc *self) {
 	return self->prev_src;
 }
 
-//void list_pnt_blit_sse(void *restrict dest, int iw, uint16_t *restrict pnt, int pw, int ph, int samp, const uint32_t *pnts);
-
 // MUST NOT be called < frame of consumer apart (only uses double buffering)
 // if it's called too soon consumer may be using the frame we are modifying
 // we don't use triple buffering because this really doesn't need to run very
 // often, even below 12 times a second still looks ok, and double buffering means
-// we take up less cache and fewer pages and that means fewer falts, and since almost
-// everything we do either runs fast enough or bottleneeks on memory double
+// we take up less cache and fewer pages and that means fewer faults, and since almost
+// everything we do either runs fast enough or bottlenecks on memory double
 // buffering here seems like a good idea
 void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 {
@@ -112,8 +113,8 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 		float xi = x*zvd*iw+(iw - self->pnt_src.w)/2.0f;
 		float yi = y*zvd*ih+(ih - self->pnt_src.h)/2.0f;
 
-		pnts[i*2+0] = xi*256;
-		pnts[i*2+1] = yi*256;
+		pnts[i*2+0] = (uint32_t)(xi*256);
+		pnts[i*2+1] = (uint32_t)(yi*256);
 	}
 	draw_points(dst, self->iw, self->ih, &self->pnt_src, samp, pnts);
 
@@ -123,12 +124,13 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 	self->tx+=0.02f; self->ty+=0.01f; self->tz-=0.003f;
 }
 
-static void point_init(MxSurf *res, int w, int h)
+static void point_init(MxSurf *res, uint16_t w, uint16_t h)
 {
 	res->w = w; res->h = h;
-	uint16_t *buf = xmalloc((w+1) * (h+1) * sizeof(uint16_t) + 64); // add extra padding for vector instructions to be able to run past the end
-	memset(buf, 0, (w+1)*(h+1)*sizeof(uint16_t));
-	int stride = w+1;
+	res->stride = w + 1 + (64 - (w+1)%64);
+	uint16_t *buf = aligned_alloc(128, res->stride * (h+1) * sizeof(uint16_t) + 128); // add extra padding for vector instructions to be able to run past the end
+	memset(buf, 0, res->stride*(h+1)*sizeof(uint16_t) + 128);
+	int stride = res->stride;
 	for(int y=0; y < h; y++)  {
 		for(int x=0; x < w; x++) {
 			float u = 1.0f*((2*x+1.0f)/(w-1) - 1), v = 1.0f*((2*y+1.0f)/(h-1) - 1);
@@ -139,12 +141,20 @@ static void point_init(MxSurf *res, int w, int h)
 	res->data = buf;
 }
 
+void list_pnt_blit_ssse3(void * const restrict dest, int iw, const uint16_t *restrict pnt, int pnt_stride, int pw, int ph, int samp, const uint32_t *pnts);
+void list_pnt_blit_sse2(void * const restrict dest, int iw, const uint16_t *restrict pnt, int pnt_stride, int pw, int ph, int samp, const uint32_t *pnts);
+void list_pnt_blit_sse(void * const restrict dest, int iw, const uint16_t *restrict pnt, int pnt_stride, int pw, int ph, int samp, const uint32_t *pnts);
+
 static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, int npnts, const uint32_t *pnts)
-{
+{(void)ih;
 #if 0 //__SSE__
-	list_pnt_blit_sse(dst, iw, pnt_src->data, pnt_src->w, pnt_src->h, npnts, pnts);
+	list_pnt_blit_sse(dest, iw, pnt_src->data, pnt_src->stride, pnt_src->w, pnt_src->h, npnts, pnts);
+
+	// these two are actually slower than no vectorization
+	//list_pnt_blit_sse2(dest, iw, pnt_src->data, pnt_src->stride, pnt_src->w, pnt_src->h, npnts, pnts);
+	//list_pnt_blit_ssse3(dest, iw, pnt_src->data, pnt_src->stride, pnt_src->w, pnt_src->h, npnts, pnts);
 #else
-	const int pnt_stride = pnt_src->w+1;
+	const int pnt_stride = pnt_src->stride;
 
 	for(int i=0; i<npnts; i++) {
 		const uint32_t ipx = pnts[i*2+0], ipy = pnts[i*2+1];
@@ -155,7 +165,7 @@ static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_s
 		uint32_t a10 = ((256-yf)*xf);
 		uint32_t a11 = ((256-yf)*(256-xf));
 
-		uint32_t off = (ipy/256u)*iw + ipx/256u;
+		uint32_t off = (ipy/256u)*(unsigned)iw + ipx/256u;
 
 		const uint16_t *s0 = pnt_src->data;
 		const uint16_t *s1 = pnt_src->data + pnt_stride;
@@ -174,7 +184,25 @@ static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_s
 #endif
 }
 
+#ifdef DEBUG
+#define map_assert(a) assert(a)
+#else
+#define map_assert(a)
+#endif
+
 #define BLOCK_SIZE 8
+
+static inline void zoom_func(float *x, float *y, float u, float v, const float R[3][3])
+{
+	const float d = 0.95f + 0.053f*hypotf(u,v);
+	const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
+		(u*R[0][0] + v*R[0][1]),
+		(u*R[1][0] + v*R[1][1])*d,
+		(u*R[2][0] + v*R[2][1])*d
+	};
+	*x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
+	*y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
+}
 
 __attribute__((hot))
 static void zoom_task(size_t work_item_id, size_t span, uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3])
@@ -182,84 +210,46 @@ static void zoom_task(size_t work_item_id, size_t span, uint16_t * restrict out,
 	const int ystart = work_item_id * span * BLOCK_SIZE;
 	const int yend   = IMIN(ystart + span * BLOCK_SIZE, (unsigned int)h);
 
-	const float ustep = BLOCK_SIZE*2.0f/w, vstep = BLOCK_SIZE*2.0f/h;
-	float v0 = -1.0f + work_item_id * span * vstep;
+	const float ustep = 2.0f/w, vstep = 2.0f/h;
+	float y0 = ystart*vstep - 1.0f;
 	for(int yd = ystart; yd < yend; yd+=BLOCK_SIZE) {
-		float v1 = v0+vstep;
+		const float y1 = (yd+BLOCK_SIZE)*vstep - 1.0f;
 
 		float x, y;
 
-		{	const float u = -1.0f, v = v0;
-			const float d = 0.95f + 0.053f*hypotf(u,v);
-			const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
-				(u*R[0][0] + v*R[0][1]),
-				(u*R[1][0] + v*R[1][1])*d,
-				(u*R[2][0] + v*R[2][1])*d
-			};
-			x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
-			y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
-		}
-		float x0 = fmaxf(fminf(x, 1.0f-FLT_EPSILON*2), 0.0f)*w*256;
-		float y0 = fmaxf(fminf(y, 1.0f-FLT_EPSILON*2), 0.0f)*h*256;
+		zoom_func(&x, &y, -1.0f, y0, R);
+		uint32_t u00 = IMIN(IMAX((int32_t)(x*w*256), 0), w*256-1);
+		uint32_t v00 = IMIN(IMAX((int32_t)(y*h*256), 0), h*256-1);
 
-		{	const float u = -1.0f, v = v1;
-			const float d = 0.95f + 0.053f*hypotf(u,v);
-			const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
-				(u*R[0][0] + v*R[0][1]),
-				(u*R[1][0] + v*R[1][1])*d,
-				(u*R[2][0] + v*R[2][1])*d
-			};
-			x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
-			y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
-		}
-		float x0s = (fmaxf(fminf(x, 1.0f-FLT_EPSILON*2), 0.0f)*w*256 - x0)/BLOCK_SIZE;
-		float y0s = (fmaxf(fminf(y, 1.0f-FLT_EPSILON*2), 0.0f)*h*256 - y0)/BLOCK_SIZE;
+		zoom_func(&x, &y, -1.0f, y1, R);
+		uint32_t u10 = IMIN(IMAX((int32_t)(x*w*256), 0), w*256-1);
+		uint32_t v10 = IMIN(IMAX((int32_t)(y*h*256), 0), h*256-1);
 
-		float u1 = -1.0f;
 		for(int xd = 0; xd < w; xd+=BLOCK_SIZE) {
-			u1 = u1+ustep;
+			const float x1 = (xd+BLOCK_SIZE)*ustep - 1.0f;
 
-			{	const float u = u1, v = v0;
-				const float d = 0.95f + 0.053f*hypotf(u,v);
-				const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
-					(u*R[0][0] + v*R[0][1]),
-					(u*R[1][0] + v*R[1][1])*d,
-					(u*R[2][0] + v*R[2][1])*d
-				};
-				x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
-				y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
-			}
-			const float x1 = fmaxf(fminf(x, 1.0f-FLT_EPSILON*2), 0.0f)*w*256;
-			const float y1 = fmaxf(fminf(y, 1.0f-FLT_EPSILON*2), 0.0f)*h*256;
+			zoom_func(&x, &y, x1, y0, R);
+			const uint32_t u01 = IMIN(IMAX((int32_t)(x*w*256), 0), w*256-1);
+			const uint32_t v01 = IMIN(IMAX((int32_t)(y*h*256), 0), h*256-1);
 
+			zoom_func(&x, &y, x1, y1, R);
+			const uint32_t u11 = IMIN(IMAX((int32_t)(x*w*256), 0), w*256-1);
+			const uint32_t v11 = IMIN(IMAX((int32_t)(y*h*256), 0), h*256-1);
 
-			{	const float u = u1, v = v1;
-				const float d = 0.95f + 0.053f*hypotf(u,v);
-				const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
-					(u*R[0][0] + v*R[0][1]),
-					(u*R[1][0] + v*R[1][1])*d,
-					(u*R[2][0] + v*R[2][1])*d
-				};
-				x = (p[0]*R[0][0] + p[1]*R[1][0] + p[2]*R[2][0]+1.0f)*0.5f;
-				y = (p[0]*R[0][1] + p[1]*R[1][1] + p[2]*R[2][1]+1.0f)*0.5f;
-			}
-			const float x1s = (fmaxf(fminf(x, 1.0f-FLT_EPSILON*2), 0.0f)*w*256 - x1)/BLOCK_SIZE;
-			const float y1s = (fmaxf(fminf(y, 1.0f-FLT_EPSILON*2), 0.0f)*h*256 - y1)/BLOCK_SIZE;
+			uint32_t u0 = u00*BLOCK_SIZE;
+			uint32_t u1 = u01*BLOCK_SIZE;
+			uint32_t v0 = v00*BLOCK_SIZE;
+			uint32_t v1 = v01*BLOCK_SIZE;
 
-			const float xsts = (x1s - x0s)/BLOCK_SIZE;
-			const float ysts = (y1s - y0s)/BLOCK_SIZE;
-			float fxst = (x1 - x0)/BLOCK_SIZE;
-			float fyst = (y1 - y0)/BLOCK_SIZE;
-
-			for(uint32_t yt=0; yt<BLOCK_SIZE; yt++, x0+=x0s, y0+=y0s, fxst+=xsts, fyst+=ysts) {
+			for(uint32_t yt=0; yt<BLOCK_SIZE; yt++) {
 				uint16_t *restrict out_line = out + (yd+yt)*w + xd;
-				int32_t xst = fxst, yst = fyst;
-				for(uint32_t xt=0, u = x0, v = y0; xt<BLOCK_SIZE; xt++, u+=xst, v+=yst) {
-					assert(u >= 0); assert(u < w*256); // in debug builds make sure rounding hasn't messed us up
-					assert(v >= 0); assert(v < h*256);
 
-					const uint32_t xs=u>>8,  ys=v>>8;
-					const uint32_t xf=u&0xFF, yf=v&0xFF;
+				uint32_t u = u0*BLOCK_SIZE;
+				uint32_t v = v0*BLOCK_SIZE;
+				for(uint32_t xt=0; xt<BLOCK_SIZE; xt++) {
+					const uint32_t ut = u/(BLOCK_SIZE*BLOCK_SIZE), vt = v/(BLOCK_SIZE*BLOCK_SIZE);
+					const uint32_t xs=ut>>8,  ys=vt>>8;
+					const uint32_t xf=ut&0xFF, yf=vt&0xFF;
 					const uint32_t xi1 = xs;
 					const uint32_t yi1 = ys*w;
 					const uint32_t xi2 = IMIN(xi1+1,(uint32_t)(w-1));
@@ -271,12 +261,20 @@ static void zoom_task(size_t work_item_id, size_t span, uint16_t * restrict out,
 					tmp = (tmp*((256u*97u)/100u)) >> 8u;
 
 					out_line[xt] = (uint16_t)tmp;
+
+					u = u + u1 - u0;
+					v = v + v1 - v0;
 				}
+				u0 = u0 - u00 + u10;
+				u1 = u1 - u01 + u11;
+				v0 = v0 - v00 + v10;
+				v1 = v1 - v01 + v11;
+
 			}
-			x0 = x1; y0 = y1;
-			x0s = x1s; y0s = y1s;
+			v00 = v01; v10 = v11;
+			u00 = u01; u10 = u11;
 		}
-		v0=v1;
+		y0=y1;
 	}
 }
 
