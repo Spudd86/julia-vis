@@ -8,7 +8,12 @@
 #include <assert.h>
 
 #include "paratask.h"
+
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__)
+#include <threads.h>
+#else
 #include "tinycthread.h"
+#endif
 
 struct work_fn_args
 {
@@ -70,7 +75,7 @@ static int test_thread(void *ctx)
 
 int main()
 {
-	struct paratask_ctx *paratask = paratask_new(16);
+	struct paratask_ctx *paratask = paratask_new(8);
 
 	uint32_t *buf1 = malloc(sizeof(uint32_t)*BUF_SIZE);
 	struct work_fn_args args1 = { buf1, BLOCK_SIZE };
@@ -95,8 +100,8 @@ int main()
 	task1 = paratask_call_async(paratask, 0, BUF_SIZE/BLOCK_SIZE, work_function, &args1);
 	task2 = paratask_call_async(paratask, 0, BUF_SIZE/BLOCK_SIZE, work_function, &args2);
 
-	paratask_wait(task1);
 	paratask_wait(task2);
+	paratask_wait(task1);
 	paratask_delete(paratask);
 
 	assert(buf1[BUF_SIZE-1] == BUF_SIZE-1);
@@ -126,19 +131,20 @@ int main()
 
 	paratask = paratask_new(0);
 
-	struct paratask_task *task_list[128];
+	struct paratask_task *task_list[256];
 	uint32_t *buf3 = malloc(sizeof(uint32_t)*128*1024*1024);
-	struct work_fn_args args3 = { buf3, 128 }; 
-	for(size_t i=0; i<128; i++) {
-		task_list[i] = paratask_call_async(paratask, i*1024*1024, 1024*1024, work_function, &args1);
+	struct work_fn_args args3 = { buf3, 128 };
+	for(size_t i=0; i<256; i++) {
+		task_list[i] = paratask_call_async(paratask, i*512, 512, work_function, &args3);
 	}
+	thrd_sleep(&(struct timespec){.tv_sec=0, .tv_nsec=1000}, NULL);
 	paratask_delete(paratask);
 	unsigned int tasks_finished = 0;
-	for(size_t i=0; i<128; i++) {
+	for(size_t i=0; i<256; i++) {
 		if(!paratask_wait(task_list[i])) tasks_finished++;
 	}
 
-	printf("Test4 Complete, finished %ud\n", tasks_finished);
+	printf("Test4 Complete, finished %u\n", tasks_finished);
 
 	return 0;
 }

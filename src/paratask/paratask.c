@@ -9,44 +9,15 @@
 
 #include "paratask.h"
 
-// if we have c11 and gcc is new enough that it's not lying about thread support
-// use real C11 threads
-#if (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__) && (defined(__clang__) || !(defined(__GNUC__) && defined(__GNUC_MINOR__) && (((__GNUC__ << 8) | __GNUC_MINOR__) >= ((4 << 8) | 9))))
+// NOTE: some versions of gcc/clang fail to define __STDC_NO_THREADS__ even if the libc doesn't support C11 threads
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__)
 #	include <threads.h>
 #else
 #	include "tinycthread.h"
 #endif
 
-#if __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_ATOMICS__) && !defined(PARATASK_NO_ATOMICS)
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_ATOMICS__) && !defined(PARATASK_NO_ATOMICS)
 #	include <stdatomic.h>
-#elif defined(__GNUC__) && !defined(PARATASK_NO_ATOMICS)
-#	if __GNUC__ >= 4 && __GNUC_MINOR__ >= 7
-		// use the gcc built in equivelents of stdatomic funcs since we have them
-		typedef int memory_order;
-		typedef size_t atomic_size_t;
-#		define memory_order_relaxed __ATOMIC_RELAXED
-#		define memory_order_consume __ATOMIC_CONSUME
-#		define memory_order_acquire __ATOMIC_ACQUIRE
-#		define memory_order_release __ATOMIC_RELEASE
-#		define memory_order_acq_rel __ATOMIC_ACQ_REL
-#		define memory_order_seq_cst __ATOMIC_SEQ_CST
-#		define atomic_init(obj, v) __atomic_store_n(obj, v, __ATOMIC_SEQ_CST)
-#		define atomic_fetch_add_explicit(v, a, o) __atomic_fetch_add(v, a, o)
-#		pragma message "Using GCC memory model aware atomics"
-#	else
-		typedef volatile size_t atomic_size_t;
-		typedef enum {
-			memory_order_relaxed,
-			memory_order_consume,
-			memory_order_acquire,
-			memory_order_release,
-			memory_order_acq_rel,
-			memory_order_seq_cst
-		} memory_order;
-#		define atomic_fetch_add_explicit(obj, arg, order) __sync_fetch_and_add((obj), (arg))
-#		define atomic_init(obj, init) do { *(obj) = (init); __sync_synchronize(); } while(0)
-#		pragma message "Using GCC atomics (no memory model)"
-#	endif
 #else
 #	define PARATASK_NO_ATOMICS 1
 #	pragma message "no atomics"
@@ -61,12 +32,16 @@ struct paratask_task
 	size_t work_offset;
 	size_t work_size;
 
-	int work_complete;
 	int nthreads_working;
-	mtx_t task_mtx;
-	cnd_t idle_cnd;
+	int nthreads_done;
 
-	struct paratask_task *next_task;
+	bool alive; ///< true as long as the task either might run or is running
+	bool work_complete; ///< true if all the task's work was done
+
+	mtx_t task_mtx;
+	cnd_t idle_cnd; ///< used to notify when task stops being alive, must hold task_mtx
+
+	struct paratask_task *next_task; ///< task to run after this one must hold ctx->queue_mtx to access
 
 #if PARATASK_NO_ATOMICS
 	size_t next_work_id;
@@ -164,9 +139,11 @@ void paratask_delete(struct paratask_ctx *self)
 	struct paratask_task *cur = self->next_task;
 	while(cur) {
 		mtx_lock(&cur->task_mtx);
-		cur->work_complete = -1;
-		cnd_broadcast(&cur->idle_cnd);
 		struct paratask_task *next = cur->next_task;
+		cur->ctx = NULL;
+		cur->alive = false;
+		cur->next_task = NULL;
+		cnd_broadcast(&cur->idle_cnd);
 		mtx_unlock(&cur->task_mtx);
 
 		cur = next;
@@ -181,6 +158,16 @@ void paratask_delete(struct paratask_ctx *self)
 
 int paratask_call(struct paratask_ctx *self, size_t work_offset, size_t work_size, paratask_task_fn fn, void *arg)
 {
+	// If only 1 thread and we're not going to be async just run in current context
+	// so we don't have threading overhead when it won't buy us anything.
+	if(self->nthreads == 1)
+	{
+		for(size_t gid = 0; gid < work_size; gid++) {
+			fn(gid + work_offset, arg);
+		}
+		return 0;
+	}
+
 	struct paratask_task *task = paratask_call_async(self, work_offset, work_size, fn, arg);
 	if(!task) return -1;
 
@@ -194,7 +181,6 @@ struct paratask_task *paratask_call_async(struct paratask_ctx *self, size_t work
 	struct paratask_task *task = malloc(sizeof(*task));
 	if(!task) return NULL;
 
-	mtx_lock(&self->queue_mtx);
 	//FIXME: return errors instead of calling abort()
 	// not too worried about hitting these though because that's a truly unreasonable
 	// amount of work, especially on 64 bit systems
@@ -208,8 +194,10 @@ struct paratask_task *paratask_call_async(struct paratask_ctx *self, size_t work
 	task->fn_arg = arg;
 
 	task->next_task = NULL;
-	task->work_complete = 0;
+	task->work_complete = false;
 	task->nthreads_working = 0;
+	task->nthreads_done = 0;
+	task->alive = true;
 
 	if(thrd_success != mtx_init(&task->task_mtx, mtx_plain)) abort();
 	cnd_init(&task->idle_cnd);
@@ -220,14 +208,16 @@ struct paratask_task *paratask_call_async(struct paratask_ctx *self, size_t work
 	atomic_init(&task->next_work_id, 0);
 #endif
 
+	mtx_lock(&self->queue_mtx);
+
 	if(!self->next_task) {
-		assert(self->last_task == NULL);
-		self->next_task = self->last_task = task;
+		self->next_task = task;
+		self->last_task = task;
 	} else {
-		assert(self->last_task);
 		self->last_task->next_task = task;
 		self->last_task = task;
 	}
+
 	cnd_broadcast(&self->queue_cnd);
 	mtx_unlock(&self->queue_mtx);
 
@@ -238,26 +228,16 @@ int paratask_wait(struct paratask_task *task)
 {
 	int retval = 0;
 	mtx_lock(&task->task_mtx);
-	// need to check both because nthreads_working will ALWAYS be zero the first
-	// time through because the workers haven't had a chance to start because we
-	// hold queue_mtx, and work_complete gets set when ANY thread runs out stuff
-	// to do so it could be set while there's still another worker that hasn't
-	// finished it's last work item
-	while(task->nthreads_working != 0 || task->work_complete == 0)
+
+	while(task->alive)
 		cnd_wait(&task->idle_cnd, &task->task_mtx);
-	if(task->work_complete != 1) { // work didn't actually finish
+
+	if(!task->work_complete) { // work didn't actually finish
 		retval = -1;
 	}
 
-#if 0
-	task->ctx = NULL;
-	task->work_offset = 0;
-	task->work_size = 0;
-	task->func = NULL;
-	task->fn_arg = NULL;
-#endif
 	mtx_unlock(&task->task_mtx);
-	
+
 	mtx_destroy(&task->task_mtx);
 	cnd_destroy(&task->idle_cnd);
 
@@ -288,13 +268,16 @@ static int task_thread(void *ctx)
 	struct paratask_ctx *self = ctx;
 	mtx_lock(&self->queue_mtx);
 	int thread_num = self->nthreads_alive++;
+	mtx_unlock(&self->queue_mtx);
 
 	set_thread_name(thread_num);
 
 	if(self->set_affinity)
 		paratsk_set_thread_affinity(thread_num);
 
-	while(1) {
+	while(1)
+	{
+		mtx_lock(&self->queue_mtx);
 		while(!self->next_task && !self->shutting_down) {
 			cnd_wait(&self->queue_cnd, &self->queue_mtx);
 		}
@@ -302,41 +285,37 @@ static int task_thread(void *ctx)
 
 		struct paratask_task *task = self->next_task;
 
-		// if we're the last thread to grab the task or the task is already done
-		// remove it from the list
-		mtx_lock(&task->task_mtx);
+		task->nthreads_working++;
+		if(task->nthreads_working == self->nthreads) { // last worker to start removes task from queue
+			self->next_task = task->next_task;
+			if(self->next_task == NULL) self->last_task = NULL;
+		}
+		mtx_unlock(&self->queue_mtx);
+
 		size_t global_work_offset = task->work_offset;
 		size_t global_work_size = task->work_size;
 		paratask_task_fn work_func = task->func;
 		void *work_fn_arg = task->fn_arg;
 
-		task->nthreads_working++;
-		mtx_unlock(&task->task_mtx);
-		mtx_unlock(&self->queue_mtx);
-
 		while(1) {
 			size_t work_item_id = next_work_item(task);
-
 			if(work_item_id >= global_work_size) break;
-
 			work_func(work_item_id + global_work_offset, work_fn_arg);
 		}
 
-		mtx_lock(&self->queue_mtx);
 		mtx_lock(&task->task_mtx);
-		if(!task->work_complete) { // first worker to get finish removes task from queue
-			self->next_task = task->next_task;
-			if(!self->next_task) self->last_task = NULL;
-			task->next_task = NULL;
-		}
-		task->work_complete = 1;
-		task->nthreads_working--;
-		if(!task->nthreads_working) {
-			if(thrd_success != cnd_signal(&task->idle_cnd)) abort(); // failure here will almost certainly stall the main thread
+		task->nthreads_done++;
+		if(task->nthreads_done == self->nthreads)
+		{
+			task->alive = false;
+			task->work_complete = true;
+
+			if(thrd_success != cnd_broadcast(&task->idle_cnd)) abort(); // failure here will almost certainly stall the main thread
 		}
 		mtx_unlock(&task->task_mtx);
 	}
 
+	// queue mutex will be held here
 	self->nthreads_alive--;
 	if(!self->nthreads_alive) {
 		if(thrd_success != cnd_signal(&self->shutdown_cnd)) abort(); // failure here will almost certainly stall the main thread
@@ -372,11 +351,26 @@ static void set_thread_name(int thread_num)
 static void paratsk_set_thread_affinity(int thread_num)
 {
 #if (defined(_WIN32) || defined(__WIN32__)) && !defined(__CYGWIN__)
+	// only works properly on systems with less than 64 CPUs, but it's unlikely
+	// that this will scale up to systems even that large anyway
+	// It will however properly use the 64 CPUs it can find
 	DWORD_PTR process_mask;
 	DWORD_PTR system_mask;
-	if(GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask)) {
-		DWORD_PTR mask = process_mask;
-		//FIXME: write windows support
+	if(GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask))
+	{
+		int count = 0;
+		for(size_t i=0; i<64; i++) {
+			if((process_mask >> i) & 1)
+			{
+				if(count == thread_num) {
+					DWORD_PTR mask = 1;
+					mask = mask << i;
+					SetThreadAffinityMask(GetCurrentThread(), mask);
+					return;
+				}
+				count++;
+			}
+		}
 	}
 #elif defined(__linux__) //exists in glibc >= 2.3.4 and in musl, Linux specific syscalls
 	cpu_set_t set; //NOTE: will fail on systems with a huge number of cores (>1024), but this probably won't scale to that anyway
@@ -403,6 +397,9 @@ static void paratsk_set_thread_affinity(int thread_num)
 static int default_thread_count(void)
 {
 #if (defined(_WIN32) || defined(__WIN32__)) && !defined(__CYGWIN__)
+	// only works properly on systems with less than 64 CPUs, but it's unlikely
+	// that this will scale up to systems even that large anyway
+	// It will however properly use the 64 CPUs it can find
 	DWORD_PTR process_mask;
 	DWORD_PTR system_mask;
 	if(GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask)) {
