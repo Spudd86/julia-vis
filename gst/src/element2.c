@@ -10,7 +10,7 @@
 
 //TODO: take a look at visualization plugins in gstreamer 1.6
 // particularly wavescope/spacescope and see how hard it would be
-// to avoid using GstAudioVisualizer
+// to avoid using GstAudioVisualizer2
 
 //TODO: work out if playbin is doing something to end up with a more efficient
 // pipeline, if so see if we can replicate it via gst-launch
@@ -74,10 +74,10 @@ static GstElementClass *parent_class = NULL;
 static void gst_julia_vis_init (GstJuliaVis * visual);
 static void gst_julia_vis_finalize (GObject * object);
 
-static gboolean gst_julia_vis_setup (GstAudioVisualizer * bscope);
-static gboolean gst_julia_vis_add_audio(GstAudioVisualizer *bscope, GstBuffer * audio);
-static gboolean gst_julia_vis_render (GstAudioVisualizer * bscope, GstVideoFrame * video);
-static void gst_julia_vis_frame_dropped (GstAudioVisualizer * bscope);
+static gboolean gst_julia_vis_setup (GstAudioVisualizer2 * bscope);
+static gboolean gst_julia_vis_add_audio(GstAudioVisualizer2 *bscope, GstBuffer * audio);
+static gboolean gst_julia_vis_render (GstAudioVisualizer2 * bscope, GstVideoFrame * video);
+static void gst_julia_vis_frame_dropped (GstAudioVisualizer2 * bscope);
 
 #define GST_JULIA_VIS_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), GST_TYPE_JULIA_VIS, GstJuliaVisPrivate))
 
@@ -185,7 +185,7 @@ static julia_vis_pixel_format get_vis_format(GstVideoFormat gst_format)
 }
 
 static gboolean
-gst_julia_vis_setup(GstAudioVisualizer * bscope)
+gst_julia_vis_setup(GstAudioVisualizer2 * bscope)
 {
 	GstJuliaVis *self = GST_JULIA_VIS(bscope);
 
@@ -218,7 +218,7 @@ gst_julia_vis_setup(GstAudioVisualizer * bscope)
 	return true;
 }
 
-static gboolean gst_julia_vis_add_audio(GstAudioVisualizer *bscope, GstBuffer * audio)
+static gboolean gst_julia_vis_add_audio(GstAudioVisualizer2 *bscope, GstBuffer * audio)
 {
 	GstJuliaVis *self = GST_JULIA_VIS(bscope);
 	
@@ -245,7 +245,7 @@ static gboolean gst_julia_vis_add_audio(GstAudioVisualizer *bscope, GstBuffer * 
 }
 
 static void
-gst_julia_vis_frame_dropped(GstAudioVisualizer * bscope)
+gst_julia_vis_frame_dropped(GstAudioVisualizer2 * bscope)
 {
 	GstJuliaVis *self = GST_JULIA_VIS(bscope);
 
@@ -253,7 +253,7 @@ gst_julia_vis_frame_dropped(GstAudioVisualizer * bscope)
 }
 
 static gboolean
-gst_julia_vis_render (GstAudioVisualizer * bscope, GstVideoFrame * video)
+gst_julia_vis_render (GstAudioVisualizer2 * bscope, GstVideoFrame * video)
 {
 	GstJuliaVis *self = GST_JULIA_VIS(bscope);
 	
@@ -372,7 +372,7 @@ gst_julia_vis_class_init (gpointer g_class, gpointer class_data)
 {
 	GObjectClass *gobject_class = (GObjectClass *) g_class;
 	GstElementClass *element_class = (GstElementClass *) g_class;
-	GstAudioVisualizerClass *scope_class = (GstAudioVisualizerClass *) g_class;
+	GstAudioVisualizer2Class *scope_class = (GstAudioVisualizer2Class *) g_class;
 
 	g_type_class_add_private (g_class, sizeof (GstJuliaVisPrivate));
 
@@ -427,7 +427,7 @@ gst_julia_vis_get_type (void)
 			(GInstanceInitFunc) gst_julia_vis_init
 		};
 		GType _type;
-		_type = g_type_register_static(GST_TYPE_AUDIO_VISUALIZER, "GstJuliaVis", &info, 0);
+		_type = g_type_register_static(GST_TYPE_AUDIO_VISUALIZER2, "GstJuliaVis", &info, 0);
 		g_once_init_leave(&type, _type);
 	}
 	return type;

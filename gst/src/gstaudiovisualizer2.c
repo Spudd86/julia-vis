@@ -47,18 +47,18 @@
 #include "gstaudiovisualizer2.h"
 //#include "pbutils-enumtypes.h"
 
-GST_DEBUG_CATEGORY_STATIC (audio_visualizer_debug);
-#define GST_CAT_DEFAULT (audio_visualizer_debug)
+GST_DEBUG_CATEGORY_STATIC (julia_visualizer_debug);
+#define GST_CAT_DEFAULT (julia_visualizer_debug)
 
 static GstBaseTransformClass *parent_class = NULL;
 
-static void gst_audio_visualizer_class_init (GstAudioVisualizerClass * klass);
-static void gst_audio_visualizer_init (GstAudioVisualizer * scope, GstAudioVisualizerClass * g_class);
+static void gst_audio_visualizer_class_init (GstAudioVisualizer2Class * klass);
+static void gst_audio_visualizer_init (GstAudioVisualizer2 * scope, GstAudioVisualizer2Class * g_class);
 static void gst_audio_visualizer_dispose (GObject * object);
 
-static gboolean gst_audio_visualizer_src_negotiate (GstAudioVisualizer * scope);
-static gboolean gst_audio_visualizer_src_setcaps (GstAudioVisualizer *scope, GstCaps * caps);
-static gboolean gst_audio_visualizer_sink_setcaps (GstAudioVisualizer *scope, GstCaps * caps);
+static gboolean gst_audio_visualizer_src_negotiate (GstAudioVisualizer2 * scope);
+static gboolean gst_audio_visualizer_src_setcaps (GstAudioVisualizer2 *scope, GstCaps * caps);
+static gboolean gst_audio_visualizer_sink_setcaps (GstAudioVisualizer2 *scope, GstCaps * caps);
 
 static GstFlowReturn gst_audio_visualizer_chain (GstPad * pad, GstObject * parent, GstBuffer * buffer);
 
@@ -73,14 +73,14 @@ static gboolean gst_audio_visualizer_src_query (GstPad * pad,
 static GstStateChangeReturn gst_audio_visualizer_change_state (GstElement *
     element, GstStateChange transition);
 
-static gboolean gst_audio_visualizer_do_bufferpool (GstAudioVisualizer * scope, GstCaps * outcaps);
+static gboolean gst_audio_visualizer_do_bufferpool (GstAudioVisualizer2 * scope, GstCaps * outcaps);
 
 static gboolean
-default_decide_allocation (GstAudioVisualizer * scope, GstQuery * query);
+default_decide_allocation (GstAudioVisualizer2 * scope, GstQuery * query);
 
-#define GST_AUDIO_VISUALIZER_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), GST_TYPE_AUDIO_VISUALIZER, GstAudioVisualizerPrivate))
+#define GST_AUDIO_VISUALIZER_GET_PRIVATE(obj) (G_TYPE_INSTANCE_GET_PRIVATE ((obj), GST_TYPE_AUDIO_VISUALIZER2, GstAudioVisualizer2Private))
 
-struct _GstAudioVisualizerPrivate
+struct _GstAudioVisualizer2Private
 {
   gboolean negotiated;
 
@@ -115,19 +115,19 @@ struct _GstAudioVisualizerPrivate
 /* base class */
 
 GType
-gst_audio_visualizer_get_type (void)
+gst_audio_visualizer2_get_type (void)
 {
   static volatile gsize audio_visualizer_type = 0;
 
   if (g_once_init_enter (&audio_visualizer_type)) {
     static const GTypeInfo audio_visualizer_info = {
-      sizeof (GstAudioVisualizerClass),
+      sizeof (GstAudioVisualizer2Class),
       NULL,
       NULL,
       (GClassInitFunc) gst_audio_visualizer_class_init,
       NULL,
       NULL,
-      sizeof (GstAudioVisualizer),
+      sizeof (GstAudioVisualizer2),
       0,
       (GInstanceInitFunc) gst_audio_visualizer_init,
     };
@@ -135,23 +135,23 @@ gst_audio_visualizer_get_type (void)
 
     /* TODO: rename when exporting it as a library */
     _type = g_type_register_static (GST_TYPE_ELEMENT,
-        "GstAudioVisualizer", &audio_visualizer_info, G_TYPE_FLAG_ABSTRACT);
+        "GstAudioVisualizer2", &audio_visualizer_info, G_TYPE_FLAG_ABSTRACT);
     g_once_init_leave (&audio_visualizer_type, _type);
   }
   return (GType) audio_visualizer_type;
 }
 
 static void
-gst_audio_visualizer_class_init (GstAudioVisualizerClass * klass)
+gst_audio_visualizer_class_init (GstAudioVisualizer2Class * klass)
 {
   GObjectClass *gobject_class = (GObjectClass *) klass;
   GstElementClass *element_class = (GstElementClass *) klass;
 
-  g_type_class_add_private (klass, sizeof (GstAudioVisualizerPrivate));
+  g_type_class_add_private (klass, sizeof (GstAudioVisualizer2Private));
 
   parent_class = g_type_class_peek_parent (klass);
 
-  GST_DEBUG_CATEGORY_INIT (audio_visualizer_debug,
+  GST_DEBUG_CATEGORY_INIT (julia_visualizer_debug,
       "baseaudiovisualizer-julia", 0,
       "scope audio visualisation base class");
 
@@ -164,8 +164,8 @@ gst_audio_visualizer_class_init (GstAudioVisualizerClass * klass)
 }
 
 static void
-gst_audio_visualizer_init (GstAudioVisualizer * scope,
-    GstAudioVisualizerClass * g_class)
+gst_audio_visualizer_init (GstAudioVisualizer2 * scope,
+    GstAudioVisualizer2Class * g_class)
 {
   GstPadTemplate *pad_template;
 
@@ -208,7 +208,7 @@ gst_audio_visualizer_init (GstAudioVisualizer * scope,
 static void
 gst_audio_visualizer_dispose (GObject * object)
 {
-  GstAudioVisualizer *scope = GST_AUDIO_VISUALIZER (object);
+  GstAudioVisualizer2 *scope = GST_AUDIO_VISUALIZER2 (object);
 
   if (scope->priv->adapter) {
     g_object_unref (scope->priv->adapter);
@@ -222,7 +222,7 @@ gst_audio_visualizer_dispose (GObject * object)
 }
 
 static void
-gst_audio_visualizer_reset (GstAudioVisualizer * scope)
+gst_audio_visualizer_reset (GstAudioVisualizer2 * scope)
 {
   gst_adapter_clear (scope->priv->adapter);
   gst_segment_init (&scope->priv->segment, GST_FORMAT_UNDEFINED);
@@ -237,7 +237,7 @@ gst_audio_visualizer_reset (GstAudioVisualizer * scope)
 }
 
 static gboolean
-gst_audio_visualizer_sink_setcaps (GstAudioVisualizer * scope, GstCaps * caps)
+gst_audio_visualizer_sink_setcaps (GstAudioVisualizer2 * scope, GstCaps * caps)
 {
   GstAudioInfo info;
 
@@ -269,16 +269,16 @@ not_negotiated:
 }
 
 static gboolean
-gst_audio_visualizer_src_setcaps (GstAudioVisualizer * scope, GstCaps * caps)
+gst_audio_visualizer_src_setcaps (GstAudioVisualizer2 * scope, GstCaps * caps)
 {
   GstVideoInfo info;
-  GstAudioVisualizerClass *klass;
+  GstAudioVisualizer2Class *klass;
   gboolean res;
 
   if (!gst_video_info_from_caps (&info, caps))
     goto wrong_caps;
 
-  klass = GST_AUDIO_VISUALIZER_CLASS (G_OBJECT_GET_CLASS (scope));
+  klass = GST_AUDIO_VISUALIZER2_CLASS (G_OBJECT_GET_CLASS (scope));
 
   scope->vinfo = info;
 
@@ -322,7 +322,7 @@ setup_failed:
 }
 
 static gboolean
-gst_audio_visualizer_src_negotiate (GstAudioVisualizer * scope)
+gst_audio_visualizer_src_negotiate (GstAudioVisualizer2 * scope)
 {
   GstCaps *othercaps, *target;
   GstStructure *structure;
@@ -371,14 +371,14 @@ no_format:
 
 /* takes ownership of the pool, allocator and query */
 static gboolean
-gst_audio_visualizer_set_allocation (GstAudioVisualizer * scope,
+gst_audio_visualizer_set_allocation (GstAudioVisualizer2 * scope,
     GstBufferPool * pool, GstAllocator * allocator,
     GstAllocationParams * params, GstQuery * query)
 {
   GstAllocator *oldalloc;
   GstBufferPool *oldpool;
   GstQuery *oldquery;
-  GstAudioVisualizerPrivate *priv = scope->priv;
+  GstAudioVisualizer2Private *priv = scope->priv;
 
   GST_OBJECT_LOCK (scope);
   oldpool = priv->pool;
@@ -412,12 +412,12 @@ gst_audio_visualizer_set_allocation (GstAudioVisualizer * scope,
 }
 
 static gboolean
-gst_audio_visualizer_do_bufferpool (GstAudioVisualizer * scope, GstCaps * outcaps)
+gst_audio_visualizer_do_bufferpool (GstAudioVisualizer2 * scope, GstCaps * outcaps)
 {
   GstQuery *query;
   gboolean result = TRUE;
   GstBufferPool *pool = NULL;
-  GstAudioVisualizerClass *klass;
+  GstAudioVisualizer2Class *klass;
   GstAllocator *allocator;
   GstAllocationParams params;
 
@@ -431,7 +431,7 @@ gst_audio_visualizer_do_bufferpool (GstAudioVisualizer * scope, GstCaps * outcap
     GST_DEBUG_OBJECT (scope, "allocation query failed");
   }
 
-  klass = GST_AUDIO_VISUALIZER_GET_CLASS (scope);
+  klass = GST_AUDIO_VISUALIZER2_GET_CLASS (scope);
 
   GST_DEBUG_OBJECT (scope, "calling decide_allocation");
   g_assert (klass->decide_allocation != NULL);
@@ -473,7 +473,7 @@ no_decide_allocation:
 }
 
 static gboolean
-default_decide_allocation (GstAudioVisualizer * scope, GstQuery * query)
+default_decide_allocation (GstAudioVisualizer2 * scope, GstQuery * query)
 {
   GstCaps *outcaps;
   GstBufferPool *pool;
@@ -539,9 +539,9 @@ default_decide_allocation (GstAudioVisualizer * scope, GstQuery * query)
 }
 
 static GstFlowReturn
-default_prepare_output_buffer (GstAudioVisualizer * scope, GstBuffer ** outbuf)
+default_prepare_output_buffer (GstAudioVisualizer2 * scope, GstBuffer ** outbuf)
 {
-  GstAudioVisualizerPrivate *priv;
+  GstAudioVisualizer2Private *priv;
 
   priv = scope->priv;
 
@@ -572,13 +572,13 @@ gst_audio_visualizer_chain (GstPad * pad, GstObject * parent,
     GstBuffer * buffer)
 {
   GstFlowReturn ret = GST_FLOW_OK;
-  GstAudioVisualizer *scope;
-  GstAudioVisualizerClass *klass;
+  GstAudioVisualizer2 *scope;
+  GstAudioVisualizer2Class *klass;
   GstClockTime ts;
   guint avail, sbpf;
 
-  scope = GST_AUDIO_VISUALIZER (parent);
-  klass = GST_AUDIO_VISUALIZER_CLASS (G_OBJECT_GET_CLASS (scope));
+  scope = GST_AUDIO_VISUALIZER2 (parent);
+  klass = GST_AUDIO_VISUALIZER2_CLASS (G_OBJECT_GET_CLASS (scope));
 
   GST_LOG_OBJECT (scope, "chainfunc called");
 
@@ -738,9 +738,9 @@ gst_audio_visualizer_src_event (GstPad * pad, GstObject * parent,
     GstEvent * event)
 {
   gboolean res;
-  GstAudioVisualizer *scope;
+  GstAudioVisualizer2 *scope;
 
-  scope = GST_AUDIO_VISUALIZER (parent);
+  scope = GST_AUDIO_VISUALIZER2 (parent);
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_QOS:
@@ -782,11 +782,11 @@ static gboolean
 gst_audio_visualizer_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
 {
   gboolean res;
-  GstAudioVisualizer *scope;
+  GstAudioVisualizer2 *scope;
 
   //TODO: need to handle EOS and possibly push out an extra video frame?
 
-  scope = GST_AUDIO_VISUALIZER (parent);
+  scope = GST_AUDIO_VISUALIZER2 (parent);
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_CAPS:
@@ -826,9 +826,9 @@ static gboolean
 gst_audio_visualizer_src_query (GstPad * pad, GstObject * parent, GstQuery * query)
 {
   gboolean res = FALSE;
-  GstAudioVisualizer *scope;
+  GstAudioVisualizer2 *scope;
 
-  scope = GST_AUDIO_VISUALIZER (parent);
+  scope = GST_AUDIO_VISUALIZER2 (parent);
 
   switch (GST_QUERY_TYPE (query)) {
     case GST_QUERY_LATENCY:
@@ -884,9 +884,9 @@ static GstStateChangeReturn
 gst_audio_visualizer_change_state (GstElement * element, GstStateChange transition)
 {
   GstStateChangeReturn ret;
-  GstAudioVisualizer *scope;
+  GstAudioVisualizer2 *scope;
 
-  scope = GST_AUDIO_VISUALIZER (element);
+  scope = GST_AUDIO_VISUALIZER2 (element);
 
   switch (transition) {
     case GST_STATE_CHANGE_READY_TO_PAUSED:

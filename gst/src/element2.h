@@ -35,14 +35,14 @@ typedef enum {
 
 struct _GstJuliaVis
 {
-	GstAudioVisualizer element;
+	GstAudioVisualizer2 element;
 
 	GstJuliaVisPrivate *priv;
 };
 
 struct _GstJuliaVisClass
 {
-	GstAudioVisualizerClass parent_class;
+	GstAudioVisualizer2Class parent_class;
 };
 
 GType gst_julia_vis_get_type (void);

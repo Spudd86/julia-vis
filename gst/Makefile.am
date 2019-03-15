@@ -16,11 +16,13 @@ AM_LDFLAGS = \
 	-Wl,--gc-sections \
 	-Wl,--as-needed
 
-plugin_LTLIBRARIES = libgstjuliavis.la
+lib_LTLIBRARIES = libgstjuliavis.la
 libgstjuliavis_la_CFLAGS = $(GST_CFLAGS)
 libgstjuliavis_la_LIBADD = $(GST_LIBS)
-libgstjuliavis_la_LDFLAGS = $(AM_LDFLAGS) $(GST_PLUGIN_LDFLAGS) -no-undefined
+libgstjuliavis_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS) -no-undefined
 libgstjuliavis_la_LIBTOOLFLAGS = --tag=disable-static
+
+
 libgstjuliavis_la_SOURCES = \
 vis/common.h \
 vis/colourspace.h \
@@ -53,6 +55,7 @@ vis/software/map.h \
 vis/software/palletblit.c \
 vis/software/simple_main.c \
 vis/software/simple_main.h \
+vis/software/resample_image.h \
 vis/paratask/paratask.c \
 vis/paratask/paratask.h \
 tinycthread/tinycthread.c \

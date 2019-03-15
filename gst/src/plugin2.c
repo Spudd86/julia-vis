@@ -15,6 +15,6 @@ plugin_init (GstPlugin * plugin)
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    julia_vis,
+    juliavis,
     "julia_vis visualization plugin",
     plugin_init, "0.0.1", "GPL", "Julia Vis", "https://github.com/Spudd86/julia-vis")

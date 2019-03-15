@@ -115,6 +115,7 @@ AC_MSG_RESULT([
         sysconfdir:             ${sysconfdir}
         libdir:                 ${libdir}
         includedir:             ${includedir}
+        plugindir:              ${plugindir}
 
         compiler:               ${CC}
         cflags:                 ${CFLAGS}
