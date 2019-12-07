@@ -8,7 +8,8 @@ AM_CPPFLAGS = \
 	-include ${top_builddir}/config.h \
 	-DSYSCONFDIR=\""$(sysconfdir)"\" \
 	-I${top_srcdir}/vis \
-	-I${top_srcdir}/tinycthread \
+	-I${top_srcdir}/extern/tinycthread \
+	-I${top_srcdir}/extern \
 	-I${top_srcdir}/src \
 	-I${top_srcdir}/gstreamer
 
@@ -31,8 +32,6 @@ vis/pallet.h \
 vis/points.c \
 vis/points.h \
 vis/getsamp.h \
-vis/isaac/isaac.c \
-vis/isaac/isaac.h \
 vis/audio/beat.c \
 vis/audio/beat.h \
 vis/audio/fft.c \
@@ -58,8 +57,10 @@ vis/software/simple_main.h \
 vis/software/resample_image.h \
 vis/paratask/paratask.c \
 vis/paratask/paratask.h \
-tinycthread/tinycthread.c \
-tinycthread/tinycthread.h \
+extern/isaac/isaac.c \
+extern/isaac/isaac.h \
+extern/tinycthread/tinycthread.c \
+extern/tinycthread/tinycthread.h \
 src/element2.c \
 src/element2.h \
 src/plugin2.c \

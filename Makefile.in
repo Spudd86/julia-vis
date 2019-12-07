@@ -43,7 +43,7 @@ CFLAGS += -Wall -Wextra -Wdouble-promotion \
 	-Wunsuffixed-float-constants \
 	-fno-strict-aliasing
 #-Wunsafe-loop-optimizations -Wconversion -Wstrict-prototypes
-CFLAGS += -I "./src" -I "./tinycthread" -I "./nuklear"
+CFLAGS += -I "${top_srcdir}/src" -I "${top_srcdir}/extern/tinycthread" -I "${top_srcdir}/extern" -I "${top_srcdir}/nuklear"
 
 ifeq (@enable_debug@,yes)
 	DEBUG=1
@@ -117,7 +117,7 @@ endif
 
 AUDIO_SRCS = src/audio/audio.c src/audio/beat.c src/audio/fft.c
 
-COMMON_SRCS = src/terminusIBM.c src/isaac/isaac.c src/pallet.c src/optproc.c src/points.c tinycthread/tinycthread.c
+COMMON_SRCS = src/terminusIBM.c extern/isaac/isaac.c src/pallet.c src/optproc.c src/points.c extern/tinycthread/tinycthread.c
 
 SOFT_SRCS = src/software/map.c src/software/maxsrc.c src/software/palletblit.c src/software/pixmisc.c src/paratask/paratask.c
 
@@ -136,7 +136,7 @@ GL_SDL_SRCS = src/sdl/sdlglmain.c src/sdl/sdlsetup.c
 TRIBUF_SRCS = src/tribuf.c
 
 #needs tinycthread just in case filedecode audio backend is enabled
-AUDIO_TEST_SRCS = src/audio/beat.c src/audio/fft.c src/audio/rb.c src/optproc.c src/software/sdl/sdl-text.c src/sdl/sdlsetup.c src/terminusIBM.c src/software/sdl/line.c tinycthread/tinycthread.c
+AUDIO_TEST_SRCS = src/audio/beat.c src/audio/fft.c src/audio/rb.c src/optproc.c src/software/sdl/sdl-text.c src/sdl/sdlsetup.c src/terminusIBM.c src/software/sdl/line.c extern/tinycthread/tinycthread.c
 
 ifeq ($(ENABLE_JACK),yes)
 AUDIO_DRV_SRCS += src/audio/jack.c
@@ -338,10 +338,6 @@ src/software/x86/avx2.o: src/software/x86/avx2.c src/common.h src/software/pixmi
 	@$(CC) -MM -MQ $@ $(CFLAGS) -mavx2 -mvzeroupper $< -MF $*.dep
 	$(CC) -c $(CFLAGS) -mavx2 -mvzeroupper $< -o $@
 
-tinycthread/%.o: tinycthread/%.c Makefile config.mk
-	@$(CC) -MM -MQ $@ @CFLAGS@ @CPPFLAGS@ @PTHREAD_CFLAGS@ $< -MF tinycthread/$*.dep
-	$(CC) @CFLAGS@ @CPPFLAGS@ @PTHREAD_CFLAGS@ -c $< -o $@
-
 src/audio/%.o: src/audio/%.c Makefile config.mk
 	@$(CC) -MM -MQ $@ $(CFLAGS) $(AUDIO_CFLAGS) $< -MF src/audio/$*.dep
 	$(CC) $(CFLAGS) $(AUDIO_CFLAGS) -c $< -o $@
@@ -380,6 +376,13 @@ src/%.o: src/%.c Makefile config.mk
 
 %.s: %.c src/*.h Makefile config.mk
 	$(CC) $< $(CFLAGS) -fverbose-asm -S -o $@
+
+extern/%.o: extern/%.c Makefile config.mk
+	@$(CC) -MM -MQ $@ @CFLAGS@ @CPPFLAGS@ @PTHREAD_CFLAGS@ $< -MF extern/$*.dep
+	$(CC) @CFLAGS@ @CPPFLAGS@ @PTHREAD_CFLAGS@ -c $< -o $@
+
+
+
 
 # automatic re-running of configure if the ocnfigure.in file has changed
 configure: configure.ac
