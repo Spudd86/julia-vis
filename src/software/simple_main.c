@@ -234,7 +234,6 @@ static float *do_fft(struct simple_soft_ctx *ctx, const float *in1, const float 
 	for(int i=1; i < nr_samp/2; i++)
 		fft[i] = sqrtf(fft[i]*fft[i] + fft[nr_samp-i]*fft[nr_samp-i])*scl;
 	fft[nr_samp/2] = fabsf(fft[nr_samp/2])*scl;
-#endif
 
 	return fft;
 }
