@@ -2,7 +2,7 @@
 #if (__x86_64__ || __i386__) && !defined(DISABLE_X86_INTRIN)
 #pragma GCC target("no-sse4.2,sse4.1")
 #ifndef DEBUG
-#pragma GCC optimize "3,inline-functions,merge-all-constants"
+#pragma GCC optimize "3,inline-functions" // Want -fmerge-all-constants but we can't put it in the optimize pragma for some reason
 // need to shut gcc up about casting away const in normal builds because
 // some of the intrinsics that REALLY ought to take const pointer don't
 #pragma GCC diagnostic ignored "-Wcast-qual"

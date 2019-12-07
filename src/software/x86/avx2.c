@@ -2,7 +2,7 @@
 #pragma GCC target("avx2,no-avx512f")
 
 #ifndef DEBUG
-#pragma GCC optimize "3,inline-functions,merge-all-constants"
+#pragma GCC optimize "3,inline-functions" // Want -fmerge-all-constants but we can't put it in the optimize pragma for some reason
 // need to shut gcc up about casting away const in normal builds because
 // some of the intrinsics that REALLY ought to take const pointer don't
 // (mostly _mm_stream_load_si128())

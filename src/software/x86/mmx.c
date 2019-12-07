@@ -2,7 +2,7 @@
 #if (__i386__)  && !defined(DISABLE_X86_INTRIN)
 
 #pragma GCC target("mmx,no-sse")
-#pragma GCC optimize "3,inline-functions,merge-all-constants"
+#pragma GCC optimize "3,inline-functions" // Want -fmerge-all-constants but we can't put it in the optimize pragma for some reason
 
 #include "common.h"
 #include "../pixmisc.h"

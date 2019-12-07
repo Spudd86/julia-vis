@@ -3,7 +3,7 @@
 
 #pragma GCC target("no-sse2,sse")
 #if DEBUG
-#pragma GCC optimize "3,inline-functions,merge-all-constants"
+#pragma GCC optimize "3,inline-functions" // Want -fmerge-all-constants but we can't put it in the optimize pragma for some reason
 #endif
 
 #include "common.h"

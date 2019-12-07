@@ -17,12 +17,26 @@ AM_LDFLAGS = \
 	-Wl,--gc-sections \
 	-Wl,--as-needed
 
+EXTRA_LTLIBRARIES = libx86vec.la
+
 lib_LTLIBRARIES = libgstjuliavis.la
 libgstjuliavis_la_CFLAGS = $(GST_CFLAGS)
-libgstjuliavis_la_LIBADD = $(GST_LIBS)
+libgstjuliavis_la_LIBADD = $(GST_LIBS) libx86vec.la
 libgstjuliavis_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS) -no-undefined
 libgstjuliavis_la_LIBTOOLFLAGS = --tag=disable-static
 
+
+libx86vec_la_CFLAGS = -O3 -fmerge-all-constants -finline-functions
+libx86vec_la_SOURCES = \
+vis/software/x86/cpuid.c \
+vis/software/x86/x86_features.h \
+vis/software/x86/mmx.c \
+vis/software/x86/sse.c \
+vis/software/x86/sse2.c \
+vis/software/x86/ssse3.c \
+vis/software/x86/sse4_1.c \
+vis/software/x86/avx2.c \
+vis/software/x86/palblit_mmxsse.h
 
 libgstjuliavis_la_SOURCES = \
 vis/common.h \
@@ -35,15 +49,6 @@ vis/getsamp.h \
 vis/audio/beat.c \
 vis/audio/beat.h \
 vis/audio/fft.c \
-vis/software/x86/cpuid.c \
-vis/software/x86/x86_features.h \
-vis/software/x86/mmx.c \
-vis/software/x86/sse.c \
-vis/software/x86/sse2.c \
-vis/software/x86/ssse3.c \
-vis/software/x86/sse4_1.c \
-vis/software/x86/avx2.c \
-vis/software/x86/palblit_mmxsse.h \
 vis/software/pixmisc.c \
 vis/software/pixmisc.h \
 vis/software/pixformat.h \
