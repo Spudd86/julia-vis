@@ -83,6 +83,7 @@ SNDFILE_CFLAGS = @SNDFILE_CFLAGS@
 SNDFILE_LIBS = @SNDFILE_LIBS@
 AUDIO_CFLAGS = $(PA_CFLAGS) $(JACK_CFLAGS) $(PULSE_CFLAGS) $(SNDFILE_CFLAGS)
 AUDIO_LIBS = $(PA_LIBS) $(JACK_LIBS) $(PULSE_LIBS) $(SNDFILE_LIBS)
+
 SDL_CFLAGS = @SDL_CFLAGS@
 SDL_LIBS = @SDL_LIBS@
 GL_CFLAGS = @GL_CFLAGS@ @GLU_CFLAGS@
@@ -307,35 +308,35 @@ src/opengl/gl_14.o: src/opengl/gl_14.c
 	$(CC) -g -O2 $(GL_CFLAGS) -w -c $< -o $@
 
 src/opengl/glx/glx_gen.o: src/opengl/glx/glx_gen.c
-	$(CC) -c $(CFLAGS) $(GL_CFLAGS) $(X11_CFLAGS) $(PP_FLAGS) -w $< -o $@
+	$(CC) -c $(CFLAGS) $(GL_CFLAGS) $(X11_CFLAGS) -w $< -o $@
 
 src/software/x86/mmx.o: src/software/x86/mmx.c src/software/x86/palblit_mmxsse.h src/common.h src/software/pixmisc.h Makefile config.mk
-	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse -mmmx $(PP_FLAGS) $< -MF $*.dep
-	$(CC) -c $(CFLAGS) -mno-sse -mmmx $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse -mmmx $< -MF $*.dep
+	$(CC) -c $(CFLAGS) -mno-sse -mmmx $< -o $@
 
 src/software/x86/3dNOW.o: src/software/x86/3dNOW.c src/software/x86/palblit_mmxsse.h src/common.h src/software/pixmisc.h Makefile config.mk
-	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse -m3dnow $(PP_FLAGS) $< -MF $*.dep
-	$(CC) -c $(CFLAGS) -mno-sse -m3dnow $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse -m3dnow $< -MF $*.dep
+	$(CC) -c $(CFLAGS) -mno-sse -m3dnow $< -o $@
 
 src/software/x86/sse.o: src/software/x86/sse.c src/software/x86/palblit_mmxsse.h src/common.h src/software/pixmisc.h Makefile config.mk
-	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse2 -msse $(PP_FLAGS) $< -MF $*.dep
-	$(CC) -c $(CFLAGS) -mno-sse2 -msse $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse2 -msse $< -MF $*.dep
+	$(CC) -c $(CFLAGS) -mno-sse2 -msse $< -o $@
 
 src/software/x86/sse2.o: src/software/x86/sse2.c src/common.h src/software/pixmisc.h Makefile config.mk
-	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse3 -msse2 $(PP_FLAGS) $< -MF $*.dep
-	$(CC) -c $(CFLAGS) -mno-sse3 -msse2 $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse3 -msse2 $< -MF $*.dep
+	$(CC) -c $(CFLAGS) -mno-sse3 -msse2 $< -o $@
 
 src/software/x86/ssse3.o: src/software/x86/ssse3.c src/common.h src/software/pixmisc.h Makefile config.mk
-	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse4.1 -mssse3 $(PP_FLAGS) $< -MF $*.dep
-	$(CC) -c $(CFLAGS) -mno-sse4.1 -mssse3 $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ $(CFLAGS) -mno-sse4.1 -mssse3 $< -MF $*.dep
+	$(CC) -c $(CFLAGS) -mno-sse4.1 -mssse3 $< -o $@
 
 src/software/x86/sse4_1.o: src/software/x86/sse4_1.c src/common.h src/software/pixmisc.h Makefile config.mk
-	@$(CC) -MM -MQ $@ $(CFLAGS) -msse4.1 $(PP_FLAGS) $< -MF $*.dep
-	$(CC) -c $(CFLAGS) -msse4.1 $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ $(CFLAGS) -msse4.1 $< -MF $*.dep
+	$(CC) -c $(CFLAGS) -msse4.1 $< -o $@
 
 src/software/x86/avx2.o: src/software/x86/avx2.c src/common.h src/software/pixmisc.h Makefile config.mk
-	@$(CC) -MM -MQ $@ $(CFLAGS) -mavx2 -mvzeroupper $(PP_FLAGS) $< -MF $*.dep
-	$(CC) -c $(CFLAGS) -mavx2 -mvzeroupper $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ $(CFLAGS) -mavx2 -mvzeroupper $< -MF $*.dep
+	$(CC) -c $(CFLAGS) -mavx2 -mvzeroupper $< -o $@
 
 tinycthread/%.o: tinycthread/%.c Makefile config.mk
 	@$(CC) -MM -MQ $@ @CFLAGS@ @CPPFLAGS@ @PTHREAD_CFLAGS@ $< -MF tinycthread/$*.dep
@@ -346,36 +347,36 @@ src/audio/%.o: src/audio/%.c Makefile config.mk
 	$(CC) $(CFLAGS) $(AUDIO_CFLAGS) -c $< -o $@
 
 src/sdl/%.o: src/sdl/%.c Makefile config.mk
-	@$(CC) -MM -MQ $@ $(CFLAGS) $(SDL_CFLAGS) $(PP_FLAGS) $< -MF src/sdl/$*.dep
-	$(CC) -c $(CFLAGS) $(SDL_CFLAGS) $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ $(CFLAGS) $(SDL_CFLAGS) $< -MF src/sdl/$*.dep
+	$(CC) -c $(CFLAGS) $(SDL_CFLAGS) $< -o $@
 
 src/software/sdl/%.o: src/software/sdl/%.c Makefile config.mk
-	@$(CC) -MM -MQ $@ $(CFLAGS) $(SDL_CFLAGS) $(PP_FLAGS) $< -MF src/software/sdl/$*.dep
-	$(CC) -c $(CFLAGS) $(SDL_CFLAGS) $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ $(CFLAGS) $(SDL_CFLAGS) $< -MF src/software/sdl/$*.dep
+	$(CC) -c $(CFLAGS) $(SDL_CFLAGS) $< -o $@
 
 src/opengl/%.o: src/opengl/%.c
-	@$(CC) -MM -MQ $@ -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(PP_FLAGS) $< -MF src/opengl/$*.dep
-	$(CC) -c -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $< -MF src/opengl/$*.dep
+	$(CC) -c -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $< -o $@
 
 src/opengl/glx/%.o: src/opengl/glx/%.c
-	@$(CC) -MM -MQ $@ -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(X11_CFLAGS) $(PP_FLAGS) $< -MF src/opengl/glx/$*.dep
-	$(CC) -c -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(X11_CFLAGS) $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(X11_CFLAGS) $< -MF src/opengl/glx/$*.dep
+	$(CC) -c -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(X11_CFLAGS) $< -o $@
 
 src/opengl/egl/%.o: src/opengl/egl/%.c
-	@$(CC) -MM -MQ $@ -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(EGL_CFLAGS) $(PP_FLAGS) $< -MF src/opengl/egl/$*.dep
-	$(CC) -c -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(EGL_CFLAGS) $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(EGL_CFLAGS) $< -MF src/opengl/egl/$*.dep
+	$(CC) -c -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(EGL_CFLAGS) $< -o $@
 
 src/opengl/egl/xegl.o: src/opengl/egl/xegl.c
-	@$(CC) -MM -MQ $@ -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(EGL_CFLAGS) $(X11_CFLAGS) $(PP_FLAGS) $< -MF src/opengl/egl/xegl.dep
-	$(CC) -c -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(EGL_CFLAGS) $(X11_CFLAGS) $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(EGL_CFLAGS) $(X11_CFLAGS) $< -MF src/opengl/egl/xegl.dep
+	$(CC) -c -DUSE_GL $(CFLAGS) $(GL_CFLAGS) $(EGL_CFLAGS) $(X11_CFLAGS) $< -o $@
 
 src/software/x11/%.o: src/software/x11/%.c Makefile config.mk
-	@$(CC) -MM -MQ $@ $(CFLAGS) $(X11_CFLAGS) $(PP_FLAGS) $< -MF src/software/x11/$*.dep
-	$(CC) -c $(CFLAGS) $(X11_CFLAGS) $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ $(CFLAGS) $(X11_CFLAGS) $< -MF src/software/x11/$*.dep
+	$(CC) -c $(CFLAGS) $(X11_CFLAGS) $< -o $@
 
 src/%.o: src/%.c Makefile config.mk
-	@$(CC) -MM -MQ $@ $(CFLAGS) $(PP_FLAGS) $< -MF src/$*.dep
-	$(CC) -c $(CFLAGS) $(PP_FLAGS) $< -o $@
+	@$(CC) -MM -MQ $@ $(CFLAGS) $< -MF src/$*.dep
+	$(CC) -c $(CFLAGS) $< -o $@
 
 %.s: %.c src/*.h Makefile config.mk
 	$(CC) $< $(CFLAGS) -fverbose-asm -S -o $@
