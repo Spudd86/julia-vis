@@ -93,6 +93,8 @@ typedef unsigned __int64 uint64_t;
 	typedef XID GLXVideoSourceSGIX;
 	typedef struct __GLXFBConfigRec *GLXFBConfigSGIX;
 	typedef XID GLXPbufferSGIX;
+#ifndef GLX_SGIX_hyperpipe
+#define GLX_SGIX_hyperpipe 1
 	typedef struct {
     char    pipeName[80]; /* Should be [GLX_HYPERPIPE_PIPE_NAME_LENGTH_SGIX] */
     int     networkId;
@@ -112,6 +114,7 @@ typedef unsigned __int64 uint64_t;
     char pipeName[80]; /* Should be [GLX_HYPERPIPE_PIPE_NAME_LENGTH_SGIX] */
     int XOrigin, YOrigin, maxHeight, maxWidth;
 } GLXPipeRectLimits;
+#endif /* GLX_SGIX_hyperpipe */
 
 #ifdef __cplusplus
 extern "C" {
