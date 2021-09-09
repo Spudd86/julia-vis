@@ -1,13 +1,20 @@
 
 #if (__x86_64__ || __i386__) && !defined(DISABLE_X86_INTRIN)
 
-#pragma GCC target("no-sse2,sse")
 #if DEBUG
 #pragma GCC optimize "3,inline-functions" // Want -fmerge-all-constants but we can't put it in the optimize pragma for some reason
 #endif
 
 #include "common.h"
 #include "../pixmisc.h"
+#include <assert.h>
+
+// all of SSE is always available on x86_64 so we don't have to worry so much about intrinsics being built with the right flags
+#ifndef __x86_64__
+#pragma GCC target("no-sse2,sse,mmx")
+#pragma clang attribute push (__attribute__(( target("no-sse2,sse,mmx") )), apply_to = function)
+#endif
+
 #include <mmintrin.h>
 #include <xmmintrin.h>
 #include <immintrin.h>
@@ -22,8 +29,6 @@ extern __inline __m64 __attribute__((__gnu_inline__, __always_inline__, __artifi
 _mm_shuffle_pi16 (__m64 __A, int const __N) { return (__m64) __builtin_ia32_pshufw ((__v4hi)__A, __N); }
 #endif
 
-#include <assert.h>
-
 #ifndef NDEBUG
 #define unreachable() assert(0)
 #else
@@ -31,7 +36,7 @@ _mm_shuffle_pi16 (__m64 __A, int const __N) { return (__m64) __builtin_ia32_pshu
 #endif
 
 // requires w%16 == 0
-__attribute__((hot))
+__attribute__((hot, target("sse,mmx")))
 void maxblend_sse(void *restrict dest, const void *restrict src, int w, int h)
 {
 	//FIXME: use src_stride
@@ -74,6 +79,12 @@ void maxblend_sse(void *restrict dest, const void *restrict src, int w, int h)
 	_mm_sfence(); // needed because of the non-temporal stores.
 }
 
+#define PALBLIT_SSE 1
+
 #include "palblit_mmxsse.h"
+
+#ifndef __x86_64__
+#pragma clang attribute pop
+#endif
 
 #endif

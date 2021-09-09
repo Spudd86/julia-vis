@@ -19,7 +19,8 @@
 
 #define USE_GLX_INTEL_swap_event 1
 
-#ifndef GLX_INTEL_swap_event
+//#ifndef GLX_INTEL_swap_event
+#if 1
 # define GLX_INTEL_swap_event 1
 # ifndef GLX_EXCHANGE_COMPLETE_INTEL
 #  define GLX_EXCHANGE_COMPLETE_INTEL 0x8180

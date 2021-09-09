@@ -116,10 +116,10 @@ int main(int argc, char **argv)
 	struct pal_ctx *pal_ctx = pal_ctx_new(screen->format->BitsPerPixel == 8);
 
 	uint16_t *map_surf[3];
-	char *map_surf_mem = aligned_alloc(256, 3 * im_w * im_h * sizeof(uint16_t));
-	for(int i=0; i<3; i++)
-		map_surf[i] = map_surf_mem + i * im_w * im_h * sizeof(uint16_t);
-	memset(map_surf_mem, 0, 3 * im_w * im_h * sizeof(uint16_t));
+	for(int i=0; i<3; i++) {
+		map_surf[i] = aligned_alloc(256, 256 + im_w * im_h * sizeof(uint16_t));
+		memset(map_surf[i], 0, 256 + im_w * im_h * sizeof(uint16_t));
+	}
 
 	tribuf *map_tb = tribuf_new((void **)map_surf, 1);
 
@@ -174,7 +174,9 @@ int main(int argc, char **argv)
 
 	int status;
 	SDL_WaitThread(map_thread, &status);
-	aligned_free(map_surf_mem);
+	for(int i=0; i<3; i++) {
+		aligned_free(map_surf[i]);
+	}
 	audio_shutdown();
 	SDL_Quit();
     return 0;

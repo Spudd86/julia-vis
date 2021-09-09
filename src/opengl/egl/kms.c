@@ -82,7 +82,7 @@ static int init_drm(opt_data *opts, int im_size)
 	drmModeRes *resources;
 	drmModeConnector *connector = NULL;
 	drmModeEncoder *encoder = NULL;
-	int i, area;
+	int i;
 
 	for (i = 0; i < ARRAY_SIZE(modules); i++) {
 		printf("trying to load module %s...", modules[i]);
@@ -251,7 +251,7 @@ static void
 drm_fb_destroy_callback(struct gbm_bo *bo, void *data)
 {
 	struct drm_fb *fb = data;
-	struct gbm_device *gbm = gbm_bo_get_device(bo);
+	// struct gbm_device *gbm = gbm_bo_get_device(bo);
 
 	if (fb->fb_id)
 		drmModeRmFB(drm.fd, fb->fb_id);

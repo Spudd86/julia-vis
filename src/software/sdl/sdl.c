@@ -37,9 +37,9 @@ int main(int argc, char **argv)
 	printf("running with %dx%d bufs\n", im_w, im_h);
 
 	uint16_t *map_surf[2];
-	map_surf[0] = aligned_alloc(128, 128 + im_w * im_h * sizeof(uint16_t));
+	map_surf[0] = aligned_alloc(512, 512 + im_w * im_h * sizeof(uint16_t));
 	memset(map_surf[0], 0, im_w * im_h * sizeof(uint16_t));
-	map_surf[1] = aligned_alloc(128, 128 + im_w * im_h * sizeof(uint16_t));
+	map_surf[1] = aligned_alloc(512, 512 + im_w * im_h * sizeof(uint16_t));
 	memset(map_surf[0], 0, im_w * im_h * sizeof(uint16_t));
 
 	int m = 0, cnt = 0;

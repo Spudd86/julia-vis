@@ -1,12 +1,13 @@
 
-#ifdef __SSE__
+#ifdef PALBLIT_SSE
 // SSE or MMXEXT
 #	define do_prefetch(addr) _mm_prefetch((s), _MM_HINT_NTA)
 #	define stream_str(addr, v) _mm_stream_pi((addr), (v))
 #	define do_sfence() _mm_sfence()
 #	define do_mm_empty() _mm_empty()
 #	define APPEND_CPUCAP(name) name##_sse
-#elif defined(__3dNOW__)
+#	define ATTRIBS __attribute__((hot, target("sse") ))
+#elif defined(PALBLIT_3dNOW)
 // should be the same as the sse version but split out just to be sure gcc doesn't generate any sse only instructions
 // plus lets us use femms which is faster on some AMD CPUs
 #	define do_prefetch(addr) __builtin_prefetch((addr), 0, 0)
@@ -14,17 +15,27 @@
 #	define do_sfence() __builtin_ia32_sfence()
 #	define do_mm_empty() _m_femms()
 #	define APPEND_CPUCAP(name) name##_3dnow
-#else
+#	define ATTRIBS __attribute__((hot, target("arch=athlon,3dnow") ))
+#elif defined(PALBLIT_MMX)
 #	define do_prefetch(addr)
 #	define stream_str(addr, v)  *(addr) = (v);
 #	define do_sfence()
 #	define do_mm_empty() _mm_empty()
 #	define APPEND_CPUCAP(name) name##_mmx
+#	define ATTRIBS __attribute__((hot, target("mmx") ))
+#else
+#	error "No target define!"
+#	define do_prefetch(addr)
+#	define stream_str(addr, v)  *(addr) = (v);
+#	define do_sfence()
+#	define do_mm_empty()
+#	define APPEND_CPUCAP(name) name##_none
+#	define ATTRIBS
 #endif
 
 //TODO: our prefetchnta is always going to fetch at least 32 bytes
 // so we probably ought to unroll the loop to process at least that many (8 pixels)
-__attribute__((hot))
+ATTRIBS
 void APPEND_CPUCAP(pallet_blit32)(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h,
@@ -118,7 +129,7 @@ void APPEND_CPUCAP(pallet_blit32)(uint8_t * restrict dest, unsigned int dst_stri
 	do_mm_empty();
 }
 
-__attribute__((hot))
+ATTRIBS
 void APPEND_CPUCAP(pallet_blit565)(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h,
@@ -271,7 +282,7 @@ void APPEND_CPUCAP(pallet_blit565)(uint8_t * restrict dest, unsigned int dst_str
 	do_mm_empty();
 }
 
-__attribute__((hot))
+ATTRIBS
 void APPEND_CPUCAP(pallet_blit555)(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h,
@@ -315,7 +326,7 @@ void APPEND_CPUCAP(pallet_blit555)(uint8_t * restrict dest, unsigned int dst_str
 	// pallet since we don't need to mask blue because we're going to shift
 	// it right to get it in the correct bit position
 
-	//TODO: interopolate colours and dither?
+	//TODO: interpolate colours and dither?
 
 	//FIXME: deal with w%16 != 0
 
@@ -402,7 +413,7 @@ void APPEND_CPUCAP(pallet_blit555)(uint8_t * restrict dest, unsigned int dst_str
 }
 
 
-__attribute__((hot))
+ATTRIBS
 void APPEND_CPUCAP(pallet_blit8)(uint8_t* restrict dest, unsigned int dst_stride,
 		const uint16_t *restrict src, unsigned int src_stride,
 		unsigned int w, unsigned int h)

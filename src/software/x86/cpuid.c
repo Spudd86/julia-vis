@@ -35,19 +35,19 @@ int cpuid(unsigned int level, unsigned int *eax, unsigned int *ebx, unsigned int
 	return 1;
 }
 
-static inline unsigned long read_cr0(void)
-{
-	unsigned long val;
-	__asm__ volatile ( "mov %%cr0, %0" : "=r"(val) );
-	return val;
-}
+// static inline unsigned long read_cr0(void)
+// {
+// 	unsigned long val;
+// 	__asm__ volatile ( "mov %%cr0, %0" : "=r"(val) );
+// 	return val;
+// }
 
-static inline unsigned long read_cr4(void)
-{
-    unsigned long val;
-    __asm__ volatile ( "mov %%cr4, %0" : "=r"(val) );
-    return val;
-}
+// static inline unsigned long read_cr4(void)
+// {
+//     unsigned long val;
+//     __asm__ volatile ( "mov %%cr4, %0" : "=r"(val) );
+//     return val;
+// }
 #endif
 
 uint64_t x86feat_get_features(void)
@@ -96,7 +96,7 @@ uint64_t x86feat_get_features(void)
 
 	//__get_cpuid(0x80000000, &eax, &ebx, &ecx, &edx);
 	//if(eax<0x80000001) return features;
-	if(__get_cpuid_max(0x80000000, NULL) < 0x80000001) return features;
+	if(__get_cpuid_max(0x80000000, NULL) < 0x80000001u) return features;
 
 	__get_cpuid(0x80000001, &eax, &ebx, &ecx, &edx);
 	if(edx & (1 << 30)) features |= X86FEAT_3DNOWEXT;

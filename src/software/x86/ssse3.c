@@ -12,7 +12,7 @@
 #include <tmmintrin.h>
 
 #if 0
-__attribute__((hot))
+__attribute__((hot, target("no-sse4.1,ssse3,sse3")))
 void list_pnt_blit_ssse3(void * const restrict dest, int iw, const uint16_t *restrict pnt, int pnt_stride, int pw, int ph, int samp, const uint32_t *pnts)
 {
 	const __m128i max_off = _mm_set1_epi16(0x8000);
@@ -103,7 +103,7 @@ void list_pnt_blit_ssse3(void * const restrict dest, int iw, const uint16_t *res
 
 #if 1
 //FIXME: interpolation is wrong way around
-__attribute__((hot))
+__attribute__((hot, target("no-sse4.1,ssse3,sse3")))
 void pallet_blit32_ssse3(uint8_t *restrict dest, unsigned int dst_stride,
                         const uint16_t *restrict src, unsigned int src_stride,
                         unsigned int w, unsigned int h,
@@ -374,7 +374,7 @@ void pallet_blit32_ssse3(uint8_t *restrict dest, unsigned int dst_stride,
 
 #else
 
-__attribute__((hot))
+__attribute__((hot, target("no-sse4.1,ssse3,sse3")))
 void pallet_blit32_ssse3(uint8_t *restrict dest, unsigned int dst_stride,
                         const uint16_t *restrict src, unsigned int src_stride,
                         unsigned int w, unsigned int h,

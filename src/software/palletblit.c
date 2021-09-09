@@ -399,7 +399,7 @@ static void pallet_blit32_dispatch(uint8_t * restrict dest, unsigned int dst_str
 	if(feat & X86FEAT_SSE) pallet_blit32 = pallet_blit32_sse;
 	if(feat & X86FEAT_SSE2) pallet_blit32 = pallet_blit32_sse2;
 	//if(feat & X86FEAT_SSSE3) pallet_blit32 = pallet_blit32_ssse3; // interpolates backwards right now, needs fixing
-	//if(feat & X86FEAT_AVX2) pallet_blit32 = pallet_blit32_avx2;
+	if(feat & X86FEAT_AVX2) pallet_blit32 = pallet_blit32_avx2; // Also broken in some way
 
 	pallet_blit32(dest, dst_stride, src, src_stride, w, h, pal);
 }

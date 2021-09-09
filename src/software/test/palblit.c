@@ -78,8 +78,18 @@ int main()
 			printf("SSE2 32 blit failed!\n");
 		}
 	}
-	//if(feat & X86FEAT_SSSE3) pallet_blit32_ssse3;
-	//if(feat & X86FEAT_AVX2) pallet_blit32_avx2;
+	if(feat & X86FEAT_SSSE3) {
+		pallet_blit32_ssse3(test, UINT16_MAX, src, UINT16_MAX, UINT16_MAX, 1, pal);
+		if(memcmp(ref, test, sizeof(uint32_t)*UINT16_MAX) != 0) {
+			printf("SSSE2 32 blit failed!\n");
+		}
+	}
+	if(feat & X86FEAT_AVX2) {
+		pallet_blit32_avx2(test, UINT16_MAX, src, UINT16_MAX, UINT16_MAX, 1, pal);
+		if(memcmp(ref, test, sizeof(uint32_t)*UINT16_MAX) != 0) {
+			printf("AVX2 32 blit failed!\n");
+		}
+	}
 
 	printf("32 bit tests complete\n");
 

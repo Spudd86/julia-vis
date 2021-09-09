@@ -110,7 +110,7 @@ void init_gl(const opt_data *opt_data, int width, int height)
 	GLboolean res_boost = opts->gl_opts != NULL && strstr(opts->gl_opts, "rboost") != NULL;
 	packed_intesity_pixels = opts->gl_opts != NULL && strstr(opts->gl_opts, "pintens") != NULL;
 	scr_w = width; scr_h = height;
-	if(opts->fullscreen) im_w = scr_w, im_h=scr_h;
+	if(opts->fullscreen) im_w = scr_w<<res_boost, im_h=scr_h<<res_boost;
 	else { im_w = IMAX(make_pow2(IMAX(scr_w, scr_h)), 128)<<res_boost; im_h = im_w; }
 	while(!check_res(im_w, im_h)) { // shrink textures until they work
 		printf(" %ix%i Too big! Shrink texture\n", im_h, im_w);

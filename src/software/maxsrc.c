@@ -18,7 +18,6 @@ static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, 
 static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, int npnts, const uint32_t *pnts);
 
 struct maxsrc {
-	void *buf;
 	uint16_t *prev_src;
 	uint16_t *next_src;
 	int iw, ih;
@@ -34,24 +33,27 @@ struct maxsrc *maxsrc_new(int w, int h)
 	struct maxsrc *self = calloc(sizeof(*self), 1);
 
 	self->iw = w; self->ih = h;
-	self->samp = (IMAX(w,h)); //IMIN(IMAX(w,h), 1023);
+	self->samp = IMAX(w,h); //IMIN(IMAX(w,h), 1023);
 
 	point_init(&self->pnt_src, (uint16_t)IMAX(w/24, 8), (uint16_t)IMAX(h/24, 8));
 	printf("maxsrc using %i %dx%d points\n", self->samp, self->pnt_src.w, self->pnt_src.h);
 
-	size_t bufsize = 2 * (size_t)w * (size_t)h * sizeof(uint16_t) + 128;
-	self->prev_src = self->buf = aligned_alloc(128, bufsize); // add extra padding for vector instructions to be able to run past the end
+	// add extra padding for vector instructions to be able to run past the end
+	size_t bufsize = (size_t)w * (size_t)h * sizeof(uint16_t) + 256;
+	self->prev_src = aligned_alloc(256, bufsize);
 	memset(self->prev_src, 0, bufsize);
-	self->next_src = self->prev_src + w*h;
+	self->next_src = aligned_alloc(256, bufsize);
+	memset(self->next_src, 0, bufsize);
 
 	return self;
 }
 
 void maxsrc_delete(struct maxsrc *self)
 {
-	aligned_free(self->buf);
+	aligned_free(self->prev_src);
+	aligned_free(self->next_src);
 	free((void*)self->pnt_src.data);
-	self->next_src = self->prev_src = self->buf = NULL;
+	self->next_src = self->prev_src = NULL;
 	self->iw = self->ih = self->samp = 0;
 	free(self);
 }

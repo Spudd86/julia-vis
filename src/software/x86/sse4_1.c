@@ -25,7 +25,7 @@
 #endif
 
 // requires w%16 == 0 && h%16 == 0
-__attribute__((hot))
+__attribute__((hot, target("no-sse4.2,sse4.1")))
 void maxblend_sse4_1(void *restrict dest, const void *restrict src, int w, int h)
 {
 	__m128i * restrict mbdst = dest;

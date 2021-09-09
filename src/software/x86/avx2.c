@@ -1,4 +1,4 @@
-#if (__x86_64__ || __i386__) && !defined(DISABLE_X86_INTRIN)
+#if (__x86_64__) && !defined(DISABLE_X86_INTRIN)
 #pragma GCC target("avx2,no-avx512f")
 
 #ifndef DEBUG
@@ -9,6 +9,18 @@
 #pragma GCC diagnostic ignored "-Wcast-qual"
 #endif
 
+/*
+ * Streaming reads and modern Intel CPUs
+ * For the most part the streaming load instruction doesn't really do anything 
+ * on modern CPUs unless it's reading from Write-Combining memory We aren't using 
+ * WC memory so we should ALWAYS prioritize streaming writes. We DO however want 
+ * to use the non-temporal pre-fetch hint for reads as it *does* have an effect.
+ *
+ * So, prefer pre-fetch hints for reads, streaming writes
+ *
+ * See https://stackoverflow.com/questions/40096894/do-current-x86-architectures-support-non-temporal-loads-from-normal-memory
+ */
+
 #include "common.h"
 #include "../pixmisc.h"
 #include <mmintrin.h>
@@ -17,68 +29,131 @@
 #include <immintrin.h>
 
 // requires w%16 == 0 && h%16 == 0
-#if 0
-//TODO: which of these is faster?
-// for sse4 the one with prefetching is faster, need to figure out why
-
-__attribute__((hot))
+__attribute__((hot, target("avx2,no-avx512f")))
 void maxblend_avx2(void *restrict dest, const void *restrict src, int w, int h)
 {
-	__m256i * restrict mbdst = dest; __m256i * restrict mbsrc = (__m256i *)src;
+	_mm256_zeroupper();
+	__m256i * restrict mbdst = dest; const __m256i * restrict mbsrc = src;
+	_mm_prefetch(mbdst + 0, _MM_HINT_NTA);
+	_mm_prefetch(mbdst + 2, _MM_HINT_NTA);
+	_mm_prefetch(mbdst + 4, _MM_HINT_NTA);
+	_mm_prefetch(mbdst + 6, _MM_HINT_NTA);
+
+	_mm_prefetch(mbsrc + 0, _MM_HINT_NTA);
+	_mm_prefetch(mbsrc + 2, _MM_HINT_NTA);
+	_mm_prefetch(mbsrc + 4, _MM_HINT_NTA);
+	_mm_prefetch(mbsrc + 6, _MM_HINT_NTA);
+
 	const size_t npix = (size_t)w*(size_t)h;
-	for(size_t i=0; i < npix; i+=128, mbdst+=8, mbsrc+=8) { // can step 128 because w%16 == 0 && h%16 == 0 -> (w*h)%256 == 0 
-		_mm256_stream_si256(mbdst + 0, _mm256_max_epu16(_mm256_stream_load_si256(mbdst + 0), _mm256_stream_load_si256(mbsrc + 0)));
-		_mm256_stream_si256(mbdst + 1, _mm256_max_epu16(_mm256_stream_load_si256(mbdst + 1), _mm256_stream_load_si256(mbsrc + 1)));
-		_mm256_stream_si256(mbdst + 2, _mm256_max_epu16(_mm256_stream_load_si256(mbdst + 2), _mm256_stream_load_si256(mbsrc + 2)));
-		_mm256_stream_si256(mbdst + 3, _mm256_max_epu16(_mm256_stream_load_si256(mbdst + 3), _mm256_stream_load_si256(mbsrc + 3)));
-		_mm256_stream_si256(mbdst + 4, _mm256_max_epu16(_mm256_stream_load_si256(mbdst + 4), _mm256_stream_load_si256(mbsrc + 4)));
-		_mm256_stream_si256(mbdst + 5, _mm256_max_epu16(_mm256_stream_load_si256(mbdst + 5), _mm256_stream_load_si256(mbsrc + 5)));
-		_mm256_stream_si256(mbdst + 6, _mm256_max_epu16(_mm256_stream_load_si256(mbdst + 6), _mm256_stream_load_si256(mbsrc + 6)));
-		_mm256_stream_si256(mbdst + 7, _mm256_max_epu16(_mm256_stream_load_si256(mbdst + 7), _mm256_stream_load_si256(mbsrc + 7)));
+	for(size_t i=0; i < npix; i+=64, mbdst+=4, mbsrc+=4) { // can step up to 128 because w%16 == 0 && h%16 == 0 -> (w*h)%256 == 0
+		_mm_prefetch(mbdst + 8 , _MM_HINT_NTA);
+		_mm_prefetch(mbdst + 10, _MM_HINT_NTA);
+		_mm_prefetch(mbsrc + 8 , _MM_HINT_NTA);
+		_mm_prefetch(mbsrc + 10, _MM_HINT_NTA);
+		_mm256_stream_si256(mbdst + 0, _mm256_max_epu16(_mm256_load_si256(mbdst + 0), _mm256_load_si256(mbsrc + 0)));
+		_mm256_stream_si256(mbdst + 1, _mm256_max_epu16(_mm256_load_si256(mbdst + 1), _mm256_load_si256(mbsrc + 1)));
+		_mm256_stream_si256(mbdst + 2, _mm256_max_epu16(_mm256_load_si256(mbdst + 2), _mm256_load_si256(mbsrc + 2)));
+		_mm256_stream_si256(mbdst + 3, _mm256_max_epu16(_mm256_load_si256(mbdst + 3), _mm256_load_si256(mbsrc + 3)));
 	}
 	_mm_mfence(); // needed because of the non-temporal stores.
 }
-#else
-// TODO: since we have 256 vectors can we assume that cache lines are at least 64 bytes and use fewer
-// prefetch instructions?
-__attribute__((hot))
-void maxblend_avx2(void *restrict dest, const void *restrict src, int w, int h)
-{
-	__m256i * restrict mbdst = dest; const __m256i * restrict mbsrc = src;
-	_mm_prefetch(mbdst + 0, _MM_HINT_NTA);
-	_mm_prefetch(mbdst + 1, _MM_HINT_NTA);
-	_mm_prefetch(mbdst + 2, _MM_HINT_NTA);
-	_mm_prefetch(mbdst + 3, _MM_HINT_NTA);
-	_mm_prefetch(mbdst + 4, _MM_HINT_NTA);
-	_mm_prefetch(mbdst + 5, _MM_HINT_NTA);
-	_mm_prefetch(mbdst + 6, _MM_HINT_NTA);
-	_mm_prefetch(mbdst + 7, _MM_HINT_NTA);
 
-	const size_t npix = (size_t)w*(size_t)h;
-	for(size_t i=0; i < npix; i+=128, mbdst+=8, mbsrc+=8) { // can step 128 because w%16 == 0 && h%16 == 0 -> (w*h)%256 == 0
-		__builtin_prefetch(mbdst +  8, 1, 0);
-		__builtin_prefetch(mbdst +  9, 1, 0);
-		__builtin_prefetch(mbdst + 10, 1, 0);
-		__builtin_prefetch(mbdst + 11, 1, 0);
-		__builtin_prefetch(mbdst + 12, 1, 0);
-		__builtin_prefetch(mbdst + 13, 1, 0);
-		__builtin_prefetch(mbdst + 14, 1, 0);
-		__builtin_prefetch(mbdst + 15, 1, 0);
-		mbdst[0] = _mm256_max_epu16(mbdst[0], _mm256_stream_load_si256(mbsrc + 0));
-		mbdst[1] = _mm256_max_epu16(mbdst[1], _mm256_stream_load_si256(mbsrc + 1));
-		mbdst[2] = _mm256_max_epu16(mbdst[2], _mm256_stream_load_si256(mbsrc + 2));
-		mbdst[3] = _mm256_max_epu16(mbdst[3], _mm256_stream_load_si256(mbsrc + 3));
-		mbdst[4] = _mm256_max_epu16(mbdst[4], _mm256_stream_load_si256(mbsrc + 4));
-		mbdst[5] = _mm256_max_epu16(mbdst[5], _mm256_stream_load_si256(mbsrc + 5));
-		mbdst[6] = _mm256_max_epu16(mbdst[6], _mm256_stream_load_si256(mbsrc + 6));
-		mbdst[7] = _mm256_max_epu16(mbdst[7], _mm256_stream_load_si256(mbsrc + 7));
-	}
-	_mm_mfence(); // needed because of the non-temporal stores.
+#if 0
+__attribute__((hot, target("avx2,no-avx512f"), gnu_inline, always_inline,__artificial__))
+static void do16_pix(uint32_t *restrict d, const uint16_t *restrict s, const uint32_t *restrict pal)
+{
+    __m128i ind1, ind2, v, vs, vt, v_1;
+    __m256i res, c0, c1, c2, c3, t, v0, v1;
+
+    //  first 8 pixels
+    v = _mm_lddqu_si128((const __m128i *)s);
+
+    v_1 = _mm_lddqu_si128((const __m128i *)s + 1);
+
+    ind1 = _mm_srli_epi16(_mm_unpacklo_epi16(v, (__m128i){0ll, 0ll}), 8); // look into using _mm_cvtepu16_epi32
+    ind2 = _mm_srli_epi16(_mm_unpackhi_epi16(v, (__m128i){0ll, 0ll}), 8);
+
+    c0 = _mm256_i32gather_epi64((const int64_t *)pal, ind1, 4);
+    c1 = _mm256_i32gather_epi64((const int64_t *)pal, ind2, 4);
+
+    ind1 = _mm_srli_epi16(_mm_unpacklo_epi16(v_1, (__m128i){0ll, 0ll}), 8); // look into using _mm_cvtepu16_epi32
+    ind2 = _mm_srli_epi16(_mm_unpackhi_epi16(v_1, (__m128i){0ll, 0ll}), 8);
+
+    c0 = _mm256_shuffle_epi8(c0, _mm256_setr_epi8( 0,  4,  1,  5,  2,  6,  3,  7,
+                                                    8, 12,  9, 13, 10, 14, 11, 15,
+                                                    16, 20, 17, 21, 18, 22, 19, 23,
+                                                    24, 28, 25, 29, 26, 30, 27, 31));
+    c1 = _mm256_shuffle_epi8(c1, _mm256_setr_epi8( 0,  4,  1,  5,  2,  6,  3,  7,
+                                                    8, 12,  9, 13, 10, 14, 11, 15,
+                                                    16, 20, 17, 21, 18, 22, 19, 23,
+                                                    24, 28, 25, 29, 26, 30, 27, 31));
+
+    c2 = _mm256_i32gather_epi64((const int64_t *)pal, ind1, 4);
+    c3 = _mm256_i32gather_epi64((const int64_t *)pal, ind2, 4);
+
+    c2 = _mm256_shuffle_epi8(c2, _mm256_setr_epi8( 0,  4,  1,  5,  2,  6,  3,  7,
+                                                    8, 12,  9, 13, 10, 14, 11, 15,
+                                                    16, 20, 17, 21, 18, 22, 19, 23,
+                                                    24, 28, 25, 29, 26, 30, 27, 31));
+    c3 = _mm256_shuffle_epi8(c3, _mm256_setr_epi8( 0,  4,  1,  5,  2,  6,  3,  7,
+                                                    8, 12,  9, 13, 10, 14, 11, 15,
+                                                    16, 20, 17, 21, 18, 22, 19, 23,
+                                                    24, 28, 25, 29, 26, 30, 27, 31));
+
+    v  = _mm_and_si128(v, _mm_set1_epi16(0xff));
+    vs = _mm_sub_epi16(_mm_set1_epi16(256), v);
+
+    v  = _mm_packs_epi16(v, v);
+    vs = _mm_packs_epi16(vs, vs);
+
+    v = _mm_unpacklo_epi8(vs, v); // vs0, v0, vs1, v1 ... 
+
+    t = _mm256_set_m128i(_mm_unpackhi_epi16(v, v), _mm_unpacklo_epi16(v, v)); // vs0, v0, vs0, v0, vs1, v1, vs1, v1, ...
+
+    v0 = _mm256_unpacklo_epi32(t, t);
+    t  = _mm256_unpackhi_epi32(t, t);
+
+    v1 = _mm256_permute2x128_si256(v0, t, 013); // Top halves of v0, t go in v1
+    v0 = _mm256_permute2x128_si256(v0, t, 020); // bottom halves of v0, t go in v0
+
+    c0 = _mm256_maddubs_epi16(c0, v0);
+    c1 = _mm256_maddubs_epi16(c1, v1);
+
+    c0 = _mm256_srli_epi16(c0, 8);
+    c1 = _mm256_srli_epi16(c1, 8);
+
+    res = _mm256_permute4x64_epi64(_mm256_packus_epi16(c0, c1), _MM_SHUFFLE(3,1,2,0));
+
+    _mm256_stream_si256((__m256i *)d, res);
+
+    v  = _mm_and_si128(v, _mm_set1_epi16(0xff));
+    vs = _mm_sub_epi16(_mm_set1_epi16(256), v);
+
+    v  = _mm_packs_epi16(v, v);
+    vs = _mm_packs_epi16(vs, vs);
+
+    v = _mm_unpacklo_epi8(vs, v); // vs0, v0, vs1, v1 ... 
+
+    t = _mm256_set_m128i(_mm_unpackhi_epi16(v, v), _mm_unpacklo_epi16(v, v)); // vs0, v0, vs0, v0, vs1, v1, vs1, v1, ...
+
+    v0 = _mm256_unpacklo_epi32(t, t);
+    t  = _mm256_unpackhi_epi32(t, t);
+
+    v1 = _mm256_permute2x128_si256(v0, t, 013); // Top halves of v0, t go in v1
+    v0 = _mm256_permute2x128_si256(v0, t, 020); // bottom halves of v0, t go in v0
+
+    c2 = _mm256_maddubs_epi16(c2, v0);
+    c3 = _mm256_maddubs_epi16(c3, v1);
+
+    c2 = _mm256_srli_epi16(c2, 8);
+    c3 = _mm256_srli_epi16(c3, 8);
+
+    res = _mm256_permute4x64_epi64(_mm256_packus_epi16(c2, c3), _MM_SHUFFLE(3,1,2,0));
+    _mm256_stream_si256((__m256i *)d + 1, res);
 }
 #endif
 
-//_mm256_set_m128i(
-__attribute__((hot))
+__attribute__((hot, target("avx2,no-avx512f")))
 void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
                         const uint16_t *restrict src, unsigned int src_stride,
                         unsigned int w, unsigned int h,
@@ -130,21 +205,16 @@ void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
 		const uint16_t *restrict s = src + y*w;
 		_mm_prefetch(s, _MM_HINT_NTA);
 
-		//__m128i old_stream;
-
 		uint32_t *restrict d = (uint32_t *restrict)(dest + y*dst_stride);
 		size_t x = 0;
 
-		uintptr_t dp = (uintptr_t)d;
-		dp = 8 - ((dp%16)/2);
-		if(dp) {
+		if( ((uintptr_t)d) % sizeof(__m256i) ) {
+			uintptr_t dp = 8u - ( ((uintptr_t)d) % sizeof(__m256i) )/4u;
 			const __m256i move_mask = _mm256_cmpgt_epi32(_mm256_set1_epi32(dp), _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7));
 			__m128i col0, col1, col2, col3, ind1, ind2, v;
 			__m256i res, c0, c1, c2, c3, t, v1, v2, v1s, v2s;
 
-			// can stream load here because it's our buffer and the start of a line is always aligned
-			v = _mm_stream_load_si128((__m128i *)s); // cast away const to suppress warning
-			// old_stream = v;
+			v = _mm_lddqu_si128((const __m128i *)s);
 
 			ind1 = _mm_srli_epi32(_mm_unpacklo_epi16(v, zero), 8); // look into using _mm_cvtepu16_epi32
 			ind2 = _mm_srli_epi32(_mm_unpackhi_epi16(v, zero), 8);
@@ -168,10 +238,10 @@ void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
 			v1s = _mm256_sub_epi16(sub, v1);
 			v2s = _mm256_sub_epi16(sub, v2);
 
-			c0 = _mm256_mullo_epi16(c0, v1);
-			c1 = _mm256_mullo_epi16(c1, v1s);
-			c2 = _mm256_mullo_epi16(c2, v2);
-			c3 = _mm256_mullo_epi16(c3, v2s);
+			c0 = _mm256_mullo_epi16(c0, v1s);
+			c1 = _mm256_mullo_epi16(c1, v1);
+			c2 = _mm256_mullo_epi16(c2, v2s);
+			c3 = _mm256_mullo_epi16(c3, v2);
 
 			c0 = _mm256_add_epi16(c0, c1);
 			c2 = _mm256_add_epi16(c2, c3);
@@ -187,29 +257,18 @@ void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
 			x+=dp;
 			d+=dp;
 			s+=dp;
-		} // else {
-			// old_stream = _mm_stream_load_si128((__m128i *)s); // cast away const to suppress warning
-		//}
-		// old_stream = _mm_shuffle_epi8(old_stream, align_shuff);
+		}
+
+		// Number of bytes to get to the next cache line so we can mark with the proper non-temporal pre-fetch hint
+		size_t next_cache_offset = (int8_t)(sizeof(__m128i) - ((uintptr_t)s)%sizeof(__m128i));
 
 		for(; x + 8 < w; x+=8, s+=8, d+=8) {
-			_mm_prefetch(s + 8, _MM_HINT_NTA);
+			_mm_prefetch((const uint8_t *)s + sizeof(__m128i) + next_cache_offset, _MM_HINT_NTA); // load next cache line
+#if 1
 			__m128i col0, col1, col2, col3, ind1, ind2, v;
 			__m256i res, c0, c1, c2, c3, t, v1, v2, v1s, v2s;
 
-			// TODO: use _mm_alignr_epi8() so we can do use _mm_stream_load_si128 (can't alignr requires the shift to be a compile time constant)
-			// something like:
-			//   __m128i stemp = _mm_stream_load_si128((__m128i *)s); // cast away const to suppress warning
-			//   v = _mm_alignr_epi8(stemp, old_stream, dp*4);
-			//
-			//   need to rotate stemp so that we can put the right things
-			//   in place with the permute, and so that we won't need to mess with
-			//   it when it becomes old_stream
-			//
-			//   stemp = _mm_shuffle_epi8(stemp, align_shuff);
-			//   v = _mm_blendv_epi8(old_stream, stemp, align_mask); 
-			//   old_stream = stemp
-			// and we don't add dp to s inside the if() statement above so it stays aligned
+			//  first 8 pixels
 			v = _mm_lddqu_si128((const __m128i *)s);
 
 			ind1 = _mm_unpacklo_epi16(_mm_srli_epi16(v, 8), zero); // look into using _mm_cvtepu16_epi32
@@ -234,10 +293,10 @@ void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
 			v1s = _mm256_sub_epi16(sub, v1);
 			v2s = _mm256_sub_epi16(sub, v2);
 
-			c0 = _mm256_mullo_epi16(c0, v1);
-			c1 = _mm256_mullo_epi16(c1, v1s);
-			c2 = _mm256_mullo_epi16(c2, v2);
-			c3 = _mm256_mullo_epi16(c3, v2s);
+			c0 = _mm256_mullo_epi16(c0, v1s);
+			c1 = _mm256_mullo_epi16(c1, v1);
+			c2 = _mm256_mullo_epi16(c2, v2s);
+			c3 = _mm256_mullo_epi16(c3, v2);
 
 			c0 = _mm256_add_epi16(c0, c1);
 			c2 = _mm256_add_epi16(c2, c3);
@@ -248,12 +307,13 @@ void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
 
 			//TODO: _mm256_permute4x64_epi64 is kinda slow (3 clock latency), figure out another way to do this
 			res = _mm256_permute4x64_epi64(_mm256_packus_epi16(c0, c2), _MM_SHUFFLE(3,1,2,0));
+#else
 
+#endif
 			_mm256_stream_si256((__m256i *)d, res);
-			//_mm256_storeu_si256((__m256i *)d, res);
 		}
 
-		if(w-x) { // should be the same as 8-dp
+		if(w-x) {
 			const __m256i move_mask = _mm256_cmpgt_epi32(_mm256_set1_epi32(w-x), _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7));
 			__m128i col0, col1, col2, col3, ind1, ind2, v;
 			__m256i res, c0, c1, c2, c3, t, v1, v2, v1s, v2s;
@@ -282,10 +342,10 @@ void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
 			v1s = _mm256_sub_epi16(sub, v1);
 			v2s = _mm256_sub_epi16(sub, v2);
 
-			c0 = _mm256_mullo_epi16(c0, v1);
-			c1 = _mm256_mullo_epi16(c1, v1s);
-			c2 = _mm256_mullo_epi16(c2, v2);
-			c3 = _mm256_mullo_epi16(c3, v2s);
+			c0 = _mm256_mullo_epi16(c0, v1s);
+			c1 = _mm256_mullo_epi16(c1, v1);
+			c2 = _mm256_mullo_epi16(c2, v2s);
+			c3 = _mm256_mullo_epi16(c3, v2);
 
 			c0 = _mm256_add_epi16(c0, c1);
 			c2 = _mm256_add_epi16(c2, c3);

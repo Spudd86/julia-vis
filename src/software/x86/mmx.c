@@ -16,7 +16,7 @@
 #define unreachable __builtin_unreachable
 #endif
 
-__attribute__((hot))
+__attribute__((hot, target("mmx")))
 void maxblend_mmx(void *restrict dest, const void *restrict src, int w, int h)
 {
 	__m64 *mbdst = dest; const __m64 *mbsrc = src;
@@ -64,6 +64,8 @@ void maxblend_mmx(void *restrict dest, const void *restrict src, int w, int h)
 	}
 	_mm_empty();
 }
+
+#define PALBLIT_MMX 1
 
 #include "palblit_mmxsse.h"
 

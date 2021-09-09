@@ -1,17 +1,21 @@
 
 #if (__x86_64__ || __i386__) && !defined(DISABLE_X86_INTRIN)
-#pragma GCC target("no-sse3,sse2")
+
 #ifndef DEBUG
 #pragma GCC optimize "3,inline-functions" // Want -fmerge-all-constants but we can't put it in the optimize pragma for some reason
 #endif
 
 #include "common.h"
 #include "../pixmisc.h"
+
+#include <assert.h>
+
+#pragma GCC target("no-sse3,sse2")
+
 #include <mmintrin.h>
 #include <xmmintrin.h>
 #include <emmintrin.h>
 
-#include <assert.h>
 
 #ifndef NDEBUG
 #define unreachable() assert(0)
@@ -20,7 +24,7 @@
 #endif
 
 // requires w%16 == 0 && h%16 == 0
-__attribute__((hot))
+__attribute__((hot, target("sse2,no-sse3")))
 void maxblend_sse2(void *restrict dest, const void *restrict src, int w, int h)
 {
 	__m128i *restrict mbdst = dest; const __m128i *restrict mbsrc = src;
@@ -63,7 +67,7 @@ void maxblend_sse2(void *restrict dest, const void *restrict src, int w, int h)
 }
 
 //#define pb32_load_v(s) (_mm_setr_epi16(*((s)+0), *((s)+0), *((s)+0), *((s)+0), *((s)+1), *((s)+1), *((s)+1), *((s)+1)))
-static inline __attribute__((__always_inline__, __artificial__))
+static inline __attribute__((__always_inline__, __artificial__, target("sse2,no-sse3")))
 __m128i pb32_load_v(const uint16_t *restrict s) {
 	// yes this REALLY is faster than calling _mm_setr_epi16
 	__m128i r = _mm_set_epi32(0,0,0,*(const uint32_t *)(s)); // compiler WILL actually fold this to down a single movd instruction
@@ -74,7 +78,7 @@ __m128i pb32_load_v(const uint16_t *restrict s) {
 }
 
 #if 1
-__attribute__((hot))
+__attribute__((hot, target("sse2,no-sse3")))
 void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
                         const uint16_t *restrict src, unsigned int src_stride,
                         unsigned int w, unsigned int h,
@@ -331,7 +335,7 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 // *******************************************************************************************************************
 // **************************************** Simple unaligned accesses version ****************************************
 // mostly here for reference and comparison.
-__attribute__((hot))
+__attribute__((hot, target("sse2,no-sse3")))
 void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
                         const uint16_t *restrict src, unsigned int src_stride,
                         unsigned int w, unsigned int h,
