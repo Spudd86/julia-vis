@@ -108,6 +108,7 @@ void optproc(int argc, char **argv, opt_data *res)
 				break;
 			case 'r':
 				res->rational_julia = 1;
+                res->map_name = "rational";
 				break;
 			case 'm':
 				res->map_name = optarg;
