@@ -1,5 +1,5 @@
-#ifndef DEBUG
-#pragma GCC optimize "3,ira-hoist-pressure,inline-functions,merge-all-constants,modulo-sched,modulo-sched-allow-regmoves"
+#ifdef NDEBUG
+#pragma GCC optimize "3,ira-hoist-pressure,inline-functions,modulo-sched,modulo-sched-allow-regmoves"
 #endif
 
 
@@ -38,10 +38,28 @@ int point_span_scope_debug_level = 0;
 
 // Once we have clipped spans can render each line in parallel.
 
-
 // NOTES:
 //   The geometry of the scope is such that you could get long horizontal spans, but they won't 
 //   overlap with very many other generated spans, and would have a very gradual slope
+
+// Acceleration structure notes
+//  - When building spans, at all times we are either moving away from the origin or towards it linearly.
+//  - can use this (NOTE: this is all in texture space)
+//     - can find point of minimum distance to origin and split the spans around that, that way any given span
+//       is always either increasing or decreasing it's distance to the origin
+//     - can find that point by building equation for distance to origin squared, taking the derivative, and finding
+//       where the derivative is zero
+//         - Derivative is linear.
+//     - then can check new spans that overlap by finding where they interesect
+//  - Keep the spans in a tree that has at each node the exteems of the spans inside it.
+//  - want to link the leaves in the order that they show up along the line
+//    - this helps with two things: when looking up spans that overlap a new one we can look for the right ending spans
+//           and then just walk the ones between and when we're actually rendering spans we just start at the left and
+//           walk the leaves.
+///   - can just store spans in an array and use indicies as pointers, uint16 for compactness
+// Need to make sure that when generating the spans for a particular line segment we don't overlap them
+//    - this means we need to nudge the endpoints, in both screenspace and texture space
+//        - NOTE: current code nudges to put them on integer locations
 
 struct span
 {
@@ -135,8 +153,11 @@ struct point
 	float y;
 };
 
+static void generate_spans(struct scope_renderer *self, int ymin, int ymax, const struct point* pnts);
+static void render_spans(struct scope_renderer *self, int ymin, int ymax, uint16_t *restrict dest);
+
+static void render_line(struct scope_renderer * const self, void *restrict dest, int line);
 static void generate_spans_for_line(struct scope_renderer *self, const struct point* pnts, int line);
-static void render_line(struct scope_renderer *self, void *restrict dest, int line);
 
 void scope_render(struct scope_renderer *self,
                   void *restrict dest,
@@ -157,6 +178,9 @@ void scope_render(struct scope_renderer *self,
 	};
 
 	struct point pnts[samp];
+	
+	float ymin = ih;
+	float ymax = 0;
 
 	for(int i=0; i<samp; i++)
 	{
@@ -182,21 +206,28 @@ void scope_render(struct scope_renderer *self,
 		//pnts[i].y = (uint32_t)(yi*256);
 		pnts[i].x = xi;
 		pnts[i].y = yi;
+		
+		ymin = fminf(ymin, yi);
+		ymax = fmaxf(ymax, yi);
 	}
 	
-	// TODO: use paratask
-	for(int line = 0; line < self->ih; line++)
-	{
-		generate_spans_for_line(self, pnts, line);
-		render_line(self, dest, line);
-	}
+	int first_line = floor(ymin - self->line_width*1.4142135623730950488016887f);
+	int last_line = ceil(ymax + self->line_width*1.4142135623730950488016887f);
+	
+	//for(int line = first_line; line <= last_line; line++)
+	//{
+		//generate_spans_for_line(self, pnts, line);
+		//render_line(self, dest, line);
+	//}
+	generate_spans(self, first_line, last_line, pnts);
+	render_spans(self, first_line, last_line, dest);
 }
 
 /*****************************************************************************************************************************************
  * Internal rendering stuff
  */
 __attribute__((hot,noinline,optimize("-ffinite-math-only")))
-static void render_line(struct scope_renderer *self, void *restrict dest, int line)
+static void render_line(struct scope_renderer * const self, void *restrict dest, int line)
 {
 	uint16_t *restrict dst_line = (uint16_t *restrict)dest + self->iw * line;
 
@@ -213,27 +244,56 @@ static void render_line(struct scope_renderer *self, void *restrict dest, int li
 		// positive y (due to the geometry of the boxes we're rendering we never need to cross
 		// y texture axis in the middle of a span)
 
-#if 1
-		//const int32_t tx1 = (((int32_t)span->tx1) + 64)<<15; 
-		//const int32_t ty1 = (((int32_t)span->ty1) +  0)<<15;
-		//const int32_t tx2 = (((int32_t)span->tx2) + 64)<<15; 
-		//const int32_t ty2 = (((int32_t)span->ty2) +  0)<<15;
-		
-		const int32_t tx1 = (span->ftx1 + 1.0)*(32768*self->tex_w);
-		const int32_t ty1 = (span->fty1 + 1.0)*(32768*self->tex_h);
-		const int32_t tx2 = (span->ftx2 + 1.0)*(32768*self->tex_w); 
-		const int32_t ty2 = (span->fty2 + 1.0)*(32768*self->tex_h);
+#if 0
+		const int32_t tx1 = (span->ftx1 + 1.0)*(32768*(self->tex_w - 1));
+		const int32_t ty1 = (span->fty1 + 1.0)*(32768*(self->tex_h - 1));
+		const int32_t tx2 = (span->ftx2 + 1.0)*(32768*(self->tex_w - 1));
+		const int32_t ty2 = (span->fty2 + 1.0)*(32768*(self->tex_h - 1));
 		
 		const int32_t dx = (tx2 - tx1)/span->l;
 		const int32_t dy = (ty2 - ty1)/span->l;
 		
 		for(int32_t x = span->ix, tx = tx1, ty = ty1; x <= span->ix + span->l; ++x, tx += dx, ty += dy)
 		{
-			const uint32_t ys =  ty>>16,      xs =  tx>>16;
+			const uint32_t ys =  ty>>16,      xs =  tx>>16;     assert(ys < self->tex_h); assert(xs < self->tex_w);
 			const uint32_t yf = (ty>>8)&0xff, xf = (tx>>8)&0xff;
-#else
-		const float dx = (span->ftx2 - span->ftx1)/(span->l+1);
-		const float dy = (span->fty2 - span->fty1)/(span->l+1);
+#elif 0
+		const int32_t tx1 = (span->ftx1 + 1.0)*(128*(self->tex_w - 1));
+		const int32_t ty1 = (span->fty1 + 1.0)*(128*(self->tex_h - 1));
+		const int32_t tx2 = (span->ftx2 + 1.0)*(128*(self->tex_w - 1)); 
+		const int32_t ty2 = (span->fty2 + 1.0)*(128*(self->tex_h - 1));
+
+		for(uint32_t x = span->ix, i = 0; x <= span->ix + span->l; ++x, ++i)
+		{
+			const uint32_t t  = (256*i)/span->l;
+			const uint32_t tx = tx1 * t + (256 - t) * tx2;
+			const uint32_t ty = ty1 * t + (256 - t) * ty2;
+			
+			const uint32_t ys =  ty>>16,      xs =  tx>>16;     assert(ys < self->tex_h); assert(xs < self->tex_w);
+			const uint32_t yf = (ty>>8)&0xff, xf = (tx>>8)&0xff;
+#elif 0
+		const float linv = 1.0f/span->l;
+		// Convert range to 24.8 fixed point ranges are [-1. 1] so add 1 and multiply by 128 to end up
+		// with the range being [0, 256*texture_size]
+		const float ftx1 = (span->ftx1 + 1.0f)*128*(self->tex_w - 1);
+		const float ftx2 = (span->ftx2 + 1.0f)*128*(self->tex_w - 1);
+		const float fty1 = (span->fty1 + 1.0f)*128*(self->tex_h - 1);
+		const float fty2 = (span->fty2 + 1.0f)*128*(self->tex_h - 1);
+		
+		for(int32_t i = 0; i <= span->l; ++i)
+		{
+			const int32_t x = span->ix + i;
+			const float t = i/(float)span->l;
+			//const int32_t tx = ftx1*t + (1.0f-t)*ftx2;
+			//const int32_t ty = fty1*t + (1.0f-t)*fty2;
+			const int32_t tx = ftx1*(1.0f - t) + t*ftx2;
+			const int32_t ty = fty1*(1.0f - t) + t*fty2;
+
+			const uint32_t ys = ty>>8,   xs = tx>>8;
+			const uint32_t yf = ty&0xff, xf = tx&0xff;
+#elif 1
+		const float dx = (span->ftx2 - span->ftx1)/(span->l);
+		const float dy = (span->fty2 - span->fty1)/(span->l);
 		
 		for(int32_t i = 0; i <= span->l; ++i)
 		{
@@ -242,10 +302,26 @@ static void render_line(struct scope_renderer *self, void *restrict dest, int li
 			const float fty = span->fty1 + i*dy;
 
 			// Convert to 24.8 fixed point ranges are [-1. 1] so add 1 and multiply by 128
-			const int32_t tx = (ftx + 1.0f)*128*self->tex_w;
-			const int32_t ty = (fty + 1.0f)*128*self->tex_h;
+			const int32_t tx = (ftx + 1.0f)*(128*(self->tex_w - 1));
+			const int32_t ty = (fty + 1.0f)*(128*(self->tex_h - 1));
 			
-			const uint32_t ys = ty>>8,   xs = tx>>8;
+			const uint32_t ys = ty>>8,   xs = tx>>8;     assert(ys < self->tex_h); assert(xs < self->tex_w);
+			const uint32_t yf = ty&0xff, xf = tx&0xff;
+#else
+		const float ftx1 = (span->ftx1 + 1.0f)*128*(self->tex_w - 1);
+		const float ftx2 = (span->ftx2 + 1.0f)*128*(self->tex_w - 1);
+		const float fty1 = (span->fty1 + 1.0f)*128*(self->tex_h - 1);
+		const float fty2 = (span->fty2 + 1.0f)*128*(self->tex_h - 1);
+		const float dx = (ftx2 - ftx1)/(span->l);
+		const float dy = (fty2 - fty1)/(span->l);
+		
+		for(int32_t i = 0; i <= span->l; ++i)
+		{
+			const int32_t x = span->ix + i;
+			const int32_t tx = ftx1 + i*dx;
+			const int32_t ty = fty1 + i*dy;
+			
+			const uint32_t ys = ty>>8,   xs = tx>>8;     assert(ys < self->tex_h); assert(xs < self->tex_w);
 			const uint32_t yf = ty&0xff, xf = tx&0xff;
 #endif
 
@@ -273,14 +349,6 @@ static void render_line(struct scope_renderer *self, void *restrict dest, int li
 	}
 }
 
-
-
-__attribute__((hot,always_inline,optimize("-ffinite-math-only")))
-static inline float line_zero_crossing(float x0, float y0, float x1, float y1)
-{
-	return x0 - y0 * (x1 - x0) / (y1 - y0);
-}
-
 /*******************************************************************
  * Interpolate tx/ty to what they should be when the line (x0,y0)->(x1, y1)
  * crosses zero
@@ -290,12 +358,27 @@ static inline void calc_span_end(float* xo, float* txo, float* tyo,
                                  float x0, float y0, float x1, float y1, 
                                  float tx0, float ty0, float tx1, float ty1)
 {
-	float t = y0/(y1 - y0);
-	
-	// (1 - t) * v0 + t * v1;
-	*xo  = (1 - t) * x0 + t * x1;
-	*txo = (1 - t) * tx0 + t * tx1;
-	*tyo = (1 - t) * ty0 + t * ty1;
+	float t;
+	if(fabsf(x1 - x0) > 0.000001f)
+	{
+		*xo = x0 - y0 * (x1 - x0) / (y1 - y0);
+		t = (*xo  - x0)/(x1 - x0);
+		
+		// (1 - t) * v0 + t * v1;
+		//*xo  = (1 - t) * x0 + t * x1;
+		*txo = (1 - t) * tx0 + t * tx1;
+		*tyo = (1 - t) * ty0 + t * ty1;
+		
+		assert((*xo >= x0 && *xo <= x1) || (*xo >= x1 && *xo <= x0));
+		assert(*txo >= -1.0f && *txo <= 1.0f);
+		assert(*tyo >=  0.0f && *tyo <= 1.0f);
+	}
+	else
+	{
+		*xo = x0;
+		*txo = (tx0 + tx1)*0.5f;
+		*tyo = (ty0 + ty1)*0.5f;
+	}
 }
 
 #if defined(POINT_SPAN_DEBUG_LOG) && POINT_SPAN_DEBUG_LOG > 1
@@ -332,8 +415,8 @@ static inline void calc_span_end(float* xo, float* txo, float* tyo,
 			float s1_ = fabsf(x1r_ - x1_);               \
 			spans[span_count].ftx1 = tx0_ + s0_*dx_;     \
 			spans[span_count].fty1 = ty0_ + s0_*dy_;     \
-			spans[span_count].ftx2 = tx1_ + s1_*dx_;     \
-			spans[span_count].fty2 = ty1_ + s1_*dy_;     \
+			spans[span_count].ftx2 = tx1_ - s1_*dx_;     \
+			spans[span_count].fty2 = ty1_ - s1_*dy_;     \
 			                                            \
 			span_count++;                               \
 			if(span_count >= self->max_lspans) break;   \
@@ -473,27 +556,19 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 		if(ey < 0)
 		{ // we are in the p2 end cap, only one span, starting somewhere along the line EF
 			DEBUG_LOG(2, "intersect EF\n");
-			float span_x1 = line_zero_crossing(ex, ey, fx, fy);
-			
-			float tx1 = -1.0f;
-			float ty1 = hypotf(span_x1-ex, ey)/width; // EF is half the width of the line, and we want positive
 			if(gy < 0)
 			{ // other side of span is on line FG
 				DEBUG_LOG(2, "intersect FG\n");
-				float span_x2 = line_zero_crossing(fx, fy, gx, gy);
-
-				float tx2 = hypotf(span_x2-fx, fy)/width - 1.0f;
-				float ty2 = 1.0f;
+				calc_span_end(&span_x1, &tx1, &ty1, ex, ey, fx, fy, etx, ety, ftx, fty);
+				calc_span_end(&span_x2, &tx2, &ty2, fx, fy, gx, gy, ftx, fty, gtx, gty);
 				
 				ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 			}
 			else
 			{ // other side of the span is on line GH
 				DEBUG_LOG(2, "intersect GH\n");
-				float span_x2 = line_zero_crossing(gx, gy, hx, hy);
-
-				float tx2 = 1.0f;
-				float ty2 = hypotf(span_x2-hx, hy)/width; // want to set H to be 0
+				calc_span_end(&span_x1, &tx1, &ty1, ex, ey, fx, fy, etx, ety, ftx, fty);
+				calc_span_end(&span_x2, &tx2, &ty2, gx, gy, hx, hy, gtx, gty, htx, hty);
 				
 				ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 			}
@@ -501,25 +576,15 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 		else if(by < 0)
 		{ // first span starts on line BE, already know ey > 0
 			DEBUG_LOG(2, "intersect BE\n");
-			float span_x1 = line_zero_crossing(bx, by, ex, ey);
-			
-			float tx1 = -1.0f;
-			float ty1 =  0.0f;
-
 			if(hy < 0)
 			{ // Two spans, we switch at a point along line EH
 				DEBUG_LOG(2, "intersect EH\n");
-				float span_x2 = line_zero_crossing(ex, ey, hx, hy);
-				float tx2 = hypotf(span_x2-ex, ey)/width - 1.0f;
-				float ty2 = 0.0f;
-				
 				if(gy < 0)
 				{ // second span ends somewhere along line FG
 					DEBUG_LOG(2, "intersect FG\n");
-					float span_x3 = line_zero_crossing(fx, fy, gx, gy);
-
-					float tx3 = hypotf(span_x3-fx, fy)/width - 1.0f;
-					float ty3 = 1.0f;
+					calc_span_end(&span_x1, &tx1, &ty1, bx, by, ex, ey, btx, bty, etx, ety);
+					calc_span_end(&span_x2, &tx2, &ty2, ex, ey, hx, hy, etx, ety, htx, hty);
+					calc_span_end(&span_x3, &tx3, &ty3, fx, fy, gx, gy, ftx, fty, gtx, gty);
 					
 					ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 					ADD_SPAN(span_x2, span_x3, tx2, ty2, tx3, ty3)
@@ -527,10 +592,9 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 				else
 				{ // second span ends somewhere along line GH
 					DEBUG_LOG(2, "intersect GH\n");
-					float span_x3 = line_zero_crossing(gx, gy, hx, hy);
-
-					float tx3 = 1.0f;
-					float ty3 = hypotf(span_x3-hx, hy)/width;
+					calc_span_end(&span_x1, &tx1, &ty1, bx, by, ex, ey, btx, bty, etx, ety);
+					calc_span_end(&span_x2, &tx2, &ty2, ex, ey, hx, hy, etx, ety, htx, hty);
+					calc_span_end(&span_x3, &tx3, &ty3, gx, gy, hx, hy, gtx, gty, htx, hty);
 					
 					ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 					ADD_SPAN(span_x2, span_x3, tx2, ty2, tx3, ty3)
@@ -539,10 +603,8 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 			else
 			{ // only one span, ends along line CH
 				DEBUG_LOG(2, "intersect CH\n");
-				float span_x2 = line_zero_crossing(cx, cy, hx, hy);
-
-				float tx2 =  1.0f;
-				float ty2 =  0.0f;
+				calc_span_end(&span_x1, &tx1, &ty1, bx, by, ex, ey, btx, bty, etx, ety);
+				calc_span_end(&span_x2, &tx2, &ty2, cx, cy, hx, hy, ctx, cty, htx, hty);
 				
 				ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 			}
@@ -559,19 +621,10 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 					if(gy < 0)
 					{ // last span ends at a point along line FG
 						DEBUG_LOG(2, "intersect FG\n");
-						float span_x1 = line_zero_crossing(ax, ay, bx, by);
-						float span_x2 = line_zero_crossing(bx, by, cx, cy);
-						float span_x3 = line_zero_crossing(ex, ey, hx, hy);
-						float span_x4 = line_zero_crossing(fx, fy, gx, gy);
-						
-						float tx1 = -1.0f;
-						float ty1 = hypotf(span_x1-bx, by)/width;
-						float tx2 = hypotf(span_x2-bx, by)/width - 1.0f;
-						float ty2 = 0.0f;
-						float tx3 = hypotf(span_x3-ex, ey)/width - 1.0f;
-						float ty3 = 0.0f;
-						float tx4 = hypotf(span_x4-fx, fy)/width - 1.0f;
-						float ty4 = 1.0f;
+						calc_span_end(&span_x1, &tx1, &ty1, ax, ay, bx, by, atx, aty, btx, bty);
+						calc_span_end(&span_x2, &tx2, &ty2, bx, by, cx, cy, btx, bty, ctx, cty);
+						calc_span_end(&span_x3, &tx3, &ty3, ex, ey, hx, hy, etx, ety, htx, hty);
+						calc_span_end(&span_x4, &tx4, &ty4, fx, fy, gx, gy, ftx, fty, gtx, gty);
 						
 						ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 						ADD_SPAN(span_x2, span_x3, tx2, ty2, tx3, ty3)
@@ -580,19 +633,10 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 					else
 					{ // last span ends at a point along line GH
 						DEBUG_LOG(2, "intersect GH\n");
-						float span_x1 = line_zero_crossing(ax, ay, bx, by);
-						float span_x2 = line_zero_crossing(bx, by, cx, cy);
-						float span_x3 = line_zero_crossing(ex, ey, hx, hy);
-						float span_x4 = line_zero_crossing(gx, gy, hx, hy);
-						
-						float tx1 = -1.0f;
-						float ty1 = hypotf(span_x1-bx, by)/width;
-						float tx2 = hypotf(span_x2-bx, by)/width - 1.0f;
-						float ty2 = 0.0f;
-						float tx3 = hypotf(span_x3-ex, ey)/width - 1.0f;
-						float ty3 = 0.0f;
-						float tx4 = 1.0f;
-						float ty4 = hypotf(span_x4-hx, hy)/width;
+						calc_span_end(&span_x1, &tx1, &ty1, ax, ay, bx, by, atx, aty, btx, bty);
+						calc_span_end(&span_x2, &tx2, &ty2, bx, by, cx, cy, btx, bty, ctx, cty);
+						calc_span_end(&span_x3, &tx3, &ty3, ex, ey, hx, hy, etx, ety, htx, hty);
+						calc_span_end(&span_x4, &tx4, &ty4, gx, gy, hx, hy, gtx, gty, htx, hty);
 						
 						ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 						ADD_SPAN(span_x2, span_x3, tx2, ty2, tx3, ty3)
@@ -601,16 +645,10 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 				}
 				else
 				{ // two spans, second one ends along line CH
-					float span_x1 = line_zero_crossing(ax, ay, bx, by);
-					float span_x2 = line_zero_crossing(bx, by, cx, cy);
-					float span_x3 = line_zero_crossing(cx, cy, hx, hy);
-					
-					float tx1 = -1.0f;
-					float ty1 = hypotf(span_x1-bx, by)/width;
-					float tx2 = hypotf(span_x2-bx, by)/width - 1.0f;
-					float ty2 = 0.0f;
-					float tx3 = 1.0f;
-					float ty3 = 0.0f;
+					DEBUG_LOG(2, "intersect CH\n");
+					calc_span_end(&span_x1, &tx1, &ty1, ax, ay, bx, by, atx, aty, btx, bty);
+					calc_span_end(&span_x2, &tx2, &ty2, bx, by, cx, cy, btx, bty, ctx, cty);
+					calc_span_end(&span_x3, &tx3, &ty3, cx, cy, hx, hy, ctx, cty, htx, hty);
 					
 					ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 					ADD_SPAN(span_x2, span_x3, tx2, ty2, tx3, ty3)
@@ -618,38 +656,29 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 			}
 			else
 			{ // one span, ends along line CD
-				float span_x1 = line_zero_crossing(ax, ay, bx, by);
-				float span_x2 = line_zero_crossing(cx, cy, dx, dy);
-				
-				float tx1 = -1.0f;
-				float ty1 = hypotf(span_x1-bx, by)/width;
-				float tx2 = 1.0f;
-				float ty2 = hypotf(span_x2-cx, cy)/width;
+				DEBUG_LOG(2, "intersect CD\n");
+				calc_span_end(&span_x1, &tx1, &ty1, ax, ay, bx, by, atx, aty, btx, bty);
+				calc_span_end(&span_x2, &tx2, &ty2, cx, cy, dx, dy, ctx, cty, dtx, dty);
 			
 				ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 			}
 		}
 		else
 		{ // span starts along line AD, already know ay >= 0
+			DEBUG_LOG(2, "intersect AD\n");
 			if(cy < 0)
 			{ // at least two spans second starts along BC
+				DEBUG_LOG(2, "intersect BC\n");
 				if(hy < 0)
 				{ // three spans, third starts along EH
+					DEBUG_LOG(2, "intersect EH\n");
 					if(gy < 0)
 					{ // last span ends along FG
-						float span_x1 = line_zero_crossing(ax, ay, dx, dy);
-						float span_x2 = line_zero_crossing(bx, by, cx, cy);
-						float span_x3 = line_zero_crossing(ex, ey, hx, hy);
-						float span_x4 = line_zero_crossing(fx, fy, gx, gy);
-						
-						float tx1 = hypotf(span_x1-ax, ay)/width - 1.0f;
-						float ty1 = 1.0f;
-						float tx2 = hypotf(span_x2-bx, by)/width - 1.0f;
-						float ty2 = 0.0f;
-						float tx3 = hypotf(span_x3-ex, ey)/width - 1.0f;
-						float ty3 = 0.0f;
-						float tx4 = hypotf(span_x4-fx, fy)/width - 1.0f;
-						float ty4 = 1.0f;
+						DEBUG_LOG(2, "intersect FG\n");
+						calc_span_end(&span_x1, &tx1, &ty1, ax, ay, dx, dy, atx, aty, dtx, dty);
+						calc_span_end(&span_x2, &tx2, &ty2, bx, by, cx, cy, btx, bty, ctx, cty);
+						calc_span_end(&span_x3, &tx3, &ty3, ex, ey, hx, hy, etx, ety, htx, hty);
+						calc_span_end(&span_x4, &tx4, &ty4, fx, fy, gx, gy, ftx, fty, gtx, gty);
 						
 						ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 						ADD_SPAN(span_x2, span_x3, tx2, ty2, tx3, ty3)
@@ -657,19 +686,11 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 					}
 					else
 					{ // last span ends along GH
-						float span_x1 = line_zero_crossing(ax, ay, dx, dy);
-						float span_x2 = line_zero_crossing(bx, by, cx, cy);
-						float span_x3 = line_zero_crossing(ex, ey, hx, hy);
-						float span_x4 = line_zero_crossing(gx, gy, hx, hy);
-						
-						float tx1 = hypotf(span_x1-ax, ay)/width - 1.0f;
-						float ty1 = 1.0f;
-						float tx2 = hypotf(span_x2-bx, by)/width - 1.0f;
-						float ty2 = 0.0f;
-						float tx3 = hypotf(span_x3-ex, ey)/width - 1.0f;
-						float ty3 = 0.0f;
-						float tx4 = 1.0f;
-						float ty4 = hypotf(span_x4-hx, hy)/width;
+						DEBUG_LOG(2, "intersect GH\n");
+						calc_span_end(&span_x1, &tx1, &ty1, ax, ay, dx, dy, atx, aty, dtx, dty);
+						calc_span_end(&span_x2, &tx2, &ty2, bx, by, cx, cy, btx, bty, ctx, cty);
+						calc_span_end(&span_x3, &tx3, &ty3, ex, ey, hx, hy, etx, ety, htx, hty);
+						calc_span_end(&span_x4, &tx4, &ty4, gx, gy, hx, hy, gtx, gty, htx, hty);
 						
 						ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 						ADD_SPAN(span_x2, span_x3, tx2, ty2, tx3, ty3)
@@ -678,16 +699,10 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 				}
 				else
 				{ // two spans second ends along CH
-					float span_x1 = line_zero_crossing(ax, ay, dx, dy);
-					float span_x2 = line_zero_crossing(bx, by, cx, cy);
-					float span_x3 = line_zero_crossing(cx, cy, hx, hy);
-					
-					float tx1 = hypotf(span_x1-ax, ay)/width - 1.0f;
-					float ty1 = 1.0f;
-					float tx2 = hypotf(span_x2-bx, by)/width - 1.0f;
-					float ty2 = 0.0f;
-					float tx3 = 1.0f;
-					float ty3 = 0.0f;
+					DEBUG_LOG(2, "intersect CH\n");
+					calc_span_end(&span_x1, &tx1, &ty1, ax, ay, dx, dy, atx, aty, dtx, dty);
+					calc_span_end(&span_x2, &tx2, &ty2, bx, by, cx, cy, btx, bty, ctx, cty);
+					calc_span_end(&span_x3, &tx3, &ty3, cx, cy, hx, hy, ctx, cty, htx, hty);
 					
 					ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 					ADD_SPAN(span_x2, span_x3, tx2, ty2, tx3, ty3)
@@ -695,13 +710,9 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 			}
 			else
 			{ // one span, ends along CD
-				float span_x1 = line_zero_crossing(ax, ay, dx, dy);
-				float span_x2 = line_zero_crossing(cx, cy, dx, dy);
-				
-				float tx1 = hypotf(span_x1-ax, ay)/width - 1.0f;
-				float ty1 = 1.0f;
-				float tx2 = 1.0f;
-				float ty2 = hypotf(span_x2-cx, cy)/width;
+				DEBUG_LOG(2, "intersect CD\n");
+				calc_span_end(&span_x1, &tx1, &ty1, ax, ay, dx, dy, atx, aty, dtx, dty);
+				calc_span_end(&span_x2, &tx2, &ty2, cx, cy, dx, dy, ctx, cty, dtx, dty);
 				
 				ADD_SPAN(span_x1, span_x2, tx1, ty1, tx2, ty2)
 			}
@@ -723,19 +734,85 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 }
 
 
-
-#define BLOCK_SIZE 4
-
-
-
 #if NO_PARATASK
 
-__attribute__((hot))
-static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3]) {
-	zoom_task(0, h/BLOCK_SIZE, out, in, w, h, R);
+__attribute__((hot,noinline,optimize("-ffinite-math-only")))
+static void generate_spans(struct scope_renderer *self, int ymin, int ymax, const struct point* pnts)
+{
+	for(int line = ymin; line <= ymax; line++)
+	{
+		generate_spans_for_line(self, pnts, line);
+	}
+}
+
+__attribute__((hot,noinline,optimize("-ffinite-math-only")))
+static void render_spans(struct scope_renderer *self, int ymin, int ymax, uint16_t * restrict dest)
+{
+	for(int line = ymin; line <= ymax; line++)
+	{
+		render_line(self, dest, line);
+	}
 }
 
 #else
+
+#include "paratask/paratask.h"
+
+struct generate_spans_args {
+	struct scope_renderer *self;
+	const struct point* pnts;
+	int span;
+};
+
+static void generate_spans_paratask_func(size_t work_item_id, void *arg_)
+{
+	struct generate_spans_args *a = arg_;
+	const int ystart = work_item_id * a->span;
+	const int yend   = IMIN(ystart + a->span, a->self->iw);
+	for(int line = ystart; line < yend; line++)
+	{
+		generate_spans_for_line(a->self, a->pnts, line);
+	}
+}
+
+static void generate_spans(struct scope_renderer *self, int ymin, int ymax, const struct point* pnts)
+{
+	int span = 1;
+	struct generate_spans_args args = {
+		self,
+		pnts,
+		span
+	};
+	paratask_call(paratask_default_instance(), ymin, ymax+1, generate_spans_paratask_func, &args);
+}
+
+struct render_spans_args {
+	struct scope_renderer *self;
+	uint16_t * restrict dest;
+	int span;
+};
+
+static void render_spans_paratask_func(size_t work_item_id, void *arg_)
+{
+	struct render_spans_args *a = arg_;
+	const int ystart = work_item_id * a->span;
+	const int yend   = IMIN(ystart + a->span, a->self->iw);
+	for(int line = ystart; line < yend; line++)
+	{
+		render_line(a->self, a->dest, line);
+	}
+}
+
+static void render_spans(struct scope_renderer *self, int ymin, int ymax, uint16_t * restrict dest)
+{
+	int span = 1;
+	struct render_spans_args args = {
+		self,
+		dest,
+		span
+	};
+	paratask_call(paratask_default_instance(), ymin, ymax+1, render_spans_paratask_func, &args);
+}
 
 #endif
 
