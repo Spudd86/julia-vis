@@ -4,6 +4,20 @@ A Music Visualizer
 A beat reactive visualizer that's based around the 
 Julia set fractal.
 
+
+Parts of this codebase have been heavily optimized, some of that optimization was done a decade ago, so it may or may not matter for modern
+systems. It was also originally written to run as fast as possible on a computer that was old in 2008. Other parts were written as an 
+experiment, not all of it was ever cleaned up.
+
+There are known bugs, the pulseaudio part crashes on shutdown, I have no idea why, it didn't used to do that and I haven't changed it, nor
+can I work out what I'm doing wrong, but since it only goes wrong when the program is already shutting down it's low priority.
+
+There is also a bug in the new span based osciliscope renderer, sometimes it makes a big rectangle where it shouldn't, this is high priority
+to fix before I start working on the acceleration structure that will hopefully actually make this new one faster than the old one, at
+least on a multicore machine.
+
+And probably more I've forgotten about, and others I don't know about.
+
 Note:
 
 src/opengl/glx_gen.{c,h}
