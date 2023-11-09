@@ -6,6 +6,49 @@
 /* Define to 1 to disable use x86 vector intrinsics */
 #undef DISABLE_X86_INTRIN
 
+/* Define to 1 if we have C11 thread support */
+#undef HAVE_C11_THREADS
+
+/* Define to 1 if you have the declaration of `cnd_broadcast', and to 0 if you
+   don't. */
+#undef HAVE_DECL_CND_BROADCAST
+
+/* Define to 1 if you have the declaration of `cnd_destroy', and to 0 if you
+   don't. */
+#undef HAVE_DECL_CND_DESTROY
+
+/* Define to 1 if you have the declaration of `cnd_init', and to 0 if you
+   don't. */
+#undef HAVE_DECL_CND_INIT
+
+/* Define to 1 if you have the declaration of `cnd_wait', and to 0 if you
+   don't. */
+#undef HAVE_DECL_CND_WAIT
+
+/* Define to 1 if you have the declaration of `mtx_destroy', and to 0 if you
+   don't. */
+#undef HAVE_DECL_MTX_DESTROY
+
+/* Define to 1 if you have the declaration of `mtx_init', and to 0 if you
+   don't. */
+#undef HAVE_DECL_MTX_INIT
+
+/* Define to 1 if you have the declaration of `mtx_lock', and to 0 if you
+   don't. */
+#undef HAVE_DECL_MTX_LOCK
+
+/* Define to 1 if you have the declaration of `mtx_unlock', and to 0 if you
+   don't. */
+#undef HAVE_DECL_MTX_UNLOCK
+
+/* Define to 1 if you have the declaration of `thrd_create', and to 0 if you
+   don't. */
+#undef HAVE_DECL_THRD_CREATE
+
+/* Define to 1 if you have the declaration of `thrd_success', and to 0 if you
+   don't. */
+#undef HAVE_DECL_THRD_SUCCESS
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
@@ -219,6 +262,9 @@
    a type exists and the standard includes do not define it. */
 #undef int8_t
 
+/* Define to `long int' if <sys/types.h> does not define. */
+#undef off_t
+
 /* Define to the equivalent of the C99 'restrict' keyword, or to
    nothing if this is not supported.  Do not define if restrict is
    supported directly.  */
@@ -235,6 +281,9 @@
 
 /* Define to `unsigned int' if <sys/types.h> does not define. */
 #undef size_t
+
+/* Define to `int' if <sys/types.h> does not define. */
+#undef ssize_t
 
 /* Define to the type of an unsigned integer type of width exactly 16 bits if
    such a type exists and the standard includes do not define it. */

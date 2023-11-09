@@ -24,6 +24,13 @@ AM_INIT_AUTOMAKE([
   subdir-objects
 ])
 
+dnl disable unnecessary compiler checks
+AC_DEFUN([AC_PROG_F77], [:])
+AC_DEFUN([AC_PROG_FC], [:])
+AC_DEFUN([AC_PROG_OBJC], [:])
+AC_DEFUN([AC_PROG_OBJCCPP], [:])
+AC_DEFUN([AC_LIBTOOL_F77], [:])
+
 AC_PROG_CC
 AC_PROG_CXX
 AC_USE_SYSTEM_EXTENSIONS
@@ -50,7 +57,20 @@ AC_TYPE_UINT64_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT16_T
 AC_TYPE_UINT8_T
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
+AC_TYPE_OFF_T
 AC_HEADER_STDBOOL
+
+AC_CHECK_DECLS([thrd_create, mtx_init, mtx_lock, mtx_trylock, mtx_unlock, mtx_destroy, cnd_init, cnd_broadcast, cnd_wait, cnd_destroy, thrd_success], [ 
+    AC_DEFINE(HAVE_C11_THREADS, 1, [Define to 1 if we have C11 thread support])
+    have_c11_threads=yes
+], [
+    have_c11_threads=no
+],
+[[#include <threads.h>]])
+AM_CONDITIONAL([HAVE_C11_THREADS], [ test "x$have_c11_threads" = xyes ])
+
 
 AC_SEARCH_LIBS([sqrt], [m])
 

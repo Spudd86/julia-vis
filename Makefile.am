@@ -1,5 +1,4 @@
 EXTRA_DIST =
-CLEANFILES =
 ACLOCAL_AMFLAGS = -I m4 ${ACLOCAL_FLAGS}
 AM_MAKEFLAGS = --no-print-directory
 
@@ -26,10 +25,10 @@ KMS_CFLAGS = $(GBM_CFLAGS) $(DRM_CFLAGS)
 KMS_LIBS = $(GBM_LIBS) $(DRM_LIBS)
 
 if DEBUG
-AM_CFLAGS += -ggdb3 -O0
+AM_CFLAGS += -ggdb3 -Og
 else
 AM_CFLAGS += -DNDEBUG
-AM_CFLAGS += -g3 -O2
+AM_CFLAGS += -ggdb3 -O2
 #AM_CFLAGS += -finline-functions -maccumulate-outgoing-args -fdelete-null-pointer-checks
 #AM_CFLAGS += -funroll-loops -fpeel-loops -funswitch-loops -fvariable-expansion-in-unroller
 #AM_CFLAGS += -ftree-vectorize -ftree-loop-ivcanon -ftree-loop-im -ftree-loop-linear
@@ -135,7 +134,9 @@ src_software_libsdlcommon_la_LIBADD = $(SDL_LIBS) src/software/libsoftcore.la
 extern_libtinycthread_la_SOURCES = extern/tinycthread/tinycthread.c extern/tinycthread/tinycthread.h
 
 src_libparatask_la_SOURCES = src/paratask/paratask.c src/paratask/paratask.h
+if !HAVE_C11_THREADS
 src_libparatask_la_LIBADD  = extern/libtinycthread.la
+endif
 
 src_libtribuf_la_SOURCES = src/tribuf.c src/tribuf.h src/common.h
 
@@ -163,8 +164,7 @@ src/software/map.c src/software/map.h \
 src/software/maxsrc.c src/software/maxsrc.h \
 src/software/palletblit.c \
 src/software/pixmisc.c src/software/pixmisc.h \
-src/software/pixformat.h \
-src/software/resample_image.h
+src/software/pixformat.h
 src_software_libsoftcore_la_LIBADD = src/software/libx86.la src/libparatask.la src/libcommon.la
 
 #nuklear_libnuklear_la_SOURCES = 
@@ -200,15 +200,27 @@ bin_gl_test_LDADD = src/audio/libaudio.la src/libcommon.la src/libtribuf.la src/
 bin_glx_test_SOURCES = src/opengl/glx/glxmain.c src/optproc.c
 bin_glx_test_CFLAGS  = $(AM_CFLAGS) $(X11_CFLAGS) $(GL_CFLAGS)
 bin_glx_test_LDFLAGS = $(AM_LDFLAGS) $(X11_LIBS)
-bin_glx_test_LDADD = extern/libtinycthread.la src/libtribuf.la src/audio/libaudio.la src/libcommon.la src/opengl/libglcommon.la src/opengl/libglx.la
+bin_glx_test_LDADD =
+if !HAVE_C11_THREADS
+bin_glx_test_LDADD += extern/libtinycthread.la 
+endif
+bin_glx_test_LDADD += src/libtribuf.la src/audio/libaudio.la src/libcommon.la src/opengl/libglcommon.la src/opengl/libglx.la
 
 bin_fps_test_SOURCES = src/opengl/glx/fpsmain.c src/opengl/fpsservo/fpsservo.c src/opengl/fpsservo/fpsservo.h src/optproc.c
 bin_fps_test_CFLAGS  = $(AM_CFLAGS) $(X11_CFLAGS) $(GL_CFLAGS)
-bin_fps_test_LDADD = extern/libtinycthread.la src/libtribuf.la src/audio/libaudio.la src/libcommon.la src/opengl/libglcommon.la src/opengl/libglx.la $(X11_LIBS)
+bin_fps_test_LDADD =
+if !HAVE_C11_THREADS
+bin_fps_test_LDADD += extern/libtinycthread.la
+endif
+bin_fps_test_LDADD += src/libtribuf.la src/audio/libaudio.la src/libcommon.la src/opengl/libglcommon.la src/opengl/libglx.la $(X11_LIBS)
 
 bin_egl_test_SOURCES = src/opengl/egl/xegl.c src/opengl/eglmain.c src/opengl/egl/eglmisc.h src/optproc.c
 bin_egl_test_CFLAGS  = $(AM_CFLAGS) $(X11_CFLAGS) $(GL_CFLAGS) $(EGL_CFLAGS)
-bin_egl_test_LDADD = extern/libtinycthread.la src/libtribuf.la src/audio/libaudio.la src/libcommon.la src/opengl/libglcommon.la $(X11_LIBS) $(EGL_LIBS)
+bin_egl_test_LDADD =
+if !HAVE_C11_THREADS
+bin_egl_test_LDADD += extern/libtinycthread.la
+endif
+bin_egl_test_LDADD += src/libtribuf.la src/audio/libaudio.la src/libcommon.la src/opengl/libglcommon.la $(X11_LIBS) $(EGL_LIBS)
 
 bin_kms_test_SOURCES = src/opengl/egl/kms.c src/optproc.c
 bin_kms_test_CFLAGS  = $(AM_CFLAGS) $(KMS_CFLAGS) $(GL_CFLAGS)
@@ -216,7 +228,11 @@ bin_kms_test_LDADD = src/libtribuf.la src/audio/libaudio.la src/libcommon.la src
 
 bin_glscope_test_SOURCES = $(GL_SDL_SRCS) src/opengl/glscope-test.c src/opengl/glscope.c src/opengl/glmisc.c src/optproc.c
 bin_glscope_test_CFLAGS  = $(AM_CFLAGS) $(SDL_CFLAGS) $(GL_CFLAGS)
-bin_glscope_test_LDADD = extern/libtinycthread.la src/libtribuf.la src/audio/libaudio.la src/libcommon.la src/opengl/libglloader.la 
+bin_glscope_test_LDADD =
+if !HAVE_C11_THREADS
+bin_glscope_test_LDADD += extern/libtinycthread.la
+endif
+bin_glscope_test_LDADD += src/libtribuf.la src/audio/libaudio.la src/libcommon.la src/opengl/libglloader.la 
 
 
 # Software versions
@@ -237,7 +253,11 @@ bin_sdlthread_test_LDADD   = src/software/libsdlcommon.la src/audio/libaudio.la 
 bin_audio_test_SOURCES = src/sdl/audiotest.c src/audio/beat.c src/audio/fft.c src/audio/rb.c src/audio/rb.h src/optproc.c src/software/sdl/sdl-text.c src/sdl/sdlsetup.c src/terminusIBM.c src/software/sdl/line.c
 bin_audio_test_CFLAGS  = $(AM_CFLAGS) $(SDL_CFLAGS)
 bin_audio_test_LDFLAGS = $(AM_LDFLAGS) $(SDL_LIBS)
-bin_audio_test_LDADD   = extern/libtinycthread.la src/libtribuf.la src/audio/libaudio-drv.la
+bin_audio_test_LDADD   =
+if !HAVE_C11_THREADS
+bin_audio_test_LDADD  += extern/libtinycthread.la
+endif
+bin_audio_test_LDADD  += src/libtribuf.la src/audio/libaudio-drv.la
 
 bin_pal_test_SOURCES = src/software/sdl/test_palletblit.c
 bin_pal_test_CFLAGS  = $(AM_CFLAGS) $(SDL_CFLAGS)

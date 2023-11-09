@@ -9,11 +9,13 @@
 
 #include "paratask.h"
 
-// NOTE: some versions of gcc/clang fail to define __STDC_NO_THREADS__ even if the libc doesn't support C11 threads
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__)
+// NOTE: some versions of gcc fail to define __STDC_NO_THREADS__ even if the libc doesn't support C11 threads
+//#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__)
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__) && (defined(__clang__) || !(defined(__GNUC__) && defined(__GNUC_MINOR__) && (((__GNUC__ << 8) | __GNUC_MINOR__) >= ((4 << 8) | 9))))
 #	include <threads.h>
 #else
 #	include "tinycthread.h"
+#	pragma message "using tinycthread"
 #endif
 
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_ATOMICS__) && !defined(PARATASK_NO_ATOMICS)

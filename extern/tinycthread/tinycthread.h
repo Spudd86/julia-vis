@@ -25,6 +25,11 @@ freely, subject to the following restrictions:
 #ifndef _TINYCTHREAD_H_
 #define _TINYCTHREAD_H_
 
+// NOTE: some versions of gcc/clang fail to define __STDC_NO_THREADS__ even if the libc doesn't support C11 threads
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__)
+#	include <threads.h>
+#else
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -467,6 +472,8 @@ int tss_set(tss_t key, void *val);
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 
 #endif /* _TINYTHREAD_H_ */
