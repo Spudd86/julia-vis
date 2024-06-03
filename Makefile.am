@@ -16,8 +16,8 @@ AM_LDFLAGS = \
 	-Wl,--as-needed \
 	$(PTHREAD_LIBS)
 
-AUDIO_CFLAGS = $(PA_CFLAGS) $(JACK_CFLAGS) $(PULSE_CFLAGS) $(SNDFILE_CFLAGS)
-AUDIO_LIBS = $(PA_LIBS) $(JACK_LIBS) $(PULSE_LIBS) $(SNDFILE_LIBS)
+AUDIO_CFLAGS = $(PORTAUDIO_CFLAGS) $(JACK_CFLAGS) $(PULSE_CFLAGS) $(SNDFILE_CFLAGS)
+AUDIO_LIBS = $(PORTAUDIO_LIBS) $(JACK_LIBS) $(PULSE_LIBS) $(SNDFILE_LIBS)
 
 GL_CFLAGS += $(GLU_CFLAGS) -DUSE_GL
 GL_LIBS += $(GLU_LIBS)
@@ -51,7 +51,7 @@ endif
 # Sources
 ########################################################################################################################################
 
-src_audio_libaudio_drv_la_SOURCES = src/audio/audio.h
+src_audio_libaudio_drv_la_SOURCES = src/audio/audio.h src/audio/audio-private.h
 if ENABLE_JACK
 src_audio_libaudio_drv_la_SOURCES += src/audio/jack.c
 endif
@@ -90,20 +90,10 @@ src/software/libsdlcommon.la \
 src/software/libx86.la \
 src/software/libsoftcore.la
 
-if ENABLE_JACK
-src_audio_libaudio_drv_la_SOURCES += src/audio/jack.c
-endif
-if ENABLE_PULSE
-src_audio_libaudio_drv_la_SOURCES += src/audio/pulseaudio.c
-endif
-if ENABLE_PORTAUDIO
-src_audio_libaudio_drv_la_SOURCES += src/audio/portaudio.c
-endif
-if ENABLE_SNDFILE
-src_audio_libaudio_drv_la_SOURCES += src/audio/filedecode.c
-endif
+# Sources are set above
 src_audio_libaudio_drv_la_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS)
-src_audio_libaudio_drv_la_LDFLAGS = $(AUDIO_LIBS)
+src_audio_libaudio_drv_la_LIBADD = $(AUDIO_LIBS)
+#src_audio_libaudio_drv_la_LDFLAGS = $(AUDIO_LIBS)
 
 src_audio_libaudio_la_SOURCES = \
 src/audio/audio.c src/audio/audio.h \
@@ -111,8 +101,8 @@ src/audio/beat.c src/audio/beat.h \
 src/audio/fft.c \
 src/audio/audio-private.h
 src_audio_libaudio_la_CFLAGS = $(AM_CFLAGS) $(AUDIO_CFLAGS)
-src_audio_libaudio_la_LDFLAGS = $(AUDIO_LIBS)
-src_audio_libaudio_la_LIBADD = src/audio/libaudio-drv.la src/libtribuf.la
+#src_audio_libaudio_la_LDFLAGS = $(AUDIO_LIBS)
+src_audio_libaudio_la_LIBADD = src/audio/libaudio-drv.la src/libtribuf.la $(AUDIO_LIBS)
 
 
 src_opengl_libglloader_la_SOURCES = src/opengl/gl_14.c src/opengl/gl_14.h

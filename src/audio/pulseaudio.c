@@ -18,8 +18,10 @@ void pulse_shutdown(void) {
         if(stream)
             pa_stream_unref(stream);
 
-        if(context)
+        if(context) {
+            pa_context_disconnect(context);
             pa_context_unref(context);
+        }
 
     	pa_threaded_mainloop_free(pulse_ml);
     }

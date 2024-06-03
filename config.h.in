@@ -37,6 +37,10 @@
    don't. */
 #undef HAVE_DECL_MTX_LOCK
 
+/* Define to 1 if you have the declaration of `mtx_trylock', and to 0 if you
+   don't. */
+#undef HAVE_DECL_MTX_TRYLOCK
+
 /* Define to 1 if you have the declaration of `mtx_unlock', and to 0 if you
    don't. */
 #undef HAVE_DECL_MTX_UNLOCK
