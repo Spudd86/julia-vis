@@ -1,8 +1,16 @@
-
-- Make Makefile.in smarter
-
 - switch pallet blit sse2 to use maskmoveu so we can simplify it's alignment code
 
 - add padding to internal image buffer allocations so that vector instructions can run past the end of the image (eg: pallet blit using maskmoveu to do stores might read up to 14 bytes past the end of the image)
 
 - switch to using the julia_vis_pixel_format based pallet init function in at least all software versions so we can freely change the resulting channel orders in the pallet to make the 16 bit blitters better.
+
+- make an SDL2 version, use nuklear as UI and let user switch between visualizer modes.
+   - Also select audio input
+     - refactor audio subsystem to support this
+   - Also let user switch between software and OpenGL visualizer
+   - Add support for SDL2 Audio backend for recording
+
+- Use newer audio API on Windows natively. (WASPI)
+   - default to using loopback on default output device.
+
+- Build a release binary of SDL2 version
