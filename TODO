@@ -8,6 +8,7 @@
    - Also select audio input
      - refactor audio subsystem to support this
    - Also let user switch between software and OpenGL visualizer
+       - Should grab existing state images to start up different modes to make things smooth?
    - Add support for SDL2 Audio backend for recording
 
 - Use newer audio API on Windows natively. (WASPI)
