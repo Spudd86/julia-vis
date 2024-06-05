@@ -10,6 +10,9 @@
    - Also let user switch between software and OpenGL visualizer
        - Should grab existing state images to start up different modes to make things smooth?
    - Add support for SDL2 Audio backend for recording
+   - Switch to https://github.com/Dav1dde/glad for generating the loader, lets us pass the SDL2 getprocaddr
+   - Vulkan backand?
+      - simplified shaders?
 
 - Use newer audio API on Windows natively. (WASPI)
    - default to using loopback on default output device.
