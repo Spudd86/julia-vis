@@ -10,10 +10,10 @@
 #include <assert.h>
 
 // all of SSE is always available on x86_64 so we don't have to worry so much about intrinsics being built with the right flags
-#ifndef __x86_64__
+// #ifndef __x86_64__
 #pragma GCC target("no-sse2,sse,mmx")
 #pragma clang attribute push (__attribute__(( target("no-sse2,sse,mmx") )), apply_to = function)
-#endif
+// #endif
 
 #include <mmintrin.h>
 #include <xmmintrin.h>
@@ -36,8 +36,8 @@ _mm_shuffle_pi16 (__m64 __A, int const __N) { return (__m64) __builtin_ia32_pshu
 #endif
 
 // requires w%16 == 0
-__attribute__((hot, target("sse,mmx")))
-void maxblend_sse(void *restrict dest, const void *restrict src, int w, int h)
+__attribute__((hot, flatten, target("no-sse2,sse,mmx")))
+void maxblend_sse(void *restrict dest, const void *restrict src, size_t n)
 {
 	//FIXME: use src_stride
 	//FIXME: deal with w%16 != 0
@@ -45,7 +45,7 @@ void maxblend_sse(void *restrict dest, const void *restrict src, int w, int h)
 	const __m64 off = _mm_set1_pi16(0x8000);
 	_mm_prefetch(mbdst, _MM_HINT_NTA);
 	_mm_prefetch(mbsrc, _MM_HINT_NTA);
-	for(unsigned int i=0; i < 2*w*h/sizeof(__m64); i+=4, mbdst+=4, mbsrc+=4) {
+	for(size_t i=0; i < 2*n/sizeof(__m64); i+=4, mbdst+=4, mbsrc+=4) {
 		_mm_prefetch(mbdst + 4, _MM_HINT_NTA);
 		_mm_prefetch(mbsrc + 4, _MM_HINT_NTA);
 

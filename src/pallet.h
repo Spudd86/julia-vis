@@ -27,4 +27,6 @@ struct pal_lst {
 };
 struct pal_lst * pallet_get_palettes(void);
 
+void pallet_blit_raw(uint8_t* restrict dst, julia_vis_pixel_format dst_fmt, int dst_pitch, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal);
+
 #endif /* include guard */

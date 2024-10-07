@@ -6,6 +6,31 @@
 #include <limits.h>
 #include <malloc.h>
 #include <assert.h>
+#include <stdalign.h>
+
+
+// #define PT_PERTHREAD_WORK_COUNTS 1
+
+/*
+ * Use a futex-like? (actually futex on Linux)
+ *
+ * Counts how many of our threads are awake?
+ *
+ *
+ * Turn task queue into a circular buffer?
+ *   - need safe sleep/wake for that, but would be lock free when nothing is sleeping
+ * 
+ * Might be able to use for notify completion... need some way to know no thread might try to START a task, ideally without requiring them all to start it
+ *  - last thread out sends wakeup to waiter
+ *      path would be dec, broadcast if dec set counter to 0
+ *
+ * Could have an active threads counter that also has a flag in it to indicate started and have paratask_wait() use futex waiting to wait
+ * for it to be no active threads, but started?
+ * Could also have all workers keep an atomic count of finished work items? Or they could atomically decrement a remaining work items number with a local count of how many
+ * tasks they ran before they move one and wait for it be 0 in paratask_wait(). That is every thread only does one operation on the value paratask_wait() is looking at
+ */
+
+
 
 #include "paratask.h"
 
@@ -47,10 +72,29 @@ struct paratask_task
 
 #if PARATASK_NO_ATOMICS
 	size_t next_work_id;
+#elif PT_PERTHREAD_WORK_COUNTS
+	struct {
+		alignas(256) atomic_size_t next_work_id;
+		int  next_steal;
+		size_t range_bound;
+	} per_thread[];
 #else
 	atomic_size_t next_work_id;
 #endif
 
+};
+
+typedef enum {
+	PTX_STARTING,
+	PTX_WAITING,
+	PTX_RUNNING_TASK,
+	PTX_STOPPING
+} thread_state;
+
+struct paratask_thread
+{
+	thrd_t thread;
+	thread_state state;
 };
 
 struct paratask_ctx
@@ -71,7 +115,30 @@ struct paratask_ctx
 	thrd_t threads[];   ///< all the threads in our pool
 };
 
-once_flag default_instance_once_flag = ONCE_FLAG_INIT;
+// #define MAX_THREADS 2048
+
+// static once_flag global_data_once_flag = ONCE_FLAG_INIT;
+// static const uint16_t *thread_id_permutations = NULL; // TODO: turn this into a static table? (just make sure that for thread id <= n the first n only contain thread id < n)
+
+// If we think of it as a 2d array, need property that for any n
+// thread_id_permutations[0..n][0..(n-1)] < n+1
+
+// static void create_global_data_fn(void)
+// {
+// 	uint16_t *permutations = malloc(sizeof(*thread_id_permutations) * MAX_THREADS * MAX_THREADS);
+
+
+
+// 	thread_id_permutations = permutations;
+// }
+
+// static void create_global_data(void)
+// {
+// 	call_once(&global_data_once_flag, create_global_data_fn);
+// }
+
+
+static once_flag default_instance_once_flag = ONCE_FLAG_INIT;
 static struct paratask_ctx *default_instance = NULL;
 static void create_default_instance(void) { default_instance = paratask_new(0); }
 struct paratask_ctx *paratask_default_instance(void) {
@@ -119,6 +186,8 @@ struct paratask_ctx *paratask_new(int nthreads)
 			abort(); //FIXME: do better than this
 		}
 	}
+
+	printf("Paratask Started\n");
 
 	return self;
 }
@@ -180,7 +249,15 @@ int paratask_call(struct paratask_ctx *self, size_t work_offset, size_t work_siz
 
 struct paratask_task *paratask_call_async(struct paratask_ctx *self, size_t work_offset, size_t work_size, paratask_task_fn fn, void *arg)
 {
+	size_t next_work_id;
+#if !PARATASK_NO_ATOMICS && PT_PERTHREAD_WORK_COUNTS
+	struct paratask_task *task = malloc(sizeof(*task) + sizeof(task->per_thread[0]) * self->nthreads);
+#else
 	struct paratask_task *task = malloc(sizeof(*task));
+#endif
+// #if PARATASK_NO_ATOMICS && PT_PERTHREAD_WORK_COUNTS
+// 	task->per_thread = malloc(sizeof(task->per_thread[0]) * (self->nthreads + 1));
+// #endif
 	if(!task) return NULL;
 
 	//FIXME: return errors instead of calling abort()
@@ -206,6 +283,19 @@ struct paratask_task *paratask_call_async(struct paratask_ctx *self, size_t work
 
 #if PARATASK_NO_ATOMICS
 	task->next_work_id = 0;
+#elif PT_PERTHREAD_WORK_COUNTS
+	for(int i = 0; i < self->nthreads; i++)
+	{
+		atomic_init(&task->per_thread[i].next_work_id, (i * task->work_size) / self->nthreads);
+		// atomic_init(&task->per_thread[i].next_steal, (i + 1) % self->nthreads);
+		task->per_thread[i].next_steal = (i + 1) % self->nthreads;
+
+	}
+	for(int i = 0; i < self->nthreads - 1; i++)
+	{
+		task->per_thread[i].range_bound = ((i + 1) * task->work_size) / self->nthreads;
+	}
+	task->per_thread[self->nthreads - 1].range_bound = task->work_size;
 #else
 	atomic_init(&task->next_work_id, 0);
 #endif
@@ -248,7 +338,7 @@ int paratask_wait(struct paratask_task *task)
 	return retval;
 }
 
-static size_t next_work_item(struct paratask_task *task)
+static size_t next_work_item(struct paratask_task *task, int thread_num)
 {
 	size_t work_item_id;
 
@@ -256,6 +346,25 @@ static size_t next_work_item(struct paratask_task *task)
 	mtx_lock(&task->task_mtx);
 	work_item_id = task->next_work_id++;
 	mtx_unlock(&task->task_mtx);
+#elif PT_PERTHREAD_WORK_COUNTS
+	work_item_id = atomic_fetch_add_explicit(&task->per_thread[thread_num].next_work_id, 1, memory_order_relaxed);
+	if(work_item_id >= task->per_thread[thread_num].range_bound)
+	{
+		const int nthreads = task->ctx->nthreads;
+		int steal = task->per_thread[thread_num].next_steal; //atomic_load_explicit(&task->per_thread[thread_num].next_steal, memory_order_relaxed);
+		for(int i=0; i < nthreads; i++)
+		{
+			work_item_id = atomic_fetch_add_explicit(&task->per_thread[steal].next_work_id, 1, memory_order_relaxed);
+			if(work_item_id < task->per_thread[steal].range_bound)
+			{
+				// atomic_store_explicit(&task->per_thread[thread_num].next_steal, steal, memory_order_relaxed);
+				task->per_thread[thread_num].next_steal = steal;
+				return work_item_id;
+			}
+			steal++;
+		}
+		return task->work_size;
+	}
 #else
 	work_item_id = atomic_fetch_add_explicit(&task->next_work_id, 1, memory_order_relaxed);
 #endif
@@ -300,7 +409,7 @@ static int task_thread(void *ctx)
 		void *work_fn_arg = task->fn_arg;
 
 		while(1) {
-			size_t work_item_id = next_work_item(task);
+			size_t work_item_id = next_work_item(task, thread_num);
 			if(work_item_id >= global_work_size) break;
 			work_func(work_item_id + global_work_offset, work_fn_arg);
 		}

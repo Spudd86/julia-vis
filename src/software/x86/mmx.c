@@ -16,12 +16,12 @@
 #define unreachable __builtin_unreachable
 #endif
 
-__attribute__((hot, target("mmx")))
-void maxblend_mmx(void *restrict dest, const void *restrict src, int w, int h)
+__attribute__((hot, flatten, target("mmx")))
+void maxblend_mmx(void *restrict dest, const void *restrict src, size_t n)
 {
 	__m64 *mbdst = dest; const __m64 *mbsrc = src;
 	const __m64 off = _mm_set1_pi16(0x8000);
-	for(unsigned int i=0; i < 2*w*h/sizeof(__m64); i+=4, mbdst+=4, mbsrc+=4) {
+	for(size_t i=0; i < 2*n/sizeof(__m64); i+=4, mbdst+=4, mbsrc+=4) {
 
 		__m64 v1, v2, v3, v4, t1, t2, t3, t4;
 		__m64 m1, m2, m3, m4;

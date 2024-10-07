@@ -6,6 +6,8 @@
 #ifndef AUDIOPRIVATE_H_
 #define AUDIOPRIVATE_H_
 
+//TODO: need a function to list possible devices
+
 int audio_setup_pa(const opt_data *od);
 void audio_stop_pa(void);
 int jack_setup(const opt_data *);

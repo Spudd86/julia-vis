@@ -16,14 +16,14 @@ __m64 _mm_max_pi16(__m64 a, __m64 b) {
 
 // should be the same as the sse version but split out just to be sure gcc doesn't generate any sse only instructions
 // plus lets us use femms which is faster on some AMD CPUs (also tunes for athalons instead of generic)
-__attribute__((hot, target("no-sse,athlon,3dnow")))
-void maxblend_3dnow(void *restrict dest, const void *restrict src, int w, int h)
+__attribute__((hot, flatten, target("no-sse,athlon,3dnow")))
+void maxblend_3dnow(void *restrict dest, const void *restrict src, size_t n)
 {
 	__m64 *mbdst = dest; const __m64 *mbsrc = src;
 	const __m64 off = _mm_set1_pi16(0x8000);
 	__builtin_prefetch(mbdst, 0, 0);
 	__builtin_prefetch(mbsrc, 0, 0);
-	for(unsigned int i=0; i < 2*w*h/sizeof(__m64); i+=4, mbdst+=4, mbsrc+=4) {
+	for(unsigned int i=0; i < 2*n/sizeof(__m64); i+=4, mbdst+=4, mbsrc+=4) {
 		__builtin_prefetch(mbdst + 4, 0, 0);
 		__builtin_prefetch(mbsrc + 4, 0, 0);
 

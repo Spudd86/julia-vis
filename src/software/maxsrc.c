@@ -1,30 +1,39 @@
 //#pragma GCC optimize "3,ira-hoist-pressure,inline-functions,merge-all-constants,modulo-sched,modulo-sched-allow-regmoves"
-
+#pragma GCC optimize "-ffinite-math-only"
 #include "common.h"
 #include "maxsrc.h"
 #include "getsamp.h"
+#include "scope_render.h"
 
 #include <float.h>
 #include <assert.h>
 
+#define SPLIT_PNTS 1
+
+static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3]);
+
+#ifndef SPLIT_PNTS
 typedef struct {
 	uint16_t *restrict data;
 	uint16_t w,h;
 	uint16_t stride;
 } MxSurf;
-
 static void point_init(MxSurf *res, uint16_t w, uint16_t h);
-static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3]);
 static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, int npnts, const uint32_t *pnts);
+#endif
 
 struct maxsrc {
 	uint16_t *prev_src;
 	uint16_t *next_src;
 	int iw, ih;
-	int samp;
 	float tx, ty, tz;
 
+#ifndef SPLIT_PNTS
+	int samp;
 	MxSurf pnt_src;
+#else
+	struct scope_renderer *scope;
+#endif
 };
 
 struct maxsrc *maxsrc_new(int w, int h)
@@ -33,16 +42,18 @@ struct maxsrc *maxsrc_new(int w, int h)
 	struct maxsrc *self = calloc(sizeof(*self), 1);
 
 	self->iw = w; self->ih = h;
+#ifndef SPLIT_PNTS
 	self->samp = IMAX(w,h); //IMIN(IMAX(w,h), 1023);
-
 	point_init(&self->pnt_src, (uint16_t)IMAX(w/24, 8), (uint16_t)IMAX(h/24, 8));
 	printf("maxsrc using %i %dx%d points\n", self->samp, self->pnt_src.w, self->pnt_src.h);
-
+#else
+	self->scope = scope_renderer_new(w, h, IMAX(w,h));
+#endif
 	// add extra padding for vector instructions to be able to run past the end
-	size_t bufsize = (size_t)w * (size_t)h * sizeof(uint16_t) + 256;
-	self->prev_src = aligned_alloc(256, bufsize);
+	size_t bufsize = (size_t)w * (size_t)h * sizeof(uint16_t) + 1024;
+	self->prev_src = aligned_alloc(512, bufsize);
 	memset(self->prev_src, 0, bufsize);
-	self->next_src = aligned_alloc(256, bufsize);
+	self->next_src = aligned_alloc(512, bufsize);
 	memset(self->next_src, 0, bufsize);
 
 	return self;
@@ -52,9 +63,13 @@ void maxsrc_delete(struct maxsrc *self)
 {
 	aligned_free(self->prev_src);
 	aligned_free(self->next_src);
-	free((void*)self->pnt_src.data);
+#ifndef SPLIT_PNTS
+	aligned_free((void*)self->pnt_src.data);
+#else
+	scope_renderer_delete(self->scope);
+#endif
 	self->next_src = self->prev_src = NULL;
-	self->iw = self->ih = self->samp = 0;
+	self->iw = self->ih = 0;
 	free(self);
 }
 
@@ -72,7 +87,6 @@ const uint16_t *maxsrc_get(struct maxsrc *self) {
 void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 {
 	uint16_t *dst = self->next_src;
-	int samp = self->samp;
 	int iw = self->iw, ih = self->ih;
 
 	float cx=cosf(self->tx), cy=cosf(self->ty), cz=cosf(self->tz);
@@ -85,9 +99,13 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 	};
 
 	zoom(dst, self->prev_src, iw, ih, R);
-
+#ifndef SPLIT_PNTS
+	int samp = self->samp;
 	uint32_t pnts[samp*2]; // TODO: if we do dynamically choose number of points based on spacing move allocating this into context object
 
+	// float thresh = IMIN(iw, ih) * 0.125f/24.0f ;
+	int npnts = 0;
+	float pxi = INFINITY, pyi = INFINITY;
 	for(int i=0; i<samp; i++) {
 		//TODO: maybe change the spacing of the points depending on
 		// the rate of change so that the distance in final x,y coords is
@@ -115,17 +133,27 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 		float xi = x*zvd*iw+(iw - self->pnt_src.w)/2.0f;
 		float yi = y*zvd*ih+(ih - self->pnt_src.h)/2.0f;
 
-		pnts[i*2+0] = (uint32_t)(xi*256);
-		pnts[i*2+1] = (uint32_t)(yi*256);
+		if((pxi-xi)*(pxi-xi) + (pyi-yi)*(pyi-yi) > 8) // if too close to previous point, skip
+		{
+			pxi = xi, pyi = yi;
+			pnts[npnts*2+0] = (uint32_t)(xi*256);
+			pnts[npnts*2+1] = (uint32_t)(yi*256);
+			npnts++;
+		}
 	}
-	draw_points(dst, self->iw, self->ih, &self->pnt_src, samp, pnts);
+	// printf("Num points: % 4i\n", npnts);
+	draw_points(dst, self->iw, self->ih, &self->pnt_src, npnts, pnts);
+#else
+	scope_render(self->scope, dst, self->tx, self->ty, self->tz, audio, audiolen);
+#endif
 
 	self->next_src = self->prev_src;
 	self->prev_src = dst;
 
-	self->tx+=0.02f; self->ty+=0.01f; self->tz-=0.003f;
+	self->tx+=0.02003f; self->ty+=0.0101f; self->tz-=0.00307f;
 }
 
+#ifndef SPLIT_PNTS
 static void point_init(MxSurf *res, uint16_t w, uint16_t h)
 {
 	res->w = w; res->h = h;
@@ -185,6 +213,7 @@ static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_s
 	}
 #endif
 }
+#endif
 
 #ifdef DEBUG
 #define map_assert(a) assert(a)
@@ -192,11 +221,57 @@ static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_s
 #define map_assert(a)
 #endif
 
+/* Iterations   Accuracy
+ *  2          6.5 digits
+ *  3           20 digits
+ *  4           62 digits
+ * assuming a numeric type able to maintain that degree of accuracy in
+ * the individual operations.
+ */
+#define ITER 3
+
+__attribute__((hot))
+static float dist(float P, float Q) {
+/* A reasonably robust method of calculating `sqrt(P*P + Q*Q)'
+ *
+ * Transliterated from _More Programming Pearls, Confessions of a Coder_
+ * by Jon Bentley, pg. 156.
+ */
+    P = fabsf(P);
+    Q = fabsf(Q);
+
+    if (P<Q) {
+    	float R;
+        R = P;
+        P = Q;
+        Q = R;
+    }
+
+/* The book has this as:
+ *  if P = 0.0 return Q; # in AWK
+ * However, this makes no sense to me - we've just insured that P>=Q, so
+ * P==0 only if Q==0;  OTOH, if Q==0, then distance == P...
+ */
+    if ( Q == 0.0 )
+        return P;
+
+    for (int i=0; i<ITER; i++) {
+    	float R;
+        R = Q / P;
+        R = R * R;
+        R = R / (4.0 + R);
+        P = P + 2.0 * R * P;
+        Q = Q * R;
+    }
+    return P;
+}
+
 #define BLOCK_SIZE 8
 
+__attribute__((hot,always_inline))
 static inline void zoom_func(float *x, float *y, float u, float v, const float R[3][3])
 {
-	const float d = 0.95f + 0.053f*hypotf(u,v);
+	const float d = 0.95f + 0.053f*sqrtf(u*u+v*v);
 	const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 		(u*R[0][0] + v*R[0][1]),
 		(u*R[1][0] + v*R[1][1])*d,
@@ -282,7 +357,6 @@ static void zoom_task(size_t work_item_id, size_t span, uint16_t * restrict out,
 
 #if NO_PARATASK
 
-__attribute__((hot))
 static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3]) {
 	zoom_task(0, h/BLOCK_SIZE, out, in, w, h, R);
 }

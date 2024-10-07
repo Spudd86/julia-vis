@@ -90,6 +90,7 @@ int beat_get_count(void) {
 void audio_shutdown()
 {
 	if(audio_drv_shutdown != NULL) audio_drv_shutdown();
+	audio_drv_shutdown = NULL;
 
 	printf("audio shutting down\n");
 	//tribuf_destroy(samp_tb);

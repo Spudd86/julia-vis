@@ -25,21 +25,23 @@
 #endif
 
 // requires w%16 == 0 && h%16 == 0
-__attribute__((hot, target("no-sse4.2,sse4.1")))
-void maxblend_sse4_1(void *restrict dest, const void *restrict src, int w, int h)
+__attribute__((hot, flatten, target("no-sse4.2,sse4.1")))
+void maxblend_sse4_1(void *restrict dest, const void *restrict src, size_t npix)
 {
 	__m128i * restrict mbdst = dest;
 	__m128i * restrict mbsrc = (__m128i *)src; // cast away const because _mm_stream_load_si128() doesn't take a const pointer for some stupid reason
-	const size_t npix = (size_t)w*(size_t)h;
 	// just assume cache lines are at least 64 bytes
-	_mm_prefetch(mbdst +  0, _MM_HINT_NTA);
+	_mm_prefetch(mbdst +  4, _MM_HINT_NTA);
 	for(size_t i=0; i < npix; i+=32, mbdst+=4, mbsrc+=4) {
-		_mm_prefetch(mbdst +  8, _MM_HINT_NTA);
+		_mm_prefetch(mbdst + 8, _MM_HINT_NTA);
 		mbdst[0] = _mm_max_epu16(mbdst[0], _mm_stream_load_si128(mbsrc + 0));
 		mbdst[1] = _mm_max_epu16(mbdst[1], _mm_stream_load_si128(mbsrc + 1));
 		mbdst[2] = _mm_max_epu16(mbdst[2], _mm_stream_load_si128(mbsrc + 2));
 		mbdst[3] = _mm_max_epu16(mbdst[3], _mm_stream_load_si128(mbsrc + 3));
 	}
+	// for(size_t i=0; i < npix; i+=8, mbdst++, mbsrc++) {
+	// 	*mbdst = _mm_max_epu16(*mbdst, _mm_stream_load_si128(mbsrc));
+	// }
 }
 
 #endif

@@ -1,5 +1,9 @@
 #if (__x86_64__ || __i386__)  && !defined(DISABLE_X86_INTRIN)
 
+//TODO: replace all this with gcc/clang target_clones attribute
+
+//TODO: have to disable 3dNOW on 64 bit, gcc is dropping support
+
 #include "common.h"
 #include "x86_features.h"
 

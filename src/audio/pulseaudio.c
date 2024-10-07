@@ -185,7 +185,7 @@ int pulse_setup(const opt_data *od)
     pa_stream_set_state_callback(stream, stream_state_callback, &stream_ready);
 
     printf("pulseaudio: Connecting to source '%s'\n", source_name);
-    pa_stream_connect_record(stream, source_name, &buf_attr, PA_STREAM_FIX_RATE);
+    pa_stream_connect_record(stream, source_name, &buf_attr, PA_STREAM_FIX_RATE | PA_STREAM_ADJUST_LATENCY);
     // we probably don't want PA_STREAM_ADJUST_LATENCY since it tries to fiddle with device latency, which we don't actually 
     // care too much about as long as it isn't huge...
 

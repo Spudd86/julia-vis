@@ -71,6 +71,8 @@ void update_points(struct point_data *pd, unsigned int passed_time, int retarget
 /*			pd->t[i] = 0.5f*isaac_next_signed_float(pd->rng);*/
 	}
 
+	if(passed_time - pd->done_time <= 0) return;
+
 	const float tsped = 0.002f;
 	const unsigned int steps_ps = 150;
 

@@ -32,25 +32,24 @@
 #include <float.h>
 
 // requires w%16 == 0 && h%16 == 0
-__attribute__((hot, target("avx2,no-avx512f")))
-void maxblend_avx2(void *restrict dest, const void *restrict src, int w, int h)
+__attribute__((hot, flatten, target("avx2,no-avx512f")))
+void maxblend_avx2(void *restrict dest, const void *restrict src, size_t npix)
 {
 	_mm256_zeroupper();
 	__m256i * restrict mbdst = dest; const __m256i * restrict mbsrc = src;
-	_mm_prefetch(mbdst + 0, _MM_HINT_NTA);
-	_mm_prefetch(mbdst + 2, _MM_HINT_NTA);
-	_mm_prefetch(mbdst + 4, _MM_HINT_NTA);
-	_mm_prefetch(mbdst + 6, _MM_HINT_NTA);
+	// _mm_prefetch(mbdst + 0, _MM_HINT_NTA);
+	// _mm_prefetch(mbdst + 2, _MM_HINT_NTA);
+	// _mm_prefetch(mbdst + 4, _MM_HINT_NTA);
+	// _mm_prefetch(mbdst + 6, _MM_HINT_NTA);
 
 	_mm_prefetch(mbsrc + 0, _MM_HINT_NTA);
 	_mm_prefetch(mbsrc + 2, _MM_HINT_NTA);
 	_mm_prefetch(mbsrc + 4, _MM_HINT_NTA);
 	_mm_prefetch(mbsrc + 6, _MM_HINT_NTA);
 
-	const size_t npix = (size_t)w*(size_t)h;
 	for(size_t i=0; i < npix; i+=64, mbdst+=4, mbsrc+=4) { // can step up to 128 because w%16 == 0 && h%16 == 0 -> (w*h)%256 == 0
-		_mm_prefetch(mbdst + 8 , _MM_HINT_NTA);
-		_mm_prefetch(mbdst + 10, _MM_HINT_NTA);
+		// _mm_prefetch(mbdst + 8 , _MM_HINT_NTA);
+		// _mm_prefetch(mbdst + 10, _MM_HINT_NTA);
 		_mm_prefetch(mbsrc + 8 , _MM_HINT_NTA);
 		_mm_prefetch(mbsrc + 10, _MM_HINT_NTA);
 		_mm256_stream_si256(mbdst + 0, _mm256_max_epu16(_mm256_load_si256(mbdst + 0), _mm256_load_si256(mbsrc + 0)));
@@ -72,7 +71,7 @@ void maxblend_avx2(void *restrict dest, const void *restrict src, int w, int h)
  * @param w width of image (needs power of 2)
  * @param h height of image (needs divisable by ?)
  */
-__attribute__((hot, target("avx2,no-avx512f")))
+__attribute__((hot, flatten, target("avx2,no-avx512f")))
 void soft_map_avx2_task(size_t work_item_id, size_t span, uint16_t *restrict out, uint16_t *restrict in, int w, int h, const struct point_data *pd)
 {
 	const int ystart = work_item_id * span * 8;
@@ -295,7 +294,7 @@ static void do16_pix(uint32_t *restrict d, const uint16_t *restrict s, const uin
 }
 #endif
 
-__attribute__((hot, target("avx2,no-avx512f")))
+__attribute__((hot, flatten, target("avx2,no-avx512f")))
 void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
                         const uint16_t *restrict src, unsigned int src_stride,
                         unsigned int w, unsigned int h,

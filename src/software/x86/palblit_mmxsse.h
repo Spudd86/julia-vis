@@ -6,7 +6,7 @@
 #	define do_sfence() _mm_sfence()
 #	define do_mm_empty() _mm_empty()
 #	define APPEND_CPUCAP(name) name##_sse
-#	define ATTRIBS __attribute__((hot, target("sse") ))
+#	define ATTRIBS __attribute__((hot, flatten, target("sse,no-sse2") ))
 #elif defined(PALBLIT_3dNOW)
 // should be the same as the sse version but split out just to be sure gcc doesn't generate any sse only instructions
 // plus lets us use femms which is faster on some AMD CPUs
@@ -15,14 +15,14 @@
 #	define do_sfence() __builtin_ia32_sfence()
 #	define do_mm_empty() _m_femms()
 #	define APPEND_CPUCAP(name) name##_3dnow
-#	define ATTRIBS __attribute__((hot, target("arch=athlon,3dnow") ))
+#	define ATTRIBS __attribute__((hot, flatten, target("arch=athlon,3dnow") ))
 #elif defined(PALBLIT_MMX)
 #	define do_prefetch(addr)
 #	define stream_str(addr, v)  *(addr) = (v);
 #	define do_sfence()
 #	define do_mm_empty() _mm_empty()
 #	define APPEND_CPUCAP(name) name##_mmx
-#	define ATTRIBS __attribute__((hot, target("mmx") ))
+#	define ATTRIBS __attribute__((hot, flatten, target("mmx,no-sse") ))
 #else
 #	error "No target define!"
 #	define do_prefetch(addr)

@@ -107,6 +107,10 @@ PKG_CHECK_MODULES([SDL], [sdl])
 AC_SUBST(SDL_CFLAGS)
 AC_SUBST(SDL_LIBS)
 
+PKG_CHECK_MODULES([SDL2], [sdl2])
+AC_SUBST(SDL2_CFLAGS)
+AC_SUBST(SDL2_LIBS)
+
 AC_ARG_ENABLE([jack], AS_HELP_STRING([--enable-jack], [enable using jack for audio input (default: disabled)]))
 AS_IF([ test "x$enable_jack" = xyes ], [
 	PKG_CHECK_MODULES([JACK], [jack], [

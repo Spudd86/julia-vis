@@ -24,12 +24,11 @@
 #endif
 
 // requires w%16 == 0 && h%16 == 0
-__attribute__((hot, target("sse2,no-sse3")))
-void maxblend_sse2(void *restrict dest, const void *restrict src, int w, int h)
+__attribute__((hot, flatten, target("sse2,no-sse3")))
+void maxblend_sse2(void *restrict dest, const void *restrict src, size_t npix)
 {
 	__m128i *restrict mbdst = dest; const __m128i *restrict mbsrc = src;
 	const __m128i off = _mm_set1_epi16(0x8000);
-	const size_t npix = (size_t)w*(size_t)h;
 
 	_mm_prefetch(mbdst, _MM_HINT_NTA);
 	_mm_prefetch(mbsrc, _MM_HINT_NTA);
@@ -78,7 +77,7 @@ __m128i pb32_load_v(const uint16_t *restrict s) {
 }
 
 #if 1
-__attribute__((hot, target("sse2,no-sse3")))
+__attribute__((hot, flatten, target("sse2,no-sse3")))
 void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
                         const uint16_t *restrict src, unsigned int src_stride,
                         unsigned int w, unsigned int h,
@@ -335,7 +334,7 @@ void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
 // *******************************************************************************************************************
 // **************************************** Simple unaligned accesses version ****************************************
 // mostly here for reference and comparison.
-__attribute__((hot, target("sse2,no-sse3")))
+__attribute__((hot, flatten, target("sse2,no-sse3")))
 void pallet_blit32_sse2(uint8_t *restrict dest, unsigned int dst_stride,
                         const uint16_t *restrict src, unsigned int src_stride,
                         unsigned int w, unsigned int h,

@@ -6,6 +6,45 @@
 
 #include <assert.h>
 
+// TODO: switch over to something like:
+
+#if 0
+__attribute__((target("arch=athlon,3dnow") ))
+void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+__attribute__((target("mmx,no-sse") ))
+void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+__attribute__((target("sse,no-sse2") ))
+void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+__attribute__((target("sse2,no-sse3")))
+void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+__attribute__((target("avx2,no-avx512f")))
+void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+__attribute__((target("default")))
+void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+
+// This lets GCC generate a resolver function
+// Would need prototype of "default" visible in every implementation file
+
+
+#endif
 
 // pallet must have 257 entries (for easier interpolation on 16 bit indices)
 // output pix = (pallet[in/256]*(in%256) + pallet[in/256+1]*(255-in%256])/256
@@ -329,6 +368,7 @@ pallet_blit8_fn pallet_blit8 = pallet_blit8_dispatch;
 pallet_blit555_fn pallet_blit555 = pallet_blit555_dispatch;
 pallet_blit565_fn pallet_blit565 = pallet_blit565_dispatch;
 pallet_blit32_fn pallet_blit32 = pallet_blit32_dispatch;
+pallet_blit101010_fn pallet_blit101010 = pallet_blit_101010_fallback;
 
 static void pallet_blit8_dispatch(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
@@ -409,6 +449,7 @@ pallet_blit8_fn pallet_blit8 = pallet_blit8_fallback;
 pallet_blit555_fn pallet_blit555 = pallet_blit555_fallback;
 pallet_blit565_fn pallet_blit565 = pallet_blit565_fallback;
 pallet_blit32_fn pallet_blit32 = pallet_blit32_fallback;
+pallet_blit101010_fn pallet_blit101010 = pallet_blit_101010_fallback;
 #endif
 
 #ifndef NDEBUG
@@ -449,3 +490,37 @@ void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h,
 	}
 }
 
+void pallet_blit_raw(uint8_t* restrict dst, julia_vis_pixel_format dst_fmt, int dst_pitch, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal)
+{
+	const unsigned  int src_stride = w;
+
+	switch(dst_fmt) { // pallet code takes care of channel order
+		case SOFT_PIX_FMT_RGBx101010:
+		case SOFT_PIX_FMT_BGRx101010:
+			pallet_blit101010(dst, dst_pitch, src, src_stride, w, h, pal);
+			break;
+		case SOFT_PIX_FMT_RGBx8888:
+		case SOFT_PIX_FMT_BGRx8888:
+		case SOFT_PIX_FMT_xRGB8888:
+		case SOFT_PIX_FMT_xBGR8888:
+			pallet_blit32(dst, dst_pitch, src, src_stride, w, h, pal);
+			break;
+		case SOFT_PIX_FMT_RGB565:
+		case SOFT_PIX_FMT_BGR565:
+			pallet_blit565(dst, dst_pitch, src, src_stride, w, h, pal);
+			break;
+		case SOFT_PIX_FMT_RGB555:
+		case SOFT_PIX_FMT_BGR555:
+			pallet_blit555(dst, dst_pitch, src, src_stride, w, h, pal);
+			break;
+		case SOFT_PIX_FMT_8_xRGB_PAL:
+		case SOFT_PIX_FMT_8_xBGR_PAL:
+		case SOFT_PIX_FMT_8_RGBx_PAL:
+		case SOFT_PIX_FMT_8_BGRx_PAL:
+			pallet_blit8(dst, dst_pitch, src, src_stride, w, h);
+			break;
+		default:
+			unreachable();
+	}
+
+}

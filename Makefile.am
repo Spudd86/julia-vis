@@ -87,6 +87,7 @@ src/opengl/libglloader.la \
 src/opengl/libglx.la \
 src/opengl/libglcommon.la \
 src/software/libsdlcommon.la \
+src/software/libsdl2common.la \
 src/software/libx86.la \
 src/software/libsoftcore.la
 
@@ -121,6 +122,11 @@ src_software_libsdlcommon_la_SOURCES = src/optproc.c src/software/sdl/sdl-text.c
 src_software_libsdlcommon_la_CFLAGS = $(AM_CFLAGS) $(SDL_CFLAGS)
 src_software_libsdlcommon_la_LIBADD = $(SDL_LIBS) src/software/libsoftcore.la
 
+#src/software/sdl/sdl-text.c src/sdl/sdlsetup.c src/software/sdl/sdl-palblit.c
+src_software_libsdl2common_la_SOURCES = src/optproc.c src/software/sdl2/sdl2-text.c
+src_software_libsdl2common_la_CFLAGS = $(AM_CFLAGS) $(SDL2_CFLAGS)
+src_software_libsdl2common_la_LIBADD = $(SDL2_LIBS) src/software/libsoftcore.la
+
 extern_libtinycthread_la_SOURCES = extern/tinycthread/tinycthread.c extern/tinycthread/tinycthread.h
 
 src_libparatask_la_SOURCES = src/paratask/paratask.c src/paratask/paratask.h
@@ -135,6 +141,7 @@ src_libcommon_la_SOURCES = src/terminusIBM.c extern/isaac/isaac.c extern/isaac/i
 if !DEBUG
 src_software_libx86_la_CFLAGS  = $(AM_CFLAGS) -O3 -fmerge-all-constants
 endif
+#TODO: for newer gcc/clang need to disable 3dNOW as support is being removed on x86_64
 src_software_libx86_la_SOURCES = \
 src/software/x86/cpuid.c \
 src/software/x86/mmx.c \
@@ -155,6 +162,8 @@ src/software/maxsrc.c src/software/maxsrc.h \
 src/software/palletblit.c \
 src/software/pixmisc.c src/software/pixmisc.h \
 src/software/pixformat.h
+src_software_libsoftcore_la_SOURCES += src/software/point_span.c src/software/scope_render.h
+# src_software_libsoftcore_la_SOURCES += src/software/pnt_scope.c src/software/scope_render.h 
 src_software_libsoftcore_la_LIBADD = src/software/libx86.la src/libparatask.la src/libcommon.la
 
 #nuklear_libnuklear_la_SOURCES = 
@@ -163,8 +172,8 @@ src_software_libsoftcore_la_LIBADD = src/software/libx86.la src/libparatask.la s
 # Programs
 ########################################################################################################################################
 
-bin_PROGRAMS = bin/sdl-test bin/sdlthread-test bin/audio-test
-EXTRA_PROGRAMS = bin/glscope-test bin/pal-test bin/pal-test2 bin/palblit-test
+bin_PROGRAMS = bin/sdl2-test bin/sdl-test bin/sdlthread-test bin/audio-test
+EXTRA_PROGRAMS = bin/glscope-test bin/pal-test bin/pal-test2 bin/palblit-test bin/softscope-test
 
 if ENABLE_GL
 bin_PROGRAMS += bin/gl-test
@@ -227,6 +236,11 @@ bin_glscope_test_LDADD += src/libtribuf.la src/audio/libaudio.la src/libcommon.l
 
 # Software versions
 
+bin_sdl2_test_SOURCES = src/software/sdl2/sdl2main.c src/opengl/gles3/gles_pallet.c src/opengl/gles3/gles3_text.c
+bin_sdl2_test_CFLAGS  = $(AM_CFLAGS) $(SDL2_CFLAGS)
+bin_sdl2_test_LDFLAGS = $(AM_LDFLAGS) $(SDL2_LIBS) -lGL
+bin_sdl2_test_LDADD   = src/software/libsdl2common.la  src/audio/libaudio.la src/libcommon.la src/software/libsoftcore.la
+
 bin_sdl_test_SOURCES = src/software/sdl/sdl.c
 bin_sdl_test_CFLAGS  = $(AM_CFLAGS) $(SDL_CFLAGS)
 bin_sdl_test_LDFLAGS = $(AM_LDFLAGS) $(SDL_LIBS)
@@ -264,6 +278,10 @@ bin_palblit_test_CFLAGS  = $(AM_CFLAGS) $(SDL_CFLAGS)
 bin_palblit_test_LDFLAGS = $(AM_LDFLAGS) $(SDL_LIBS)
 bin_palblit_test_LDADD   = src/software/libsoftcore.la src/software/libsdlcommon.la src/libcommon.la
 
+bin_softscope_test_SOURCES = src/software/sdl/softscope-test.c
+bin_softscope_test_CFLAGS  = $(AM_CFLAGS) $(SDL_CFLAGS)
+bin_softscope_test_LDFLAGS = $(AM_LDFLAGS) $(SDL_LIBS)
+bin_softscope_test_LDADD   = src/software/libsdlcommon.la src/audio/libaudio.la src/libcommon.la src/software/libsoftcore.la
 
 
 ########################################################################################################################################

@@ -2,17 +2,17 @@
 #define PIXMISC_H
 
 #include "pixformat.h"
-typedef void (*maxblend_fn)(void *restrict dest, const void *restrict src, int w, int h);
+typedef void (*maxblend_fn)(void *restrict dest, const void *restrict src, size_t n);
 
 // require w%16 == 0
 // requires (h*w)%32 == 0
-void maxblend_mmx(void *restrict dest, const void *restrict src, int w, int h);
-void maxblend_3dnow(void *restrict dest, const void *restrict src, int w, int h);
-void maxblend_sse(void *restrict dest, const void *restrict src, int w, int h);
-void maxblend_sse2(void *restrict dest, const void *restrict src, int w, int h);
-void maxblend_sse4_1(void *restrict dest, const void *restrict src, int w, int h);
-void maxblend_avx2(void *restrict dest, const void *restrict src, int w, int h);
-void maxblend_fallback(void *restrict dest, const void *restrict src, int w, int h);
+void maxblend_mmx(void *restrict dest, const void *restrict src, size_t n);
+void maxblend_3dnow(void *restrict dest, const void *restrict src, size_t n);
+void maxblend_sse(void *restrict dest, const void *restrict src, size_t n);
+void maxblend_sse2(void *restrict dest, const void *restrict src, size_t n);
+void maxblend_sse4_1(void *restrict dest, const void *restrict src, size_t n);
+void maxblend_avx2(void *restrict dest, const void *restrict src, size_t n);
+void maxblend_fallback(void *restrict dest, const void *restrict src, size_t n);
 
 void maxblend(void *dest, const void *src, int w, int h);
 
@@ -32,6 +32,11 @@ typedef void (*pallet_blit565_fn)(uint8_t * restrict dest, unsigned int dst_stri
 					const uint32_t *restrict pal);
 
 typedef void (*pallet_blit32_fn)(uint8_t *restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+
+typedef void (*pallet_blit101010_fn)(uint8_t *restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,
 					unsigned int w, unsigned int h,
 					const uint32_t *restrict pal);
@@ -117,6 +122,7 @@ extern pallet_blit8_fn pallet_blit8;
 extern pallet_blit555_fn pallet_blit555;
 extern pallet_blit565_fn pallet_blit565;
 extern pallet_blit32_fn pallet_blit32;
+extern pallet_blit101010_fn pallet_blit101010;
 
 void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal);
 

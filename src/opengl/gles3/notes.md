@@ -1,0 +1,2 @@
+ - With GLES 3 should be able to make a version that doesn't need any extensions
+    - GL_MAX as blend func is core!

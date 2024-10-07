@@ -37,10 +37,10 @@ int main(int argc, char **argv)
 	printf("running with %dx%d bufs\n", im_w, im_h);
 
 	uint16_t *map_surf[2];
-	map_surf[0] = aligned_alloc(512, 512 + im_w * im_h * sizeof(uint16_t));
-	memset(map_surf[0], 0, im_w * im_h * sizeof(uint16_t));
-	map_surf[1] = aligned_alloc(512, 512 + im_w * im_h * sizeof(uint16_t));
-	memset(map_surf[0], 0, im_w * im_h * sizeof(uint16_t));
+	map_surf[0] = aligned_alloc(512, 1024 + im_w * im_h * sizeof(uint16_t));
+	memset(map_surf[0], 0, 1024 + im_w * im_h * sizeof(uint16_t));
+	map_surf[1] = aligned_alloc(512, 1024 + im_w * im_h * sizeof(uint16_t));
+	memset(map_surf[0], 0, 1024 + im_w * im_h * sizeof(uint16_t));
 
 	int m = 0, cnt = 0;
 
@@ -57,7 +57,7 @@ int main(int argc, char **argv)
 	uint32_t now = tick0;
 	uint32_t maxfrms = 0;
 
-	int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
+	int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0, show_fps = 0;
 	int lastframe_key = 0;
 
 	SDL_Event event;
@@ -68,6 +68,7 @@ int main(int argc, char **argv)
 		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F2)) { if(!lastframe_key) { debug_pal = !debug_pal; } lastframe_key = 1; }
 		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F3)) { if(!lastframe_key) { show_mandel = !show_mandel; } lastframe_key = 1; }
 		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F4)) { if(!lastframe_key) { show_fps_hist = !show_fps_hist; } lastframe_key = 1; }
+		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F5)) { if(!lastframe_key) { show_fps = !show_fps; } lastframe_key = 1; }
 		else lastframe_key = 0;
 
 		m = (m+1)&0x1;
@@ -91,9 +92,13 @@ int main(int argc, char **argv)
 		else
 			pallet_blit_SDL(screen, map_surf[m], im_w, im_h, pal_ctx_get_active(pal_ctx));
 
-		char buf[32];
-		sprintf(buf,"%6.1f FPS", 1000.0f / frametime);
-		DrawText(screen, buf);
+		if(show_fps)
+		{
+			char buf[32];
+			sprintf(buf,"%6.1f FPS", 1000.0f / frametime);
+			DrawText(screen, buf);
+		}
+
 		SDL_Flip(screen);
 
 		now = SDL_GetTicks();
@@ -114,7 +119,7 @@ int main(int argc, char **argv)
 		}
 
 		now = SDL_GetTicks();
-		if(now - fps_oldtime < 10) SDL_Delay(10 - (now - fps_oldtime)); // stay below 1000FPS
+		// if(now - fps_oldtime < 10) SDL_Delay(10 - (now - fps_oldtime)); // stay below 1000FPS
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
 		fps_oldtime = SDL_GetTicks();
 		cnt++;
