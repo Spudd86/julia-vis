@@ -13,6 +13,12 @@
 //TODO: add ability to change audio sample-rate without resetting video
 //TODO: add ability to change output video channel order without reset
 
+//TODO: split audio parts enough that we can run with either synchronous audio or async and replace more code with this
+//  [ ] Make unified API for sync and async audio
+//  [ ] Split this into a backend that is totally independent of where the audio comes from. (Just gets notified of beats, get's passed current audio to render function)
+
+//TODO: allow getting output without palette mapping so for example can do it via GLES in web/SDL2
+
 struct simple_soft_ctx {
 	soft_map_func map_func;
 	bool rational_julia;
@@ -168,7 +174,6 @@ void simple_soft_change_map_func(struct simple_soft_ctx *ctx, simple_soft_map_fu
 	}
 }
 
-// TODO: need a "now" take it as an argument
 void simple_soft_render(struct simple_soft_ctx *ctx, Pixbuf *out, int64_t now, int64_t tick0)
 {
 	ctx->m = (ctx->m+1)&0x1;
@@ -197,7 +202,7 @@ void simple_soft_render(struct simple_soft_ctx *ctx, Pixbuf *out, int64_t now, i
 	pallet_blit_Pixbuf(out, ctx->map_surf[ctx->m], ctx->im_w, ctx->im_h, pal_ctx_get_active(ctx->pal_ctx));
 	//pallet_blit_Pixbuf(out, maxsrc_get(ctx->maxsrc), ctx->im_w, ctx->im_h, pal_ctx_get_active(ctx->pal_ctx));
 
-	int newbeat = beat_ctx_count(ctx->beat);
+	uint64_t newbeat = beat_ctx_count(ctx->beat);
 	if(newbeat != ctx->beats) pal_ctx_start_switch(ctx->pal_ctx, newbeat);
 
 	if(newbeat != ctx->beats && now - ctx->last_beat_time > 1000) {

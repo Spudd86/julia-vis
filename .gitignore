@@ -9,11 +9,14 @@ src/config.h
 .cproject
 .project
 .settings
+.cache
+compile_commands.json
 *~
 .deps/
 .libs/
 gst/Makefile.in
 Makefile
+Makefile.in
 /m4/libtool.m4
 /m4/lt*.m4
 /libtool
@@ -64,10 +67,14 @@ Makefile
 *.pc
 *.pch
 *.dirstamp
+*.d
+.vscode
 bin/*
 build/*
 
+perf.data*
 
 *.mkv
 *.wav
 *.mp3
+*.mid

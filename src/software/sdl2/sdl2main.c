@@ -7,6 +7,9 @@
 // #include <SDL2/SDL_opengl.h>
 
 #include <GLES3/gl3.h>
+
+#include "opengl/gles3/gles3misc.h"
+
 #include "pallet.h"
 
 #include "audio/audio.h"
@@ -27,76 +30,22 @@ SDL_Surface* render_string(const char *str);
 void DrawText(SDL_Renderer* renderer, const char* text);
 void pallet_blit_SDL(SDL_Surface *dst, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal);
 
-#define CHECK_GL_ERR do { GLint glerr = glGetError(); while(glerr != GL_NO_ERROR) {\
-	fprintf(stderr, "%s: In function '%s':\n%s:%d: Warning: %s\n", \
-		__FILE__, __func__, __FILE__, __LINE__, gl_error_string(glerr)); \
-		glerr = glGetError();\
-		}\
-	} while(0)
-
-static char const* gl_error_string(GLenum const err)
-{
-  switch (err)
-  {
-    // opengl 2 errors (8)
-    case GL_NO_ERROR:
-      return "GL_NO_ERROR";
-
-    case GL_INVALID_ENUM:
-      return "GL_INVALID_ENUM";
-
-    case GL_INVALID_VALUE:
-      return "GL_INVALID_VALUE";
-
-    case GL_INVALID_OPERATION:
-      return "GL_INVALID_OPERATION";
-
-    case GL_OUT_OF_MEMORY:
-      return "GL_OUT_OF_MEMORY";
-
-    // opengl 3 errors (1)
-    case GL_INVALID_FRAMEBUFFER_OPERATION:
-      return "GL_INVALID_FRAMEBUFFER_OPERATION";
-
-    // gles 2, 3 and gl 4 error are handled by the switch above
-    default:
-    //   assert(!"unknown error");
-      return NULL;
-  }
-}
-
 struct glpal_ctx * pal_init_gles3(GLboolean float_packed_pixels);
 
 static const char *vtx_shader_src =
-	"#version 300 es\n"
-	// "attribute vec2 vertex;\n"
-	"layout(location = 0) in vec4 vertex;"
+	"const vec2 texc[4] = vec2[4](vec2(0, 0), vec2(1, 0), vec2(0, 1), vec2(1, 1));"
+	"const vec2 vert[4] = vec2[4](vec2(-1, -1), vec2( 1, -1), vec2(-1,  1), vec2( 1,  1));"
 	"out vec2 uv;"
 	"void main() {\n"
-	"	uv = vertex.xy;\n"
-	"	gl_Position = vec4(vertex.zw, 0. , 1. );\n"
-	// "	gl_Position = vec4((vertex.zw*0.5+0.5)*gl_viewportDimensions.xy, 0.0f, 1.0f);\n"
-	// "	gl_Position = vec4((vertex*0.5+0.5)*viewportDimensions.xy, 0.0f, 1.0f);\n"
+	"	uv = texc[gl_VertexID];\n"
+	"	gl_Position = vec4(vert[gl_VertexID], 0. , 1. );\n"
 	"}";
 static const char *frag_shader_src =
-	"#version 300 es\n"
-	"#ifdef GL_ES\n"
-	"precision highp float;\n"
-	"#endif\n"
-
-	// "varying vec2 uv;\n"
 	"uniform sampler2D src;\n"
 	"in vec2 uv;\n"
 	"out vec4 fragColour;\n"
-	"vec4 gamma_curve(vec4 c) {\n"
-	"	return mix(c * 12.92, 1.055*pow(c, vec4(1.0/2.4)) - 0.055, greaterThan(c, vec4(0.0031308)));"
-	"}\n"
 	"void main() {\n"
-	// "	fragColour = texture(src, uv) + vec4(uv*0.5, 0, 1);\n"
-	// "	fragColour = gamma_curve(texture(src, uv));\n"
 	"	fragColour = texture(src, uv);\n"
-	// "	fragColour = vec4(uv, 0, 1);\n"
-	// "	gl_FragColor = texture(src, gl_FragCoord.xy / viewportDimensions.xy);\n"
 	"}";
 
 //TODO: switch to using the julia_vis_pixel_format based pallet init function
@@ -117,15 +66,25 @@ int main(int argc, char **argv)
 	else if(strcmp(opts.map_name, "butterfly") == 0) map_func = soft_map_butterfly;
 	else if(opts.quality >= 1)  map_func = soft_map;
 	if(audio_init(&opts) < 0) exit(1);
-	
+
 	// SDL_SetHint(SDL_HINT_APP_NAME, "Julia Set Audio Visualizer");
 	SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION , "1");
-	
+
 	if(opts.w < 0 && opts.h < 0) opts.w = opts.h = IM_SIZE;
 	else if(opts.w < 0) opts.w = opts.h;
 	else if(opts.h < 0) opts.h = opts.w;
 
+	int win_w = opts.w ;
+	int win_h = opts.h ;
+
+	// TODO: option!
+	opts.w *= 2;
+	opts.h *= 2;
+
 	int im_w = opts.w - opts.w%16, im_h = opts.h - opts.h%16;
+
+
+
 	printf("running with %dx%d bufs\n", im_w, im_h);
 
 
@@ -143,12 +102,12 @@ int main(int argc, char **argv)
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-	
+
 	// SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 #endif
 	SDL_Window *window = SDL_CreateWindow("Julia Set Audio Visualizer",
 	                                      SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-	                                      opts.w, opts.h,
+	                                      win_w, win_h,
 	                                      SDL_WINDOW_OPENGL );
 	if(!window)
 	{
@@ -157,6 +116,7 @@ int main(int argc, char **argv)
 	}
 
 	int window_sdl_pixformat = SDL_GetWindowPixelFormat(window);
+
 #ifdef USE_SDL_RENDERER
 	int renderCount = SDL_GetNumRenderDrivers();
 	printf("Total render drivers: %d\n", renderCount);
@@ -179,7 +139,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	// SDL_GLContext glcontext = SDL_GL_CreateContext(window);
 	SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 	if(!renderer)
 	{
@@ -189,111 +148,29 @@ int main(int argc, char **argv)
 
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 
-	SDL_GL_SetSwapInterval(-1);
-
-	// julia_vis_pixel_format texture_format = SOFT_PIX_FMT_xRGB8888;
-
 	julia_vis_pixel_format texture_format = SOFT_PIX_FMT_xRGB8888;
 	SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB32, SDL_TEXTUREACCESS_STREAMING, opts.w, opts.h);
 
-	struct Pixbuf screen = {
-		.w = opts.w, .h = opts.h,
-		.pitch = opts.w * sizeof(uint32_t), .bpp = 32,
-		.format = texture_format,
-		// .data = aligned_alloc(512, 512 + opts.w * opts.h * sizeof(uint32_t))
-		.data = NULL
-	};
 #elif defined(USE_GL_UPLOAD)
 	//TODO: use GL pallet code
 	SDL_GLContext context = SDL_GL_CreateContext(window);
 #ifdef GL_ACCEL_PAL
 	struct glpal_ctx *glpal = pal_init_gles3(false);
 #else
-	GLuint shader_program = glCreateProgram();
-	GLuint vertex_shader   = glCreateShader(GL_VERTEX_SHADER);
-	GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+	GLuint shader_program = compile_program_defs(NULL, vtx_shader_src, frag_shader_src);
+	if(!shader_program) exit(1);
 
-	GLchar *info_log = NULL;
-	GLint  log_length;
-	GLint compiled = GL_FALSE;
-
-	glShaderSource(vertex_shader, 1, (const GLchar**)&vtx_shader_src, NULL);
-	glShaderSource(fragment_shader, 1, (const GLchar**)&frag_shader_src, NULL);
-
-	glCompileShader(vertex_shader);
-	glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &compiled);
-	
-	glGetShaderiv(vertex_shader, GL_INFO_LOG_LENGTH, &log_length);
-	if(log_length != 0) {
-		info_log = (GLchar *) malloc(log_length * sizeof(GLchar));
-		glGetShaderInfoLog(vertex_shader, log_length, &log_length, info_log);
-		printf("%s\n", info_log);
-		free(info_log);
-		info_log = NULL;
-	}
-
-	if(!compiled) {
-		printf("vertex shader compile failed");
-		return 1;	
-	}
-
-	glCompileShader(fragment_shader);
-	glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &compiled);
-	
-	glGetShaderiv(fragment_shader, GL_INFO_LOG_LENGTH, &log_length);
-	if(log_length != 0) {
-		info_log = (GLchar *) malloc(log_length * sizeof(GLchar));
-		glGetShaderInfoLog(fragment_shader, log_length, &log_length, info_log);
-		printf("%s\n", info_log);
-		free(info_log);
-		info_log = NULL;
-	}
-
-	if(!compiled) {
-		printf("fragment shader compile failed");
-		return 1;	
-	}
-	
-	// Program keeps shaders alive after they are attached
-	glAttachShader(shader_program, vertex_shader); glDeleteShader(vertex_shader);
-	glAttachShader(shader_program, fragment_shader); glDeleteShader(fragment_shader);
-	glLinkProgram(shader_program);
-	GLint linked = GL_FALSE;
-	glGetProgramiv(shader_program, GL_LINK_STATUS, &linked);
-
-	glGetProgramiv(shader_program, GL_INFO_LOG_LENGTH, &log_length);
-	if(log_length != 0) {
-		info_log = (GLchar *) malloc(log_length * sizeof(GLchar));
-		glGetProgramInfoLog(shader_program, log_length, &log_length, info_log);
-		printf("%s\n", info_log);
-		free(info_log);
-		info_log = NULL;
-	}
-
-	if (!linked) {
-		printf("Failed Shader compile:\nvertex:\n%s\nfragment:\n%s\n", vtx_shader_src, frag_shader_src);
-		return 1;
-	}
-
-	glUseProgram(shader_program);
-	glUniform1i(glGetUniformLocation(shader_program, "src"), 0);
-	glUseProgram(0);
+	glUseProgram(shader_program); CHECK_GL_ERR;
+	glUniform1i(glGetUniformLocation(shader_program, "src"), 0); CHECK_GL_ERR;
+	glUseProgram(0); CHECK_GL_ERR;
 
 	uint8_t *fallback_pixel_buffer = aligned_alloc(512, 512 + im_w * im_h * sizeof(uint32_t));
 
-
-	
-	GLuint pbos[2];
-
-	glGenBuffers(2, pbos);
-
-	for(int i=0; i<2; i++)
-	{
-		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbos[i]);
-		glBufferData(GL_PIXEL_UNPACK_BUFFER, opts.w * opts.h * sizeof(uint32_t), NULL, GL_STREAM_DRAW);
-	}
-	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-	CHECK_GL_ERR;
+	GLuint pbo;
+	glGenBuffers(1, &pbo); CHECK_GL_ERR;
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo); CHECK_GL_ERR;
+	glBufferData(GL_PIXEL_UNPACK_BUFFER, opts.w * opts.h * sizeof(uint32_t), NULL, GL_STREAM_DRAW); CHECK_GL_ERR;
+	glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0); CHECK_GL_ERR;
 #endif
 
 	GLuint upload_tex = 0;
@@ -305,7 +182,7 @@ int main(int argc, char **argv)
 	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_G, GL_GREEN);
 	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, GL_RED);
 	// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ALPHA);
-	
+
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 #ifdef GL_ACCEL_PAL
@@ -327,8 +204,8 @@ int main(int argc, char **argv)
 #else
 	julia_vis_pixel_format texture_format = SOFT_PIX_FMT_BGRx8888;
 #endif
-	
-	
+
+
 	uint16_t *map_surf[2];
 	map_surf[0] = aligned_alloc(512, 512 + im_w * im_h * sizeof(uint16_t));
 	memset(map_surf[0], 0, im_w * im_h * sizeof(uint16_t));
@@ -350,7 +227,10 @@ int main(int argc, char **argv)
 	uint32_t now = tick0;
 	uint32_t maxfrms = 0;
 
+	uint32_t target_frames = 0;
+
 	int debug_maxsrc = 0, debug_pal = 0, show_mandel = 0, show_fps_hist = 0;
+	int limit_fps = 1;
 	int lastframe_key = 0;
 
 	SDL_Event event;
@@ -361,6 +241,7 @@ int main(int argc, char **argv)
 		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F2)) { if(!lastframe_key) { debug_pal = !debug_pal; } lastframe_key = 1; }
 		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F3)) { if(!lastframe_key) { show_mandel = !show_mandel; } lastframe_key = 1; }
 		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F4)) { if(!lastframe_key) { show_fps_hist = !show_fps_hist; } lastframe_key = 1; }
+		else if((event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_F6)) { if(!lastframe_key) { limit_fps = !limit_fps; } lastframe_key = 1; }
 		else lastframe_key = 0;
 
 		m = (m+1)&0x1;
@@ -385,26 +266,26 @@ int main(int argc, char **argv)
 		SDL_UnlockTexture(texture);
 		SDL_RenderClear(renderer);
 		SDL_RenderCopy(renderer, texture, NULL, NULL);
-		
+
 		char buf[32];
 		sprintf(buf,"%6.1f FPS", 1000.0f / frametime);
 		DrawText(renderer, buf);
-		
+
 		SDL_RenderPresent(renderer);
 #elif defined(USE_GL_UPLOAD)
 
-		glViewport(0, 0, im_w, im_h); CHECK_GL_ERR; ;
+		glViewport(0, 0, win_w, win_h); CHECK_GL_ERR; ;
 
 #ifndef GL_ACCEL_PAL
 		glBindTexture(GL_TEXTURE_2D, upload_tex); CHECK_GL_ERR;
 
-		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbos[(m+1)&0x1]);
+		glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
 		glBufferData(GL_PIXEL_UNPACK_BUFFER, im_w * im_h * sizeof(uint32_t), NULL, GL_STREAM_DRAW);
 		void *dst_buf = glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0, im_w * im_h * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);// | GL_MAP_UNSYNCHRONIZED_BIT);
 		if(dst_buf) {
 			pallet_blit_raw(dst_buf, texture_format, im_w * sizeof(uint32_t), src_buf, im_w, im_h, pal_ctx_get_active(pal_ctx));
 			glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
-			glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbos[m]);
+			glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, im_w, im_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 			glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 		}
@@ -416,18 +297,9 @@ int main(int argc, char **argv)
 			printf("Map failed\n");
 		}
 
-		static const float verts[] = {
-			0, 0 , -1, -1,
-			1, 0 ,  1, -1,
-			0, 1 , -1,  1,
-			1, 1 ,  1,  1
-		};
 		glUseProgram(shader_program); CHECK_GL_ERR;
 		glBindTexture(GL_TEXTURE_2D, upload_tex); CHECK_GL_ERR;
-		glEnableVertexAttribArray(0); CHECK_GL_ERR;
-		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(float)*4, verts);CHECK_GL_ERR;
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);CHECK_GL_ERR;
-		glDisableVertexAttribArray(0);CHECK_GL_ERR;
 		glBindTexture(GL_TEXTURE_2D, 0); CHECK_GL_ERR;
 		glUseProgram(0);CHECK_GL_ERR;
 #else
@@ -435,7 +307,6 @@ int main(int argc, char **argv)
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, im_w, im_h, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, src_buf); CHECK_GL_ERR;
 		gl_pal_render(glpal, upload_tex);
 		glBindTexture(GL_TEXTURE_2D, 0); CHECK_GL_ERR;
-
 #endif
 		char buf[32];
 		sprintf(buf,"%6.1f FPS", 1000.0f / frametime);
@@ -479,17 +350,29 @@ int main(int argc, char **argv)
 		else update_points(pd, (now - tick0), 0);
 		beats = newbeat;
 
-		if((tick0+(maxfrms*1000)/opts.maxsrc_rate) - now > 1000/opts.maxsrc_rate) {
+		if(tick0+(maxfrms*1000)/opts.maxsrc_rate - now > 1000/opts.maxsrc_rate) {
 			audio_data ad; audio_get_samples(&ad);
 			maxsrc_update(maxsrc, ad.data, ad.len);
 			audio_finish_samples();
-			maxfrms++;
+
+			//tick0 + (maxfrms*1000)/opts.maxsrc_rate - now > 1000/opts.maxsrc_rate
+			//tick0 - now + (maxfrms*1000 + 1000)/opts.maxsrc_rate > 0
+
+			// maxfrms++;
+			while((tick0+(maxfrms*1000)/opts.maxsrc_rate) - now > 1000/opts.maxsrc_rate) maxfrms++; // skip frames until we catch up so we don't race if we fall behind
 		}
 
 		now = SDL_GetTicks();
-		//if(now - fps_oldtime < 10) SDL_Delay(10 - (now - fps_oldtime)); // stay below 1000FPS
+
+		const uint64_t target_frame_rate = 100;
+		if(limit_fps) {
+			if(now - fps_oldtime < 5) SDL_Delay(5 - (now - fps_oldtime)); // stay below 1000FPS
+
+			now = SDL_GetTicks();
+		}
+
 		frametime = 0.02f * (now - fps_oldtime) + (1.0f - 0.02f) * frametime;
-		fps_oldtime = SDL_GetTicks();
+		fps_oldtime = now;
 		cnt++;
 	}
 

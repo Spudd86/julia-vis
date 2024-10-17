@@ -14,7 +14,7 @@ typedef void (*maxblend_fn)(void *restrict dest, const void *restrict src, size_
 
 #if defined(HAVE_ORC)
 #include <orc/orc.h>
-#include <threads.h> 
+#include <threads.h>
 
 static OrcProgram *maxblend_orc_program = NULL;
 
@@ -61,8 +61,9 @@ static void maxblend_dispatch(void *restrict dest, const void *restrict src, siz
 	if(feat & X86FEAT_SSE) blend = maxblend_sse;
 	if(feat & X86FEAT_SSE2) blend = maxblend_sse2;
 	if(feat & X86FEAT_SSE4_1) blend = maxblend_sse4_1;
+#ifndef __EMSCRIPTEN__
 	if(feat & X86FEAT_AVX2) blend = maxblend_avx2;
-
+#endif
 	blend(dest, src, n);
 }
 

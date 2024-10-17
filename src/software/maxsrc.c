@@ -47,7 +47,7 @@ struct maxsrc *maxsrc_new(int w, int h)
 	point_init(&self->pnt_src, (uint16_t)IMAX(w/24, 8), (uint16_t)IMAX(h/24, 8));
 	printf("maxsrc using %i %dx%d points\n", self->samp, self->pnt_src.w, self->pnt_src.h);
 #else
-	self->scope = scope_renderer_new(w, h, IMAX(w,h));
+	self->scope = scope_renderer_new(w, h);
 #endif
 	// add extra padding for vector instructions to be able to run past the end
 	size_t bufsize = (size_t)w * (size_t)h * sizeof(uint16_t) + 1024;
@@ -112,7 +112,7 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 		// approximately constant?
 		// maybe step with samples spaced nicely for for the straight line and
 		// let it insert up to n extra between any two?
-		// might want initial spacing to be a little tighter, probably need to tweak 
+		// might want initial spacing to be a little tighter, probably need to tweak
 		// that and max number of extra to insert.
 		// also should check spacing post transform
 		// probably want to shoot for getting about 3 pixels apart at 512x512
@@ -228,9 +228,7 @@ static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_s
  * assuming a numeric type able to maintain that degree of accuracy in
  * the individual operations.
  */
-#define ITER 3
-
-__attribute__((hot))
+__attribute__((hot,always_inline))
 static float dist(float P, float Q) {
 /* A reasonably robust method of calculating `sqrt(P*P + Q*Q)'
  *
@@ -255,7 +253,7 @@ static float dist(float P, float Q) {
     if ( Q == 0.0 )
         return P;
 
-    for (int i=0; i<ITER; i++) {
+    for (int i=0; i<2; i++) {
     	float R;
         R = Q / P;
         R = R * R;
@@ -271,7 +269,8 @@ static float dist(float P, float Q) {
 __attribute__((hot,always_inline))
 static inline void zoom_func(float *x, float *y, float u, float v, const float R[3][3])
 {
-	const float d = 0.95f + 0.053f*sqrtf(u*u+v*v);
+	// const float d = 0.95f + 0.053f*sqrtf(u*u+v*v);
+	const float d = 0.95f + 0.053f*dist(u, v);
 	const float p[] = { // first rotate our frame of reference, then do a zoom along 2 of the 3 axis
 		(u*R[0][0] + v*R[0][1]),
 		(u*R[1][0] + v*R[1][1])*d,

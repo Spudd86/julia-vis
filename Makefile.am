@@ -39,7 +39,8 @@ AM_CFLAGS += -ggdb3 -O2
 # on gcc 4.3 set precsicion of FPU to 32 bits (can get speed up for floats)
 # do this since everywhere inside our code we use only floats
 # -mrecip = let gcc generate the RCPSS and RSQRTSS instructions (fast recipricol)
-#AM_CFLAGS += -mpc32 -mrecip=all
+# AM_CFLAGS += -mpc32
+#AM_CLFAGS += -mrecip=all
 #AM_CFLAGS += -ffast-math  -fassociative-math -freciprocal-math -fno-signed-zeros
 endif
 
@@ -73,6 +74,15 @@ GL_FIXED_SRCS = src/opengl/fixed/glf_maxsrc.c src/opengl/fixed/glf_pal.c src/ope
 
 GL_GLSL_SRCS =  src/opengl/glsl/glsl_maxsrc.c src/opengl/glsl/glsl_pallet.c src/opengl/glsl/glsl_fract.c
 
+GL_GLES3_SRCS = src/opengl/gles3/gles_fract.h src/opengl/gles3/gles3misc.h \
+src/opengl/gles3/gles3_fract.c \
+src/opengl/gles3/gles3_maxsrc.c \
+src/opengl/gles3/gles3_misc.c \
+src/opengl/gles3/gles3_offscreen.c \
+src/opengl/gles3/gles3_scope.c \
+src/opengl/gles3/gles3_text.c \
+src/opengl/gles3/gles_pallet.c
+
 ########################################################################################################################################
 # Internal libraries
 ########################################################################################################################################
@@ -86,6 +96,7 @@ src/libcommon.la \
 src/opengl/libglloader.la \
 src/opengl/libglx.la \
 src/opengl/libglcommon.la \
+src/opengl/libgles3.la \
 src/software/libsdlcommon.la \
 src/software/libsdl2common.la \
 src/software/libx86.la \
@@ -127,6 +138,10 @@ src_software_libsdl2common_la_SOURCES = src/optproc.c src/software/sdl2/sdl2-tex
 src_software_libsdl2common_la_CFLAGS = $(AM_CFLAGS) $(SDL2_CFLAGS)
 src_software_libsdl2common_la_LIBADD = $(SDL2_LIBS) src/software/libsoftcore.la
 
+src_opengl_libgles3_la_SOURCES = $(GL_COMMON_HDRS) $(GL_GLES3_SRCS)
+src_opengl_libgles3_la_CFLAGS = $(AM_CFLAGS) $(GL_CFLAGS)
+src_opengl_libgles3_la_LIBADD = src/libcommon.la
+
 extern_libtinycthread_la_SOURCES = extern/tinycthread/tinycthread.c extern/tinycthread/tinycthread.h
 
 src_libparatask_la_SOURCES = src/paratask/paratask.c src/paratask/paratask.h
@@ -162,7 +177,8 @@ src/software/maxsrc.c src/software/maxsrc.h \
 src/software/palletblit.c \
 src/software/pixmisc.c src/software/pixmisc.h \
 src/software/pixformat.h
-src_software_libsoftcore_la_SOURCES += src/software/point_span.c src/software/scope_render.h
+src_software_libsoftcore_la_SOURCES += src/software/span_scope2.c src/software/scope_render.h
+# src_software_libsoftcore_la_SOURCES += src/software/point_span.c src/software/scope_render.h
 # src_software_libsoftcore_la_SOURCES += src/software/pnt_scope.c src/software/scope_render.h 
 src_software_libsoftcore_la_LIBADD = src/software/libx86.la src/libparatask.la src/libcommon.la
 
@@ -177,6 +193,7 @@ EXTRA_PROGRAMS = bin/glscope-test bin/pal-test bin/pal-test2 bin/palblit-test bi
 
 if ENABLE_GL
 bin_PROGRAMS += bin/gl-test
+bin_PROGRAMS += bin/gles3-test
 endif
 if ENABLE_X11
 bin_PROGRAMS += bin/glx-test
@@ -234,11 +251,16 @@ endif
 bin_glscope_test_LDADD += src/libtribuf.la src/audio/libaudio.la src/libcommon.la src/opengl/libglloader.la 
 
 
+bin_gles3_test_SOURCES = src/opengl/gles3/sdl2_gles3_main.c
+bin_gles3_test_CFLAGS  = $(AM_CFLAGS) $(SDL2_CFLAGS)
+bin_gles3_test_LDFLAGS = $(AM_LDFLAGS) $(SDL2_LIBS) -lGL
+bin_gles3_test_LDADD   = src/software/libsdl2common.la src/opengl/libgles3.la src/audio/libaudio.la src/libcommon.la
+
 # Software versions
 
-bin_sdl2_test_SOURCES = src/software/sdl2/sdl2main.c src/opengl/gles3/gles_pallet.c src/opengl/gles3/gles3_text.c
+bin_sdl2_test_SOURCES = src/software/sdl2/sdl2main.c src/opengl/gles3/gles_pallet.c src/opengl/gles3/gles3_text.c src/opengl/gles3/gles3_misc.c
 bin_sdl2_test_CFLAGS  = $(AM_CFLAGS) $(SDL2_CFLAGS)
-bin_sdl2_test_LDFLAGS = $(AM_LDFLAGS) $(SDL2_LIBS) -lGL
+bin_sdl2_test_LDFLAGS = $(AM_LDFLAGS) $(SDL2_LIBS) -lGLESv2
 bin_sdl2_test_LDADD   = src/software/libsdl2common.la  src/audio/libaudio.la src/libcommon.la src/software/libsoftcore.la
 
 bin_sdl_test_SOURCES = src/software/sdl/sdl.c

@@ -6,45 +6,7 @@
 
 #include <assert.h>
 
-// TODO: switch over to something like:
 
-#if 0
-__attribute__((target("arch=athlon,3dnow") ))
-void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
-					const uint16_t *restrict src, unsigned int src_stride,
-					unsigned int w, unsigned int h,
-					const uint32_t *restrict pal);
-__attribute__((target("mmx,no-sse") ))
-void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
-					const uint16_t *restrict src, unsigned int src_stride,
-					unsigned int w, unsigned int h,
-					const uint32_t *restrict pal);
-__attribute__((target("sse,no-sse2") ))
-void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
-					const uint16_t *restrict src, unsigned int src_stride,
-					unsigned int w, unsigned int h,
-					const uint32_t *restrict pal);
-__attribute__((target("sse2,no-sse3")))
-void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
-					const uint16_t *restrict src, unsigned int src_stride,
-					unsigned int w, unsigned int h,
-					const uint32_t *restrict pal);
-__attribute__((target("avx2,no-avx512f")))
-void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
-					const uint16_t *restrict src, unsigned int src_stride,
-					unsigned int w, unsigned int h,
-					const uint32_t *restrict pal);
-__attribute__((target("default")))
-void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
-					const uint16_t *restrict src, unsigned int src_stride,
-					unsigned int w, unsigned int h,
-					const uint32_t *restrict pal);
-
-// This lets GCC generate a resolver function
-// Would need prototype of "default" visible in every implementation file
-
-
-#endif
 
 // pallet must have 257 entries (for easier interpolation on 16 bit indices)
 // output pix = (pallet[in/256]*(in%256) + pallet[in/256+1]*(255-in%256])/256
@@ -250,7 +212,7 @@ void pallet_blit565_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 	for(size_t y = 0; y < h; y++) {
 		const uint16_t *restrict s = src + y*src_stride;
 		uint16_t *restrict d = (uint16_t *restrict)(dest + y*dst_stride);
-		
+
 		const uint8_t *line_dith_r = dither_thresh_r + (y%8)*8;
 		const uint8_t *line_dith_g = dither_thresh_b + (y%8)*8;
 		const uint8_t *line_dith_b = dither_thresh_g + (y%8)*8;
@@ -439,8 +401,9 @@ static void pallet_blit32_dispatch(uint8_t * restrict dest, unsigned int dst_str
 	if(feat & X86FEAT_SSE) pallet_blit32 = pallet_blit32_sse;
 	if(feat & X86FEAT_SSE2) pallet_blit32 = pallet_blit32_sse2;
 	//if(feat & X86FEAT_SSSE3) pallet_blit32 = pallet_blit32_ssse3; // interpolates backwards right now, needs fixing
+#ifndef __EMSCRIPTEN__
 	if(feat & X86FEAT_AVX2) pallet_blit32 = pallet_blit32_avx2; // Also broken in some way
-
+#endif
 	pallet_blit32(dest, dst_stride, src, src_stride, w, h, pal);
 }
 

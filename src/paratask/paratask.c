@@ -19,7 +19,7 @@
  *
  * Turn task queue into a circular buffer?
  *   - need safe sleep/wake for that, but would be lock free when nothing is sleeping
- * 
+ *
  * Might be able to use for notify completion... need some way to know no thread might try to START a task, ideally without requiring them all to start it
  *  - last thread out sends wakeup to waiter
  *      path would be dec, broadcast if dec set counter to 0
@@ -445,7 +445,11 @@ static int task_thread(void *ctx)
 #elif defined(__NetBSD__)
 #include <sched.h>
 #include <sys/param.h>
+#elif defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+#include <emscripten/threading.h>
 #endif
+
 
 static void set_thread_name(int thread_num)
 {
@@ -533,6 +537,8 @@ static int default_thread_count(void)
 		return count;
 #endif
 	}
+#elif defined(__EMSCRIPTEN__)
+	return emscripten_num_logical_cores();
 //#elif defined(__NetBSD__)
 	//TODO: NetBSD >= 5 support via sched_getaffinity_np
 #elif defined(_SC_NPROCESSORS_ONLN)

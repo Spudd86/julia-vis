@@ -85,7 +85,7 @@ done
 
 GST_PLUGIN_PATH=bin/.libs $GDB gst-launch-1.0 $DEBUG_ARGS \
 streamsynchronizer name=s \
-filesrc location=meco_star_wars_disco.mid ! decodebin ! audioconvert  ! rgvolume ! audioconvert ! tee name=t \
+filesrc location=$INPUT_AUDIO ! decodebin ! audioconvert  ! rgvolume ! audioconvert ! tee name=t \
 t.src_0 ! queue ! $VIS_PLUGIN ! $VID_FORMAT ! $TIME_OVERLAY1 ! queue max-size-buffers=2 ! s.sink_0 \
 t.src_1 ! queue ! audioconvert ! audioresample ! s.sink_1 \
 s.src_0 !  $TIME_OVERLAY2 ! videoconvert ! $VID_SINK \

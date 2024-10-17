@@ -6,3 +6,5 @@
 - add padding to internal image buffer allocations so that vector instructions can run past the end of the image (eg: pallet blit using maskmoveu to do stores might read up to 14 bytes past the end of the image)
 
 - switch to using the julia_vis_pixel_format based pallet init function in at least all software versions so we can freely change the resulting channel orders in the pallet to make the 16 bit blitters better.
+
+- For scope rasterizing: need to find "big" angle between segments then project a line width length vector that bisects that, then the quad formed by the tip of the bisecting vector and the line box ends is what we need to fill

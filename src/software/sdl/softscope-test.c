@@ -30,8 +30,8 @@ int main(int argc, char **argv)
 	uint16_t *surf;
 	surf = aligned_alloc(512, 512 + im_w * im_h * sizeof(uint16_t));
 	memset(surf, 0, im_w * im_h * sizeof(uint16_t));
-	
-	struct scope_renderer *scope = scope_renderer_new(im_w, im_h, 24);
+
+	struct scope_renderer *scope = scope_renderer_new(im_w, im_h);
 
 	int m = 0, cnt = 0;
 

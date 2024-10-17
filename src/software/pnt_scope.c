@@ -33,12 +33,12 @@ static void point_init(MxSurf *res, uint16_t w, uint16_t h);
 static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, int npnts, const uint32_t *pnts);
 
 
-struct scope_renderer* scope_renderer_new(int w, int h, int samp)
+struct scope_renderer* scope_renderer_new(int w, int h)
 {
 	struct scope_renderer *self = calloc(sizeof(*self), 1);
 
 	self->iw = w; self->ih = h;
-	self->samp = samp;
+	self->samp = IMAX(w,h);
 	point_init(&self->pnt_src, (uint16_t)IMAX(w/24, 8), (uint16_t)IMAX(h/24, 8));
 
 	return self;
@@ -77,7 +77,7 @@ void scope_render(struct scope_renderer *self,
 		// approximately constant?
 		// maybe step with samples spaced nicely for for the straight line and
 		// let it insert up to n extra between any two?
-		// might want initial spacing to be a little tighter, probably need to tweak 
+		// might want initial spacing to be a little tighter, probably need to tweak
 		// that and max number of extra to insert.
 		// also should check spacing post transform
 		// probably want to shoot for getting about 3 pixels apart at 512x512
@@ -159,7 +159,7 @@ static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_s
 		const int64_t ipx = pnts[i*2+0], ipy = pnts[i*2+1];
 		const int32_t yf = ipy&0xff, xf = ipx&0xff;
 		// const uint32_t yf = 0, xf = 0;
-		
+
 		int64_t ymin = ipy - (int64_t)((pnt_src->h) << 7) - 128;
 		int64_t ymax = ipy + (int64_t)((pnt_src->h) << 7) + 128;
 		int64_t xmin = ipx - (int64_t)((pnt_src->w) << 7) - 128;

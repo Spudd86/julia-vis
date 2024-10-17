@@ -1,6 +1,44 @@
 #ifndef PIXMISC_H
 #define PIXMISC_H
 
+// TODO: switch over to something like:
+
+#if 0
+__attribute__((target("arch=athlon,3dnow") ))
+void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+__attribute__((target("mmx,no-sse") ))
+void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+__attribute__((target("sse,no-sse2") ))
+void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+__attribute__((target("sse2,no-sse3")))
+void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+__attribute__((target("avx2,no-avx512f")))
+void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+__attribute__((target("default")))
+void pallet_blit32(uint8_t * restrict dest, unsigned int dst_stride,
+					const uint16_t *restrict src, unsigned int src_stride,
+					unsigned int w, unsigned int h,
+					const uint32_t *restrict pal);
+
+// This lets GCC generate a resolver function
+// Would need prototype of "default" visible in every implementation file
+#endif
+
 #include "pixformat.h"
 typedef void (*maxblend_fn)(void *restrict dest, const void *restrict src, size_t n);
 
@@ -11,7 +49,10 @@ void maxblend_3dnow(void *restrict dest, const void *restrict src, size_t n);
 void maxblend_sse(void *restrict dest, const void *restrict src, size_t n);
 void maxblend_sse2(void *restrict dest, const void *restrict src, size_t n);
 void maxblend_sse4_1(void *restrict dest, const void *restrict src, size_t n);
+#ifndef __EMSCRIPTEN__
+// Currently no AVX2 on emscripten
 void maxblend_avx2(void *restrict dest, const void *restrict src, size_t n);
+#endif
 void maxblend_fallback(void *restrict dest, const void *restrict src, size_t n);
 
 void maxblend(void *dest, const void *src, int w, int h);
@@ -66,10 +107,13 @@ void pallet_blit32_ssse3(uint8_t *restrict dest, unsigned int dst_stride,
                         const uint16_t *restrict src, unsigned int src_stride,
                         unsigned int w, unsigned int h,
                         const uint32_t *restrict pal);
+#ifndef __EMSCRIPTEN__
+// Currently no AVX2 on emscripten
 void pallet_blit32_avx2(uint8_t *restrict dest, unsigned int dst_stride,
                         const uint16_t *restrict src, unsigned int src_stride,
                         unsigned int w, unsigned int h,
                         const uint32_t *restrict pal);
+#endif
 
 void pallet_blit565_fallback(uint8_t * restrict dest, unsigned int dst_stride,
 					const uint16_t *restrict src, unsigned int src_stride,

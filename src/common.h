@@ -61,6 +61,8 @@ typedef bool _Bool
 #define aligned_free free
 #endif
 
+// TODO: use https://codereview.stackexchange.com/questions/292409/generic-max-for-integer-types-including-boolean
+
 //#define IMIN(x,y) ((x)+((((y)-(x)) >> 31)&((y)-(x))))
 //#define IMAX(x,y) ((x)-((((x)-(y)) >> 31)&((x)-(y))))
 #define IMIN(x,y) (((x)<(y))?(x):(y))

@@ -20,12 +20,16 @@
 
 #include "bilin-inlines.h"
 
+#ifndef __EMSCRIPTEN__
 //TODO: do something better with the list of clones
 // arch=core2,arch=nehalem,arch=westmere,arch=sandybridge,arch=ivybridge,arch=haswell,arch=broadwell,skylake,cannonlake,cooperlake,tigerlake,sapphirerapids,arch=alderlake,rocketlake,k8,k8-sse3,btver1,barcelona,bdver1,znver1,
-#define TASK_PRE_ATTRIB __attribute__((hot,flatten,optimize(3),target_clones("arch=alderlake,avx2,avx,sse3,sse4.1,sse4.2,ssse3,default")))
+// #define TASK_PRE_ATTRIB __attribute__((hot,flatten,optimize(3),target_clones("arch=alderlake,avx2,avx,sse3,sse4.1,sse4.2,ssse3,default")))
+ #define TASK_PRE_ATTRIB __attribute__((hot,flatten,optimize(3),target_clones("avx2,avx,sse3,sse4.1,sse4.2,ssse3,default")))
 
 // nocona core2 nehalem corei7 westmere sandybridge corei7-avx ivybridge core-avx-i haswell core-avx2 broadwell skylake skylake-avx512 cannonlake icelake-client icelake-server bonnell atom silvermont slm knl knm x86-64 eden-x2 nano nano-1000 nano-2000 nano-3000 nano-x2 eden-x4 nano-x4 k8 k8-sse3 opteron opteron-sse3 athlon64 athlon64-sse3 athlon-fx amdfam10 barcelona bdver1 bdver2 bdver3 bdver4 znver1 btver1 btver2 native
-
+#else
+#define TASK_PRE_ATTRIB __attribute__((hot,flatten))
+#endif
 // also for: (use c99 complex support? get's ugly when expanded...)
 // z = (z^4 + c1)/(z*z + c2)
 //

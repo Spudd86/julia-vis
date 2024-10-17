@@ -5,7 +5,7 @@
 
 struct scope_renderer;
 
-struct scope_renderer* scope_renderer_new(int w, int h, int samp);
+struct scope_renderer* scope_renderer_new(int w, int h);
 void scope_renderer_delete(struct scope_renderer*);
 void scope_render(struct scope_renderer *self,
                   void *restrict dest,
