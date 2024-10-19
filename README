@@ -13,11 +13,45 @@ Standard autotools build. From a fresh checkout
 
 ### Pre-requisites
 
-On windows you will need mingw or mingw-w64, it's been a long time since I've built on Windows so it may be broken.
+On windows you will need mingw or mingw-w64 and msys or msys2, it's 
+been a long time since I've built on Windows so it may be broken. The 
+likely best choice is mingw-w64 and msys2, which I think get's you a
+package manager to help install thre prerequisites
 
-Everywhere you will need to have installed and findable by `pkg-config` SDL 1.2 and one of the supported audio libraries.
+Everywhere you will need to have installed and findable by `pkg-config`
+SDL 1.2 and one of the supported audio libraries.
 
 On Linux I recommend building against pulseaudio, on Windows you will need the portaudio library.
+
+You will also need autotools installed.
+
+### Setting up on Windows
+
+ 1. Install msys2
+ 2. Open an msys2 terminal
+ 3. install needed packages.
+	pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-autotools mingw-w64-ucrt-x86_64-SDL mingw-w64-ucrt-x86_64-portaudio
+	pacman -S mingw-w64-pkgconf 
+   a. Optional, install gstreamer just in case you can't get the sdl version to capture audio
+	pacman -S mingw-w64-ucrt-x86_64-gstreamer mingw-w64-gst-plugins-bad mingw-w64-gst-plugins-base mingw-w64-gst-plugins-good mingw-w64-gst-plugins-ugly
+ 4. navigate in the terminal to the directory where you have the source code, or just clone from git in the msys terminal
+	git clone https://github.com/Spudd86/julia-vis.git
+	cd julia-vis
+ 5. compile and run
+	NOCONFIGURE=1 ./autogen.sh
+	./configure --host=mingw-w64-ucrt-x86_64
+	make
+	bin/sdl-test -w 1024
+   a. If that doesn't capture audio usefully and you installed GStreamer
+	./configure --host=mingw-w64-ucrt-x86_64 --enable-gst
+	make
+	./demo-gst.sh
+
+
+### Setting up on Linux
+
+Install the needed development packages, on Debian/Ubuntu:
+	sudo apt install gcc autotools-dev libpulse-dev libsdl1.2-dev
 
 ## Notes
 
