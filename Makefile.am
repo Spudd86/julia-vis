@@ -183,8 +183,8 @@ src_software_libsoftcore_la_LIBADD = src/software/libx86.la src/libparatask.la s
 # Programs
 ########################################################################################################################################
 
-bin_PROGRAMS = bin/sdl2-test bin/sdl-test bin/sdlthread-test bin/audio-test bin/soft-scope-test
-EXTRA_PROGRAMS = bin/glscope-test bin/pal-test bin/pal-test2 bin/palblit-test
+bin_PROGRAMS = bin/sdl-test bin/sdlthread-test bin/audio-test bin/soft-scope-test
+EXTRA_PROGRAMS = bin/sdl2-test bin/glscope-test bin/pal-test bin/pal-test2 bin/palblit-test
 
 if ENABLE_GL
 bin_PROGRAMS += bin/gl-test
@@ -198,7 +198,7 @@ endif
 endif
 if ENABLE_KMS
 bin_PROGRAMS += bin/kms-test
-endif
+endif 
 
 # OpenGL versions
 
@@ -247,9 +247,9 @@ bin_glscope_test_LDADD += src/libtribuf.la src/audio/libaudio.la src/libcommon.l
 
 # Software versions
 
-bin_sdl2_test_SOURCES = src/software/sdl2/sdl2main.c
+bin_sdl2_test_SOURCES = src/software/sdl2/sdl2main.cc src/opengl/gles3/gles3_pallet.c src/opengl/gles3/gles3_text.c src/opengl/gles3/gles3_misc.c src/opengl/gles3/gles3misc.h
 bin_sdl2_test_CFLAGS  = $(AM_CFLAGS) $(SDL2_CFLAGS)
-bin_sdl2_test_LDFLAGS = $(AM_LDFLAGS) $(SDL2_LIBS)
+bin_sdl2_test_LDFLAGS = $(AM_LDFLAGS) $(SDL2_LIBS) -lGLESv2
 bin_sdl2_test_LDADD   = src/software/libsdl2common.la  src/audio/libaudio.la src/libcommon.la src/software/libsoftcore.la
 
 bin_sdl_test_SOURCES = src/software/sdl/sdl.c

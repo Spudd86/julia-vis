@@ -1,7 +1,7 @@
 
 #include "common.h"
 
-#include <SDL.h>
+#include <SDL2/SDL.h>
 
 //#include "sdlhelp.h"
 #include "software/pixmisc.h"
@@ -16,7 +16,7 @@ void DrawText(SDL_Renderer* renderer, const char* text)
 	SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, text_surface);
 	//SDL_BlitSurface(text_surface, NULL, screen, NULL);
 	SDL_FreeSurface(text_surface);
-	
+
 	SDL_Rect dst_rect = {0, 0, text_surface->w, text_surface->h};
 	SDL_RenderCopy(renderer, texture, NULL, &dst_rect);
 	SDL_DestroyTexture(texture);
@@ -26,7 +26,7 @@ void DrawText(SDL_Renderer* renderer, const char* text)
 
 SDL_Surface* render_string(const char *str)
 {
-	int len = strlen(str);
+	int len = strlen(str); // TODO: handle newlines
 
 	SDL_Surface *surf = SDL_CreateRGBSurface(0, len*8, 16, 8, 0, 0, 0, 0);
 	if( surf == NULL ) {
