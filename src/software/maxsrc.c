@@ -1,4 +1,29 @@
-//#pragma GCC optimize "3,ira-hoist-pressure,inline-functions,merge-all-constants,modulo-sched,modulo-sched-allow-regmoves"
+#ifndef DEBUG
+#pragma GCC optimize "3,ira-hoist-pressure,inline-functions,modulo-sched,modulo-sched-allow-regmoves"
+#endif
+
+//#define NEW_SCOPE 1
+
+// Absolutely have to parallelize scope rendering
+
+// IDEA 1:
+// Generate spans from line segments and end points.
+// Keep a list of spans on each line sorted by leftmost x co-ord
+// Need to accelerate clipping spans to each other.
+
+// Split spans at generation time around the line/point, so each side is it's own span, probably simplifies math
+
+// Two types of spans, line segment distance based, and point distance based
+// Once clipped... can probably just have a rate to step through an image for the renderer
+//     - Can probably be a 1/4 image and just flip the slope around.
+
+// Once we have clipped spans can render each line in parallel.
+
+
+// Maybe try some sort of tile based renderer instead of what we do below.
+//   - do parallel check for line segment/tile intersection
+//       - need to preallocate list for each tile, for lock free run.
+//   - Want tiles to be cache line width within lines, need to add stride to lines so they are cache alinged?
 
 #include "common.h"
 #include "maxsrc.h"
@@ -7,6 +32,11 @@
 #include <float.h>
 #include <assert.h>
 
+static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3]);
+
+#if NEW_SCOPE
+#include "scope_render.h"
+#else
 typedef struct {
 	uint16_t *restrict data;
 	uint16_t w,h;
@@ -14,8 +44,8 @@ typedef struct {
 } MxSurf;
 
 static void point_init(MxSurf *res, uint16_t w, uint16_t h);
-static void zoom(uint16_t * restrict out, uint16_t * restrict in, int w, int h, const float R[3][3]);
 static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_src, int npnts, const uint32_t *pnts);
+#endif
 
 struct maxsrc {
 	uint16_t *prev_src;
@@ -23,8 +53,11 @@ struct maxsrc {
 	int iw, ih;
 	int samp;
 	float tx, ty, tz;
-
+#if NEW_SCOPE
+	struct scope_renderer* scope;
+#else
 	MxSurf pnt_src;
+#endif
 };
 
 struct maxsrc *maxsrc_new(int w, int h)
@@ -33,10 +66,15 @@ struct maxsrc *maxsrc_new(int w, int h)
 	struct maxsrc *self = calloc(sizeof(*self), 1);
 
 	self->iw = w; self->ih = h;
-	self->samp = IMAX(w,h); //IMIN(IMAX(w,h), 1023);
 
+#if NEW_SCOPE
+	self->samp = MIN(MAX(w/12, h/12), 128);
+	self->scope = scope_renderer_new(w, h, self->samp);
+#else
+	self->samp = IMAX(w,h); //IMIN(IMAX(w,h), 1023);
 	point_init(&self->pnt_src, (uint16_t)IMAX(w/24, 8), (uint16_t)IMAX(h/24, 8));
 	printf("maxsrc using %i %dx%d points\n", self->samp, self->pnt_src.w, self->pnt_src.h);
+#endif
 
 	// add extra padding for vector instructions to be able to run past the end
 	size_t bufsize = (size_t)w * (size_t)h * sizeof(uint16_t) + 256;
@@ -52,7 +90,12 @@ void maxsrc_delete(struct maxsrc *self)
 {
 	aligned_free(self->prev_src);
 	aligned_free(self->next_src);
+#if NEW_SCOPE
+	scope_renderer_delete(self->scope);
+	self->scope = NULL;
+#else
 	free((void*)self->pnt_src.data);
+#endif
 	self->next_src = self->prev_src = NULL;
 	self->iw = self->ih = self->samp = 0;
 	free(self);
@@ -85,21 +128,26 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 	};
 
 	zoom(dst, self->prev_src, iw, ih, R);
-
+#if NEW_SCOPE
+	scope_render(self->scope, dst, self->tx, self->ty, self->tz, audio, audiolen);
+#else
 	uint32_t pnts[samp*2]; // TODO: if we do dynamically choose number of points based on spacing move allocating this into context object
 
+	int npnts = 0;
+	float pxi = INFINITY, pyi = INFINITY;
 	for(int i=0; i<samp; i++) {
 		//TODO: maybe change the spacing of the points depending on
 		// the rate of change so that the distance in final x,y coords is
 		// approximately constant?
 		// maybe step with samples spaced nicely for for the straight line and
 		// let it insert up to n extra between any two?
-		// might want initial spacing to be a little tighter, probably need to tweak 
+		// might want initial spacing to be a little tighter, probably need to tweak
 		// that and max number of extra to insert.
 		// also should check spacing post transform
 		// probably want to shoot for getting about 3 pixels apart at 512x512
 		float s = getsamp(audio, audiolen, i*audiolen/(samp-1), audiolen/96);
 
+		// shape the waveform a bit, more slope near zero so queit stuff still makes it wiggle
 		s=copysignf(log2f(fabsf(s)*3+1)/2, s);
 
 		// xt ∈ [-0.5, 0.5] ∀∃∄∈∉⊆⊈⊂⊄
@@ -115,17 +163,23 @@ void maxsrc_update(struct maxsrc *self, const float *audio, int audiolen)
 		float xi = x*zvd*iw+(iw - self->pnt_src.w)/2.0f;
 		float yi = y*zvd*ih+(ih - self->pnt_src.h)/2.0f;
 
-		pnts[i*2+0] = (uint32_t)(xi*256);
-		pnts[i*2+1] = (uint32_t)(yi*256);
+		if((pxi-xi)*(pxi-xi) + (pyi-yi)*(pyi-yi) > 6) // if too close to previous point, skip
+		{
+			pxi = xi, pyi = yi;
+			pnts[npnts*2+0] = (uint32_t)(xi*256);
+			pnts[npnts*2+1] = (uint32_t)(yi*256);
+			npnts++;
+		}
 	}
-	draw_points(dst, self->iw, self->ih, &self->pnt_src, samp, pnts);
-
+	draw_points(dst, self->iw, self->ih, &self->pnt_src, npnts, pnts);
+#endif
 	self->next_src = self->prev_src;
 	self->prev_src = dst;
 
 	self->tx+=0.02f; self->ty+=0.01f; self->tz-=0.003f;
 }
 
+#if !NEW_SCOPE
 static void point_init(MxSurf *res, uint16_t w, uint16_t h)
 {
 	res->w = w; res->h = h;
@@ -174,8 +228,12 @@ static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_s
 		for(int y=0; y < pnt_src->h; y++) {
 			uint16_t *restrict dst_line = (uint16_t *restrict)dest + off + iw*y;
 			for(int x=0; x < pnt_src->w; x++) {
+#if 0
 				uint16_t res = (s0[x]*a00 + s0[x+1]*a01
 				              + s1[x]*a10 + s1[x+1]*a11)>>16;
+#else
+				uint16_t res = s0[x];
+#endif
 				res = IMAX(res, dst_line[x]);
 				dst_line[x] = res;
 			}
@@ -185,6 +243,7 @@ static void draw_points(void *restrict dest, int iw, int ih, const MxSurf *pnt_s
 	}
 #endif
 }
+#endif // Old scope code
 
 #ifdef DEBUG
 #define map_assert(a) assert(a)

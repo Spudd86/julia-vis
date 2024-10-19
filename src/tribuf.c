@@ -212,9 +212,12 @@ struct tribuf_s {
 #endif
 
 	void **data;
-
+#ifndef TB_NO_ATOMIC
 	//atomic_uint_fast32_t frame; //< holds a count of the number of frames finished
 	atomic_uint_fast16_t active; //< hold the current state of buffer assignment
+#else
+	uint_fast16_t active; //< hold the current state of buffer assignment
+#endif
 };
 
 //***************************** init and teardown ******************************

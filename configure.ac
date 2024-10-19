@@ -24,16 +24,26 @@ AM_INIT_AUTOMAKE([
   subdir-objects
 ])
 
+dnl disable unnecessary compiler checks
+AC_DEFUN([AC_PROG_F77], [:])
+AC_DEFUN([AC_PROG_FC], [:])
+AC_DEFUN([AC_PROG_OBJC], [:])
+AC_DEFUN([AC_PROG_OBJCCPP], [:])
+AC_DEFUN([AC_LIBTOOL_F77], [:])
+
 AC_PROG_CC
 AC_PROG_CXX
 AC_USE_SYSTEM_EXTENSIONS
 AC_SYS_LARGEFILE
+AC_CHECK_HEADERS_ONCE([threads.h])
 AC_CONFIG_HEADERS([config.h])
+
+AM_CONDITIONAL([HAVE_THREADS_H], [ test "x$HAVE_THREADS_H" = xyes ])
 
 AX_PTHREAD
 AX_CHECK_COMPILE_FLAG([-std=gnu11], [CFLAGS+=" -std=gnu11"], [
 	AX_CHECK_COMPILE_FLAG([-std=c11], [CFLAGS+=" -std=c11"], [
-		echo "Compiler does not support a new enough C standard"
+		AS_ECHO(["Compiler does not support a new enough C standard"])
 		exit -1
 	])
 ])
@@ -50,7 +60,11 @@ AC_TYPE_UINT64_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT16_T
 AC_TYPE_UINT8_T
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
+AC_TYPE_OFF_T
 AC_HEADER_STDBOOL
+#AC_HEADER_THREADS
 
 AC_SEARCH_LIBS([sqrt], [m])
 
@@ -82,10 +96,16 @@ AS_IF([ test "x$enable_vector_intrinsics" = xno ], [
 	AC_DEFINE([DISABLE_X86_INTRIN], 1, [Define to 1 to disable use x86 vector intrinsics])
 ])
 
+AC_ARG_ENABLE([lto], AS_HELP_STRING([--enable-lto], [enable link time optimization (default: enabled)]))
+AM_CONDITIONAL([ENABLE_LTO], [test "x$enable_lto" != xno])
 
 PKG_CHECK_MODULES([SDL], [sdl])
 AC_SUBST(SDL_CFLAGS)
 AC_SUBST(SDL_LIBS)
+
+PKG_CHECK_MODULES([SDL2], [sdl2])
+AC_SUBST(SDL2_CFLAGS)
+AC_SUBST(SDL2_LIBS)
 
 AC_ARG_ENABLE([jack], AS_HELP_STRING([--enable-jack], [enable using jack for audio input (default: disabled)]))
 AS_IF([ test "x$enable_jack" = xyes ], [
@@ -253,6 +273,18 @@ AS_IF([ test "x$have_gst" = xyes], [
 AC_SUBST(GST_CFLAGS)
 AC_SUBST(GST_LIBS)
 AM_CONDITIONAL([ENABLE_GST], [ test "x$enable_gst" = xyes ])
+
+AS_IF([ test "x$enable_gst" = xyes], [
+if test "x${prefix}" = "x$HOME"; then
+  gstplugindir="$HOME/.gstreamer-1.0/plugins"
+else
+  gstplugindir="\$(libdir)/gstreamer-1.0"
+fi
+AC_SUBST(gstplugindir)
+
+GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex [_]*\(gst_\|Gst\|GST_\).*'
+AC_SUBST(GST_PLUGIN_LDFLAGS)
+])
 
 #FIXME currently build is broken
 #AC_ARG_ENABLE([orc], AS_HELP_STRING([--enable-orc], [enable using orc (default: disabled)]))

@@ -3,6 +3,9 @@ config.log
 config.status
 configure
 aclocal.m4
+Makefile.in
+compile_commands.json
+.cache
 stamp-h
 stamp-h.in
 src/config.h
@@ -71,3 +74,7 @@ build/*
 *.mkv
 *.wav
 *.mp3
+*.mid
+oprofile_data
+perf.data
+perf.data.old

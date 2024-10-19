@@ -1,4 +1,4 @@
-#ifdef NDEBUG
+#ifndef DEBUG
 #pragma GCC optimize "3,ira-hoist-pressure,inline-functions,modulo-sched,modulo-sched-allow-regmoves"
 #endif
 
@@ -13,12 +13,21 @@
 //#define POINT_SPAN_DEBUG_LOG 3
 //#define DEBUG_MAX_SPAN_START 1
 
+
+#ifdef POINT_SPAN_TEST
+//Always enable full logging in test
+#	ifdef POINT_SPAN_DEBUG_LOG
+#		undef POINT_SPAN_DEBUG_LOG
+#	endif
+#	define POINT_SPAN_DEBUG_LOG 5
+#endif
+
 #if POINT_SPAN_DEBUG_LOG
 int point_span_scope_debug_level = 0;
 #endif
 
-#if POINT_SPAN_DEBUG_LOG
-#define DEBUG_LOG(level, ...) if(point_span_scope_debug_level >= level) printf(__VA_ARGS__)
+#ifdef POINT_SPAN_DEBUG_LOG
+#define DEBUG_LOG(level, ...) do { if(POINT_SPAN_DEBUG_LOG >= level && point_span_scope_debug_level >= level) printf(__VA_ARGS__); } while(0)
 #else
 #define DEBUG_LOG(level, ...)
 #endif
@@ -61,17 +70,27 @@ int point_span_scope_debug_level = 0;
 //    - this means we need to nudge the endpoints, in both screenspace and texture space
 //        - NOTE: current code nudges to put them on integer locations
 
+// NOTES ON ADDING SPANS
+// Probably need to make some helpers that do the span management
+//   - can make a thing that takes a list of the float co-ords for x location and texture co-ords
+//      that then we loop over, first and last points need to be handeled a littled different, middle ones
+//      we can just round the x location and nudge the texture co-ords to correct
+//   - to allow us to properly nudge texture co-ords we need to add a border to the texture, that is let things be
+//     one texel out of bounds.
+//        - need to double check the math on this, make sure that we never nudge too far
+//             - if we do we'll have to add texture clamping to the span renderer.
+//   - can prototype this in the current scheme before building acceleration structures
+
+
+// Possible other polyline decimation algorithms
+//   - https://bitbucket.org/jgpallero/rls/src/master/ https://www.sciencedirect.com/science/article/abs/pii/S0098300413002380
+//   - https://www.tandfonline.com/doi/abs/10.1080/23729333.2019.1631535
+
 struct span
 {
 	uint16_t ix; // output image x position
 	uint16_t l; // length of the span
-	
-	int8_t tx1; // starting texture x co-ord
-	int8_t ty1; // starting texture y co-ord
-	
-	int8_t tx2; // ending texture x co-ord
-	int8_t ty2; // ending texture y co-ord
-	
+
 	float ftx1;
 	float fty1;
 	float ftx2;
@@ -104,7 +123,7 @@ struct scope_renderer* scope_renderer_new(int w, int h, int samp)
 	struct scope_renderer *self = calloc(sizeof(*self), 1);
 
 	self->iw = w; self->ih = h;
-	self->samp = samp; //MIN(MIN(width/8, height/8), 128); //IMAX(w,h);
+	self->samp = 128; //samp; //MIN(MIN(width/8, height/8), 128); //IMAX(w,h);
 	
 	// TODO: deal with aspect ratio if screen is not square
 	self->line_width = IMAX(IMAX(w/24, 8), IMAX(h/24, 8));
@@ -142,9 +161,13 @@ struct scope_renderer* scope_renderer_new(int w, int h, int samp)
 	self->span_buf    = calloc(sizeof(self->span_buf[0]), h*self->max_lspans);
 	self->span_counts = calloc(sizeof(self->span_counts[0]), h);
 	
-	
 	DEBUG_LOG(0, "Using line width %i\n", self->line_width);
 	return self;
+}
+
+void scope_renderer_delete(struct scope_renderer* self)
+{
+	// FIXME: implement
 }
 
 struct point
@@ -153,11 +176,20 @@ struct point
 	float y;
 };
 
-static void generate_spans(struct scope_renderer *self, int ymin, int ymax, const struct point* pnts);
+static void generate_spans(struct scope_renderer *self, int ymin, int ymax, int npnts, const struct point* pnts);
 static void render_spans(struct scope_renderer *self, int ymin, int ymax, uint16_t *restrict dest);
 
 static void render_line(struct scope_renderer * const self, void *restrict dest, int line);
-static void generate_spans_for_line(struct scope_renderer *self, const struct point* pnts, int line);
+static void generate_spans_for_line(struct scope_renderer *self, int npnts, const struct point* pnts, int line);
+
+// Return square of distance from point (px, py) to line (x0,y0) -> (x1, y1)
+__attribute__((const,always_inline))
+static float point_line_dist_sqr(float x0, float y0, float x1, float y1, float px, float py)
+{
+	float tp = (y1 - y0) * px - (x1 - x0) * py + x1*y0 - y1*x0;
+	float bt = (y1 - y0) * (y1 - y0) + (x1 - x0) * (x1 - x0);
+	return (tp*tp) / bt;
+}
 
 void scope_render(struct scope_renderer *self,
                   void *restrict dest,
@@ -182,6 +214,10 @@ void scope_render(struct scope_renderer *self,
 	float ymin = ih;
 	float ymax = 0;
 
+	int npnts = 0;
+	float thresh = self->line_width * 0.25f; //TODO: tune this
+	float pxi = INFINITY, pyi = INFINITY;
+
 	for(int i=0; i<samp; i++)
 	{
 		float s = getsamp(audio, audiolen, i*audiolen/(samp-1), audiolen/96);
@@ -202,30 +238,120 @@ void scope_render(struct scope_renderer *self,
 		float xi = x*zvd*iw + iw/2.0f;
 		float yi = y*zvd*ih + ih/2.0f;
 
-		//pnts[i].x = (uint32_t)(xi*256);
-		//pnts[i].y = (uint32_t)(yi*256);
-		pnts[i].x = xi;
-		pnts[i].y = yi;
-		
-		ymin = fminf(ymin, yi);
-		ymax = fmaxf(ymax, yi);
+		if((pxi-xi)*(pxi-xi) + (pyi-yi)*(pyi-yi) > thresh) // skip short segments
+		{
+			//pnts[npnts].x = (uint32_t)(xi*256);
+			//pnts[npnts].y = (uint32_t)(yi*256);
+			pnts[npnts].x = xi;
+			pnts[npnts].y = yi;
+			npnts++;
+			//ymin = fminf(ymin, yi);
+			//ymax = fmaxf(ymax, yi);
+		}
 	}
 	
-	int first_line = floor(ymin - self->line_width*1.4142135623730950488016887f);
-	int last_line = ceil(ymax + self->line_width*1.4142135623730950488016887f);
-	
-	//for(int line = first_line; line <= last_line; line++)
-	//{
-		//generate_spans_for_line(self, pnts, line);
-		//render_line(self, dest, line);
-	//}
-	generate_spans(self, first_line, last_line, pnts);
+	// do polyline decimation with Reumann-Witkam algorithm
+	{
+		const float tolerance = self->line_width/16.0f;
+		int p0 = 0, p1 = 1;
+		int pj = p1;
+
+		int out = 1;
+
+		for( int j=2; j < npnts-1 ; ++j )
+		{
+			int pi = pj;
+			pj++;
+
+			// printf("%f\n", point_line_dist(pnts[p0].x, pnts[p0].y, pnts[p1].x, pnts[p1].y, pnts[pj].x, pnts[pj].y));
+
+			if(point_line_dist_sqr(pnts[p0].x, pnts[p0].y, pnts[p1].x, pnts[p1].y, pnts[pj].x, pnts[pj].y) < tolerance*tolerance)
+			// if(point_line_dist(pnts[p0].x, pnts[p0].y, pnts[p1].x, pnts[p1].y, pnts[pj].x, pnts[pj].y) < tolerance)
+			{
+				// printf("skip point %d\n", pj);
+				continue;
+			}
+			pnts[out].x = pnts[pi].x;
+			pnts[out].y = pnts[pi].y;
+			p0 = pi;
+			p1 = pj;
+			out++;
+
+			ymin = fminf(ymin, pnts[pi].y);
+			ymax = fmaxf(ymax, pnts[pi].y);
+		}
+		pnts[out].x = pnts[pj].x;
+		pnts[out].y = pnts[pj].y;
+
+		ymin = fminf(ymin, pnts[pj].y);
+		ymax = fmaxf(ymax, pnts[pj].y);
+
+		DEBUG_LOG(0, "Removed % 4i points of % 4d, leaving % 4d\n", npnts - out -1, npnts, out + 1 );
+		npnts = out;
+	}
+
+	//int first_line = floor(ymin - self->line_width*1.4142135623730950488016887f);
+	//int last_line = ceil(ymax + self->line_width*1.4142135623730950488016887f);
+
+	// Technically should include the root two factor as in the above commented lines, but
+	// we don't actually care about those spans sine they *should* just be passing through
+	// black parts of the texture as it only goes out to line_width.
+	int first_line = floor(ymin - self->line_width);
+	int last_line = ceil(ymax + self->line_width);
+
+	generate_spans(self, first_line, last_line, npnts, pnts);
+#ifdef POINT_SPAN_DEBUG_LOG
+	int total_spans = 0;
+	for(int line = first_line; line <= last_line; line++)
+	{
+		total_spans += self->span_counts[line];
+	}
+	DEBUG_LOG(0, "Generated %d spans total over y-range: % 4.4f % 4.4f, lines: % 4d to % 4d\n", total_spans, ymin, ymax, first_line, last_line);
+#endif
 	render_spans(self, first_line, last_line, dest);
+}
+
+static int decimate(int npnts, struct point* pnts, float tolerance)
+{
+	int p0 = 0, p1 = 1;
+	int pj = p1;
+
+	int out = 1;
+
+	for( int j=2; j < npnts-1 ; ++j )
+	{
+		int pi = pj;
+		pj++;
+
+		if(point_line_dist_sqr(pnts[p0].x, pnts[p0].y, pnts[p1].x, pnts[p1].y, pnts[pj].x, pnts[pj].y) < tolerance*tolerance)
+		{
+			// printf("skip point %d\n", pj);
+			continue;
+		}
+		pnts[out].x = pnts[pi].x;
+		pnts[out].y = pnts[pi].y;
+		p0 = pi;
+		p1 = pj;
+		out++;
+	}
+	pnts[out].x = pnts[pj].x;
+	pnts[out].y = pnts[pj].y;
+
+	DEBUG_LOG(1, "Removed % 4i points of % 4d, leaving % 4d\n", npnts - out -1, npnts, out + 1 );
+	return out + 1;
 }
 
 /*****************************************************************************************************************************************
  * Internal rendering stuff
  */
+__attribute__((hot,always_inline,optimize("-ffinite-math-only")))
+static float clamp(float d, float min, float max)
+{
+    const float t = d < min ? min : d;
+    return t > max ? max : t;
+}
+ 
+ 
 __attribute__((hot,noinline,optimize("-ffinite-math-only")))
 static void render_line(struct scope_renderer * const self, void *restrict dest, int line)
 {
@@ -245,33 +371,6 @@ static void render_line(struct scope_renderer * const self, void *restrict dest,
 		// y texture axis in the middle of a span)
 
 #if 0
-		const int32_t tx1 = (span->ftx1 + 1.0)*(32768*(self->tex_w - 1));
-		const int32_t ty1 = (span->fty1 + 1.0)*(32768*(self->tex_h - 1));
-		const int32_t tx2 = (span->ftx2 + 1.0)*(32768*(self->tex_w - 1));
-		const int32_t ty2 = (span->fty2 + 1.0)*(32768*(self->tex_h - 1));
-		
-		const int32_t dx = (tx2 - tx1)/span->l;
-		const int32_t dy = (ty2 - ty1)/span->l;
-		
-		for(int32_t x = span->ix, tx = tx1, ty = ty1; x <= span->ix + span->l; ++x, tx += dx, ty += dy)
-		{
-			const uint32_t ys =  ty>>16,      xs =  tx>>16;     assert(ys < self->tex_h); assert(xs < self->tex_w);
-			const uint32_t yf = (ty>>8)&0xff, xf = (tx>>8)&0xff;
-#elif 0
-		const int32_t tx1 = (span->ftx1 + 1.0)*(128*(self->tex_w - 1));
-		const int32_t ty1 = (span->fty1 + 1.0)*(128*(self->tex_h - 1));
-		const int32_t tx2 = (span->ftx2 + 1.0)*(128*(self->tex_w - 1)); 
-		const int32_t ty2 = (span->fty2 + 1.0)*(128*(self->tex_h - 1));
-
-		for(uint32_t x = span->ix, i = 0; x <= span->ix + span->l; ++x, ++i)
-		{
-			const uint32_t t  = (256*i)/span->l;
-			const uint32_t tx = tx1 * t + (256 - t) * tx2;
-			const uint32_t ty = ty1 * t + (256 - t) * ty2;
-			
-			const uint32_t ys =  ty>>16,      xs =  tx>>16;     assert(ys < self->tex_h); assert(xs < self->tex_w);
-			const uint32_t yf = (ty>>8)&0xff, xf = (tx>>8)&0xff;
-#elif 0
 		const float linv = 1.0f/span->l;
 		// Convert range to 24.8 fixed point ranges are [-1. 1] so add 1 and multiply by 128 to end up
 		// with the range being [0, 256*texture_size]
@@ -283,23 +382,23 @@ static void render_line(struct scope_renderer * const self, void *restrict dest,
 		for(int32_t i = 0; i <= span->l; ++i)
 		{
 			const int32_t x = span->ix + i;
-			const float t = i/(float)span->l;
-			//const int32_t tx = ftx1*t + (1.0f-t)*ftx2;
-			//const int32_t ty = fty1*t + (1.0f-t)*fty2;
-			const int32_t tx = ftx1*(1.0f - t) + t*ftx2;
-			const int32_t ty = fty1*(1.0f - t) + t*fty2;
+			const float t = i/(float)span->l; assert(t >= 0.0f && t <= 1.0f);
+			const float ftx = ftx1*t + (1.0f-t)*ftx2;
+			const float fty = fty1*t + (1.0f-t)*fty2;
+			const int32_t tx = clamp(ftx, 0.0f, 256*(self->tex_w - 1));
+			const int32_t ty = clamp(fty, 0.0f, 256*(self->tex_h - 1));
 
-			const uint32_t ys = ty>>8,   xs = tx>>8;
+			const uint32_t ys = ty>>8,   xs = tx>>8;     assert(ys < self->tex_h); assert(xs < self->tex_w);
 			const uint32_t yf = ty&0xff, xf = tx&0xff;
-#elif 1
+#elif 0
 		const float dx = (span->ftx2 - span->ftx1)/(span->l);
 		const float dy = (span->fty2 - span->fty1)/(span->l);
 		
 		for(int32_t i = 0; i <= span->l; ++i)
 		{
 			const int32_t x = span->ix + i;
-			const float ftx = span->ftx1 + i*dx;
-			const float fty = span->fty1 + i*dy;
+			const float ftx = clamp(span->ftx1 + i*dx, -1.0f, 1.0f);
+			const float fty = clamp(span->fty1 + i*dy, -1.0f, 1.0f);
 
 			// Convert to 24.8 fixed point ranges are [-1. 1] so add 1 and multiply by 128
 			const int32_t tx = (ftx + 1.0f)*(128*(self->tex_w - 1));
@@ -318,8 +417,8 @@ static void render_line(struct scope_renderer * const self, void *restrict dest,
 		for(int32_t i = 0; i <= span->l; ++i)
 		{
 			const int32_t x = span->ix + i;
-			const int32_t tx = ftx1 + i*dx;
-			const int32_t ty = fty1 + i*dy;
+			const int32_t tx = clamp(ftx1 + i*dx, 0.0f, 256*(self->tex_w - 1));
+			const int32_t ty = clamp(fty1 + i*dy, 0.0f, 256*(self->tex_h - 1));
 			
 			const uint32_t ys = ty>>8,   xs = tx>>8;     assert(ys < self->tex_h); assert(xs < self->tex_w);
 			const uint32_t yf = ty&0xff, xf = tx&0xff;
@@ -369,7 +468,7 @@ static inline void calc_span_end(float* xo, float* txo, float* tyo,
 		*txo = (1 - t) * tx0 + t * tx1;
 		*tyo = (1 - t) * ty0 + t * ty1;
 		
-		assert((*xo >= x0 && *xo <= x1) || (*xo >= x1 && *xo <= x0));
+		assert(fminf(x0, x1) <= *xo && *xo <= fmaxf(x0, x1));
 		assert(*txo >= -1.0f && *txo <= 1.0f);
 		assert(*tyo >=  0.0f && *tyo <= 1.0f);
 	}
@@ -381,9 +480,9 @@ static inline void calc_span_end(float* xo, float* txo, float* tyo,
 	}
 }
 
-#if defined(POINT_SPAN_DEBUG_LOG) && POINT_SPAN_DEBUG_LOG > 1
+#if defined(POINT_SPAN_DEBUG_LOG) && POINT_SPAN_DEBUG_LOG > 4
 #define ADD_SPAN_DEBUG_OUT(x0_, x1_, tx0_, ty0_, tx1_, ty1_) \
-	if(point_span_scope_debug_level > 1)                \
+	if(point_span_scope_debug_level > 4)                \
 		printf("span on line % 4i %4.1f, %4.1f, "       \
 		       "t: (%1.4f, %1.4f) -> (%1.4f, %1.4f)\n", \
 		       line, x0_, x1_, tx0_, ty0_, tx1_, ty1_);
@@ -392,7 +491,7 @@ static inline void calc_span_end(float* xo, float* txo, float* tyo,
 #endif
 
 #define ADD_SPAN(x0_, x1_, tx0_, ty0_, tx1_, ty1_)      \
-	do {                                                \
+	{                                                \
 		assert(tx0_ >= -1.0001 && tx0_ <= 1.0001);            \
 		assert(tx1_ >= -1.0001 && tx1_ <= 1.0001);            \
 		assert(ty0_ >= 0.0 && ty0_ <= 1.0001);             \
@@ -406,22 +505,17 @@ static inline void calc_span_end(float* xo, float* txo, float* tyo,
 			ADD_SPAN_DEBUG_OUT(x0_, x1_, tx0_, ty0_, tx1_, ty1_)\
 			spans[span_count].ix  = x0r_;               \
 			spans[span_count].l   = l_;                 \
-			spans[span_count].tx1 = tx0_*64;            \
-			spans[span_count].ty1 = ty0_*64;            \
-			spans[span_count].tx2 = tx1_*64;            \
-			spans[span_count].ty2 = ty1_*64;            \
-			                                            \
-			float s0_ = fabsf(x0r_ - x0_);               \
-			float s1_ = fabsf(x1r_ - x1_);               \
+			float s0_ = x0r_ - x0_;               \
+			float s1_ = x1r_ - x1_;               \
 			spans[span_count].ftx1 = tx0_ + s0_*dx_;     \
 			spans[span_count].fty1 = ty0_ + s0_*dy_;     \
-			spans[span_count].ftx2 = tx1_ - s1_*dx_;     \
-			spans[span_count].fty2 = ty1_ - s1_*dy_;     \
-			                                            \
-			span_count++;                               \
+			spans[span_count].ftx2 = tx1_ + s1_*dx_;     \
+			spans[span_count].fty2 = ty1_ + s1_*dy_;     \
+			/* TODO: double check +/- in nudge */ \
+			if(spans[span_count].l > 0) span_count++;                               \
 			if(span_count >= self->max_lspans) break;   \
 		}                                               \
-	}while(0);
+	}
 
 /*
  * Generate all the spans for a specific line in the image
@@ -429,14 +523,13 @@ static inline void calc_span_end(float* xo, float* txo, float* tyo,
  * Places the spans in self->span_buf starting at self->span_buf[line*samp*2] and returns the number of spans generated
  */
 __attribute__((hot,noinline,optimize("-ffinite-math-only")))
-static void generate_spans_for_line(struct scope_renderer *self, const struct point* pnts, int line)
+static void generate_spans_for_line(struct scope_renderer *self, int npnts, const struct point* pnts, int line)
 {
 	// TODO: make the span count an atomic in an array or something so that we can steal spans
 	// if we run out, or something like that
 	
 	DEBUG_LOG(1, "Starting spans for line %i\n", line);
 
-	const int   samp = self->samp;
 	const int   width = self->line_width;
 	const float width_rt2 = width * 1.4142135623730950488016887f;  // width * root 2
 	
@@ -445,9 +538,9 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
  	struct span* spans = self->span_buf + line*self->max_lspans;
 
 	uint32_t span_count = 0;
-	for(int i=0; i<samp-1; i++)
+	for(int i=0; i<npnts-1; i++)
 	{
-		DEBUG_LOG(1, "cheking segment #% 5i (%f, %f) -> (%f, %f)\n", i, pnts[i].x, pnts[i].y, pnts[i+1].x, pnts[i+1].y);
+		DEBUG_LOG(2, "cheking segment #% 5i (%f, %f) -> (%f, %f)\n", i, pnts[i].x, pnts[i].y, pnts[i+1].x, pnts[i+1].y);
 	
 		// We subtract the line we are at from the y co-ords to make things easy so
 		// we just care about what is going on at the x axis
@@ -465,7 +558,7 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 			x2 = xt, y2 = yt;
 		}
 		
-		// Since we subracted off the height we can flip the line around to always have
+		// Since we subtracted off the height we can flip the line around to always have
 		// non-negative slope without affecting our spans, since they now lie on the x-axis
 		
 		if(y1 > y2)
@@ -474,7 +567,7 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 			y2 = -y2;
 		}
 		
-		DEBUG_LOG(1, "transformed segment (%f, %f) -> (%f, %f)\n", x1, y1, x2, y2);
+		DEBUG_LOG(2, "transformed segment (%f, %f) -> (%f, %f)\n", x1, y1, x2, y2);
 		
 		// Check which of the various interesting line segments the ray starting at (0, line) intersects
 		// too that end, generate all the interesting points.
@@ -506,17 +599,17 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 #if defined(POINT_SPAN_DEBUG_LOG) && POINT_SPAN_DEBUG_LOG > 2
 		if(point_span_scope_debug_level > 3) {
 
-		DEBUG_LOG(3, "\n\nimport matplotlib.pyplot as plt\nfrom matplotlib.path import Path\nfrom matplotlib.patches import PathPatch\n");
-		DEBUG_LOG(3, "lx = [%f,%f]\n", x1, x2);
-		DEBUG_LOG(3, "ly = [%f,%f]\n", y1, y2);
-		DEBUG_LOG(3, "abcd = [(%4.4f, %4.4f), (%4.4f, %4.4f), (%4.4f, %4.4f), (%4.4f, %4.4f), (0.,0.)]\n",
+		DEBUG_LOG(4, "\n\nimport matplotlib.pyplot as plt\nfrom matplotlib.path import Path\nfrom matplotlib.patches import PathPatch\n");
+		DEBUG_LOG(4, "lx = [%f,%f]\n", x1, x2);
+		DEBUG_LOG(4, "ly = [%f,%f]\n", y1, y2);
+		DEBUG_LOG(4, "abcd = [(%4.4f, %4.4f), (%4.4f, %4.4f), (%4.4f, %4.4f), (%4.4f, %4.4f), (0.,0.)]\n",
 		          ax,ay, bx,by, cx,cy, dx,dy);
-		DEBUG_LOG(3, "efgh = [(%4.4f, %4.4f), (%4.4f, %4.4f), (%4.4f, %4.4f), (%4.4f, %4.4f), (0.,0.)]\n",
+		DEBUG_LOG(4, "efgh = [(%4.4f, %4.4f), (%4.4f, %4.4f), (%4.4f, %4.4f), (%4.4f, %4.4f), (0.,0.)]\n",
 		          ex,ey, fx,fy, gx,gy, hx,hy);
-		DEBUG_LOG(3, "bech = [(%4.4f, %4.4f), (%4.4f, %4.4f), (%4.4f, %4.4f), (%4.4f, %4.4f)]\n",
+		DEBUG_LOG(4, "bech = [(%4.4f, %4.4f), (%4.4f, %4.4f), (%4.4f, %4.4f), (%4.4f, %4.4f)]\n",
 		          bx,by, ex,ey, cx,cy, hx,hy);
-		DEBUG_LOG(3, "box_codes = [Path.MOVETO, Path.LINETO, Path.LINETO, Path.LINETO, Path.CLOSEPOLY]\n");
-		DEBUG_LOG(3, "fig, ax = plt.subplots(sharex=True,sharey=True)\n"
+		DEBUG_LOG(4, "box_codes = [Path.MOVETO, Path.LINETO, Path.LINETO, Path.LINETO, Path.CLOSEPOLY]\n");
+		DEBUG_LOG(4, "fig, ax = plt.subplots(sharex=True,sharey=True)\n"
 		             "ax.plot(lx, ly)\n"
 		             //"ax.plot(box, boy)\n"
 		             "ax.add_patch(PathPatch(Path(abcd, box_codes)))\n"
@@ -526,9 +619,9 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 		             "ax.set_ylim(%4.4f, %4.4f)\n",
 		             x1-(width_rt2+2), x2 + width_rt2+2,
 		             y1-(width_rt2+2), y2 + width_rt2+2);
-		DEBUG_LOG(3, "ax.add_patch(PathPatch(Path([(%4.4f, 0.0), (%4.4f, 0.0)], [Path.MOVETO, Path.LINETO])))\n",
+		DEBUG_LOG(4, "ax.add_patch(PathPatch(Path([(%4.4f, 0.0), (%4.4f, 0.0)], [Path.MOVETO, Path.LINETO])))\n",
 		             x1-(width_rt2+2), x2 + width_rt2+2);
-		DEBUG_LOG(3, "ax.text(%4.4f, %4.4f, 'A')\n"
+		DEBUG_LOG(4, "ax.text(%4.4f, %4.4f, 'A')\n"
 		             "ax.text(%4.4f, %4.4f, 'B')\n"
 		             "ax.text(%4.4f, %4.4f, 'C')\n"
 		             "ax.text(%4.4f, %4.4f, 'D')\n"
@@ -555,10 +648,10 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 		
 		if(ey < 0)
 		{ // we are in the p2 end cap, only one span, starting somewhere along the line EF
-			DEBUG_LOG(2, "intersect EF\n");
+			DEBUG_LOG(3, "intersect EF\n");
 			if(gy < 0)
 			{ // other side of span is on line FG
-				DEBUG_LOG(2, "intersect FG\n");
+				DEBUG_LOG(3, "intersect FG\n");
 				calc_span_end(&span_x1, &tx1, &ty1, ex, ey, fx, fy, etx, ety, ftx, fty);
 				calc_span_end(&span_x2, &tx2, &ty2, fx, fy, gx, gy, ftx, fty, gtx, gty);
 				
@@ -566,7 +659,7 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 			}
 			else
 			{ // other side of the span is on line GH
-				DEBUG_LOG(2, "intersect GH\n");
+				DEBUG_LOG(3, "intersect GH\n");
 				calc_span_end(&span_x1, &tx1, &ty1, ex, ey, fx, fy, etx, ety, ftx, fty);
 				calc_span_end(&span_x2, &tx2, &ty2, gx, gy, hx, hy, gtx, gty, htx, hty);
 				
@@ -575,13 +668,13 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 		}
 		else if(by < 0)
 		{ // first span starts on line BE, already know ey > 0
-			DEBUG_LOG(2, "intersect BE\n");
+			DEBUG_LOG(3, "intersect BE\n");
 			if(hy < 0)
 			{ // Two spans, we switch at a point along line EH
-				DEBUG_LOG(2, "intersect EH\n");
+				DEBUG_LOG(3, "intersect EH\n");
 				if(gy < 0)
 				{ // second span ends somewhere along line FG
-					DEBUG_LOG(2, "intersect FG\n");
+					DEBUG_LOG(3, "intersect FG\n");
 					calc_span_end(&span_x1, &tx1, &ty1, bx, by, ex, ey, btx, bty, etx, ety);
 					calc_span_end(&span_x2, &tx2, &ty2, ex, ey, hx, hy, etx, ety, htx, hty);
 					calc_span_end(&span_x3, &tx3, &ty3, fx, fy, gx, gy, ftx, fty, gtx, gty);
@@ -591,7 +684,7 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 				}
 				else
 				{ // second span ends somewhere along line GH
-					DEBUG_LOG(2, "intersect GH\n");
+					DEBUG_LOG(3, "intersect GH\n");
 					calc_span_end(&span_x1, &tx1, &ty1, bx, by, ex, ey, btx, bty, etx, ety);
 					calc_span_end(&span_x2, &tx2, &ty2, ex, ey, hx, hy, etx, ety, htx, hty);
 					calc_span_end(&span_x3, &tx3, &ty3, gx, gy, hx, hy, gtx, gty, htx, hty);
@@ -602,7 +695,7 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 			}
 			else
 			{ // only one span, ends along line CH
-				DEBUG_LOG(2, "intersect CH\n");
+				DEBUG_LOG(3, "intersect CH\n");
 				calc_span_end(&span_x1, &tx1, &ty1, bx, by, ex, ey, btx, bty, etx, ety);
 				calc_span_end(&span_x2, &tx2, &ty2, cx, cy, hx, hy, ctx, cty, htx, hty);
 				
@@ -611,16 +704,16 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 		}
 		else if(ay < 0)
 		{ // span starts along line AB, already know by >= 0
-			DEBUG_LOG(2, "intersect AB\n");
+			DEBUG_LOG(3, "intersect AB\n");
 			if(cy < 0)
 			{ // at least two spans, we switch at a point along line BC
-				DEBUG_LOG(2, "intersect BC\n");
+				DEBUG_LOG(3, "intersect BC\n");
 				if(hy < 0)
 				{ // three spans, next one starts at a point along line EH
-					DEBUG_LOG(2, "intersect EH\n");
+					DEBUG_LOG(3, "intersect EH\n");
 					if(gy < 0)
 					{ // last span ends at a point along line FG
-						DEBUG_LOG(2, "intersect FG\n");
+						DEBUG_LOG(3, "intersect FG\n");
 						calc_span_end(&span_x1, &tx1, &ty1, ax, ay, bx, by, atx, aty, btx, bty);
 						calc_span_end(&span_x2, &tx2, &ty2, bx, by, cx, cy, btx, bty, ctx, cty);
 						calc_span_end(&span_x3, &tx3, &ty3, ex, ey, hx, hy, etx, ety, htx, hty);
@@ -632,7 +725,7 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 					}
 					else
 					{ // last span ends at a point along line GH
-						DEBUG_LOG(2, "intersect GH\n");
+						DEBUG_LOG(3, "intersect GH\n");
 						calc_span_end(&span_x1, &tx1, &ty1, ax, ay, bx, by, atx, aty, btx, bty);
 						calc_span_end(&span_x2, &tx2, &ty2, bx, by, cx, cy, btx, bty, ctx, cty);
 						calc_span_end(&span_x3, &tx3, &ty3, ex, ey, hx, hy, etx, ety, htx, hty);
@@ -645,7 +738,7 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 				}
 				else
 				{ // two spans, second one ends along line CH
-					DEBUG_LOG(2, "intersect CH\n");
+					DEBUG_LOG(3, "intersect CH\n");
 					calc_span_end(&span_x1, &tx1, &ty1, ax, ay, bx, by, atx, aty, btx, bty);
 					calc_span_end(&span_x2, &tx2, &ty2, bx, by, cx, cy, btx, bty, ctx, cty);
 					calc_span_end(&span_x3, &tx3, &ty3, cx, cy, hx, hy, ctx, cty, htx, hty);
@@ -656,7 +749,7 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 			}
 			else
 			{ // one span, ends along line CD
-				DEBUG_LOG(2, "intersect CD\n");
+				DEBUG_LOG(3, "intersect CD\n");
 				calc_span_end(&span_x1, &tx1, &ty1, ax, ay, bx, by, atx, aty, btx, bty);
 				calc_span_end(&span_x2, &tx2, &ty2, cx, cy, dx, dy, ctx, cty, dtx, dty);
 			
@@ -665,16 +758,16 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 		}
 		else
 		{ // span starts along line AD, already know ay >= 0
-			DEBUG_LOG(2, "intersect AD\n");
+			DEBUG_LOG(3, "intersect AD\n");
 			if(cy < 0)
 			{ // at least two spans second starts along BC
-				DEBUG_LOG(2, "intersect BC\n");
+				DEBUG_LOG(3, "intersect BC\n");
 				if(hy < 0)
 				{ // three spans, third starts along EH
-					DEBUG_LOG(2, "intersect EH\n");
+					DEBUG_LOG(3, "intersect EH\n");
 					if(gy < 0)
 					{ // last span ends along FG
-						DEBUG_LOG(2, "intersect FG\n");
+						DEBUG_LOG(3, "intersect FG\n");
 						calc_span_end(&span_x1, &tx1, &ty1, ax, ay, dx, dy, atx, aty, dtx, dty);
 						calc_span_end(&span_x2, &tx2, &ty2, bx, by, cx, cy, btx, bty, ctx, cty);
 						calc_span_end(&span_x3, &tx3, &ty3, ex, ey, hx, hy, etx, ety, htx, hty);
@@ -686,7 +779,7 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 					}
 					else
 					{ // last span ends along GH
-						DEBUG_LOG(2, "intersect GH\n");
+						DEBUG_LOG(3, "intersect GH\n");
 						calc_span_end(&span_x1, &tx1, &ty1, ax, ay, dx, dy, atx, aty, dtx, dty);
 						calc_span_end(&span_x2, &tx2, &ty2, bx, by, cx, cy, btx, bty, ctx, cty);
 						calc_span_end(&span_x3, &tx3, &ty3, ex, ey, hx, hy, etx, ety, htx, hty);
@@ -699,7 +792,7 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 				}
 				else
 				{ // two spans second ends along CH
-					DEBUG_LOG(2, "intersect CH\n");
+					DEBUG_LOG(3, "intersect CH\n");
 					calc_span_end(&span_x1, &tx1, &ty1, ax, ay, dx, dy, atx, aty, dtx, dty);
 					calc_span_end(&span_x2, &tx2, &ty2, bx, by, cx, cy, btx, bty, ctx, cty);
 					calc_span_end(&span_x3, &tx3, &ty3, cx, cy, hx, hy, ctx, cty, htx, hty);
@@ -710,7 +803,7 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 			}
 			else
 			{ // one span, ends along CD
-				DEBUG_LOG(2, "intersect CD\n");
+				DEBUG_LOG(3, "intersect CD\n");
 				calc_span_end(&span_x1, &tx1, &ty1, ax, ay, dx, dy, atx, aty, dtx, dty);
 				calc_span_end(&span_x2, &tx2, &ty2, cx, cy, dx, dy, ctx, cty, dtx, dty);
 				
@@ -737,7 +830,7 @@ static void generate_spans_for_line(struct scope_renderer *self, const struct po
 #if NO_PARATASK
 
 __attribute__((hot,noinline,optimize("-ffinite-math-only")))
-static void generate_spans(struct scope_renderer *self, int ymin, int ymax, const struct point* pnts)
+static void generate_spans(struct scope_renderer *self, int ymin, int ymax, int npnts, const struct point* pnts)
 {
 	for(int line = ymin; line <= ymax; line++)
 	{
@@ -760,6 +853,7 @@ static void render_spans(struct scope_renderer *self, int ymin, int ymax, uint16
 
 struct generate_spans_args {
 	struct scope_renderer *self;
+	int npnts;
 	const struct point* pnts;
 	int span;
 };
@@ -771,19 +865,20 @@ static void generate_spans_paratask_func(size_t work_item_id, void *arg_)
 	const int yend   = IMIN(ystart + a->span, a->self->iw);
 	for(int line = ystart; line < yend; line++)
 	{
-		generate_spans_for_line(a->self, a->pnts, line);
+		generate_spans_for_line(a->self, a->npnts, a->pnts, line);
 	}
 }
 
-static void generate_spans(struct scope_renderer *self, int ymin, int ymax, const struct point* pnts)
+static void generate_spans(struct scope_renderer *self, int ymin, int ymax, int npnts, const struct point* pnts)
 {
 	int span = 1;
 	struct generate_spans_args args = {
 		self,
+		npnts,
 		pnts,
 		span
 	};
-	paratask_call(paratask_default_instance(), ymin, ymax+1, generate_spans_paratask_func, &args);
+	paratask_call(paratask_default_instance(), ymin, ymax-ymin+1, generate_spans_paratask_func, &args);
 }
 
 struct render_spans_args {
@@ -811,7 +906,7 @@ static void render_spans(struct scope_renderer *self, int ymin, int ymax, uint16
 		dest,
 		span
 	};
-	paratask_call(paratask_default_instance(), ymin, ymax+1, render_spans_paratask_func, &args);
+	paratask_call(paratask_default_instance(), ymin, ymax-ymin+1, render_spans_paratask_func, &args);
 }
 
 #endif
@@ -863,4 +958,32 @@ static void generate_spans(struct scope_renderer *self, struct point32* pnts)
 		// we can clip by checking where the two spans texture space lines intersect and using distamce to origin
 	}
 }
+#endif
+
+
+
+#ifdef POINT_SPAN_TEST
+
+// TODO: write a test suit. Make a bunch of line segments and render with a simple method that gives our expected output and compare
+//       Make sure it runs with lots of angles for the segments.
+
+// Re-run failing cases after setting point_span_scope_debug_level=3 to get full debug output for it
+
+int main()
+{
+	point_span_scope_debug_level = 0;
+}
+
+#endif
+
+
+#ifdef POINT_SPAN_BENCH
+
+// TODO: write a benchmark
+
+int main()
+{
+
+}
+
 #endif

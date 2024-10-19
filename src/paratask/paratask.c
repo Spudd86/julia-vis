@@ -9,8 +9,19 @@
 
 #include "paratask.h"
 
-// NOTE: some versions of gcc/clang fail to define __STDC_NO_THREADS__ even if the libc doesn't support C11 threads
-#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__)
+/* Future Ideas:
+ *
+ * - over a certain number of CPUs allocate either per-cpu or per-NUMA domain counters
+ *    - once a thread runs out of work on a job it starts using another CPU's counter
+ *    - each NUMA domain/CPU has it's own list of the order of other counters it will try to steal from
+ *    - could make an array of counters for each CPU, that way it's not so much wasted memory (if there are multiple active jobs)
+ * - per-thread queues?
+ */
+
+
+
+// NOTE: some versions of gcc fail to define __STDC_NO_THREADS__ even if the libc doesn't support C11 threads
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__) && (defined(__clang__) || !(defined(__GNUC__) && defined(__GNUC_MINOR__) && (((__GNUC__ << 8) | __GNUC_MINOR__) >= ((4 << 8) | 9))))
 #	include <threads.h>
 #else
 #	include "tinycthread.h"
@@ -114,6 +125,9 @@ struct paratask_ctx *paratask_new(int nthreads)
 	for(int i=0; i < self->nthreads; i++) {
 		int err = thrd_create(&self->threads[i], task_thread, self);
 		if(err != thrd_success) {
+			if(err == thrd_nomem) fprintf(stderr, "Failed to create thread, no memory\n");
+			else if(err == thrd_error) fprintf(stderr, "Failed to create thread\n");
+			else fprintf(stderr, "Failed to create thread %i\n", err);
 			abort(); //FIXME: do better than this
 		}
 	}
@@ -246,7 +260,7 @@ int paratask_wait(struct paratask_task *task)
 	return retval;
 }
 
-static size_t next_work_item(struct paratask_task *task)
+static inline size_t next_work_item(struct paratask_task *task)
 {
 	size_t work_item_id;
 

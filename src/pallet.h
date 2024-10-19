@@ -8,6 +8,9 @@
 
 #include "software/pixformat.h"
 
+//TODO: refactor, put format shuffle on output step to make internal data not depend on pixel format so we can change at runtime
+//      or at least put shuffle in step function since we're already doing linear RGB interpolation there
+
 //TODO: now that we've dropped the global variable based version rename these functions
 struct pal_ctx;
 struct pal_ctx *pal_ctx_new(int bswap);

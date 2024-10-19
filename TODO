@@ -6,3 +6,6 @@
 - add padding to internal image buffer allocations so that vector instructions can run past the end of the image (eg: pallet blit using maskmoveu to do stores might read up to 14 bytes past the end of the image)
 
 - switch to using the julia_vis_pixel_format based pallet init function in at least all software versions so we can freely change the resulting channel orders in the pallet to make the 16 bit blitters better.
+
+- Maybe make point randomization take an optional low res density map image so for the simple classic Mandelbrot can be used to put extra density near the edges of of the set and thus get more interesting Julia sets more often.
+	- Use simple escape method to calculate the density at every pixel, scale in some non-linear way (sqrt?), fill points that don't escape with some low constant.

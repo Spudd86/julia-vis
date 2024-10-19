@@ -1,22 +1,21 @@
 #if (__i386__) && !defined(DISABLE_X86_INTRIN)
 
-#pragma GCC target("no-sse,athlon,3dnow")
+#pragma GCC target("no-sse,athlon,3dnowa")
 #pragma GCC optimize "3,inline-functions"
 // Want -fmerge-all-constants but we can't put it in the optimize pragma for some reason
 
 #include "common.h"
 #include "../pixmisc.h"
 #include <mmintrin.h>
-#include <mm3dnow.h>
 
-static inline __attribute__((__always_inline__, __artificial__, target("no-sse,athlon,3dnow")))
+static inline __attribute__((__always_inline__, __artificial__, target("no-sse,athlon,3dnowa")))
 __m64 _mm_max_pi16(__m64 a, __m64 b) {
 	return (__m64)__builtin_ia32_pmaxsw((v4hi)a, (v4hi)b);
 }
 
 // should be the same as the sse version but split out just to be sure gcc doesn't generate any sse only instructions
 // plus lets us use femms which is faster on some AMD CPUs (also tunes for athalons instead of generic)
-__attribute__((hot, target("no-sse,athlon,3dnow")))
+__attribute__((hot, target("no-sse,athlon,3dnowa")))
 void maxblend_3dnow(void *restrict dest, const void *restrict src, int w, int h)
 {
 	__m64 *mbdst = dest; const __m64 *mbsrc = src;
@@ -54,7 +53,8 @@ void maxblend_3dnow(void *restrict dest, const void *restrict src, int w, int h)
 		mbdst[3]=v4;
 	}
 	__builtin_ia32_sfence();
-	_m_femms();
+	//_m_femms();
+	_mm_empty();
 }
 
 #define PALBLIT_3dNOW 1

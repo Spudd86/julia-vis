@@ -5,8 +5,10 @@
 #OUTFILE=test
 
 #FILENAME=../238913__edtijo__hejda-depressive-guitar.wav; OUTFILE=guitar
+#FILENAME=../379875_The_time_portal.mp3; OUTFILE="/media/thomasjones/My Passport/the_time_portal"
 
-FILENAME=../379875_The_time_portal.mp3; OUTFILE="/media/thomasjones/My Passport/the_time_portal"
+#FILENAME=~/Music/Opening.ogg; OUTFILE="/media/thomasjones/My Passport/chrono_cross_op_vis"
+FILENAME=~/Music/Desert_Wasteland.mp3.ogg; OUTFILE="/media/thomasjones/My Passport/Desert_Wasteland_rat_vis"
 
 #GDB='gdb --args'
 
@@ -19,8 +21,8 @@ FILENAME=../379875_The_time_portal.mp3; OUTFILE="/media/thomasjones/My Passport/
 TIME_OVERLAY1=""
 TIME_OVERLAY2=""
 
-#VIS_PLUGIN="julia_vis map-func=rational"
-VIS_PLUGIN="julia_vis map-func=normal"
+VIS_PLUGIN="julia_vis map-func=rational"
+#VIS_PLUGIN="julia_vis map-func=normal"
 #VIS_PLUGIN="julia_vis"
 
 #VID_FORMAT="video/x-raw,width=384,height=384,framerate=30/1"

@@ -20,7 +20,8 @@
 
 static opt_data opts;
 
-static soft_map_func map_func = soft_map_interp;
+//static soft_map_func map_func = soft_map_interp;
+static soft_map_func map_func = soft_map_avx2;
 
 int main(int argc, char **argv)
 {

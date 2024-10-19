@@ -21,7 +21,8 @@ freely, subject to the following restrictions:
     3. This notice may not be removed or altered from any source
     distribution.
 */
-
+#if !(defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201102L) && !defined(__STDC_NO_THREADS__))
+// don't build if native C11 threads exist
 #include "tinycthread.h"
 #include <stdlib.h>
 
@@ -928,4 +929,6 @@ void call_once(once_flag *flag, void (*func)(void))
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif

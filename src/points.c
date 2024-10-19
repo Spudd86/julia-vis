@@ -74,6 +74,16 @@ void update_points(struct point_data *pd, unsigned int passed_time, int retarget
 	const float tsped = 0.002f;
 	const unsigned int steps_ps = 150;
 
+	//TODO change to use the fact that:
+	// we can properly step an exponential with
+	// blend = 1.0f - pow(<constant>, delta_t*speed)
+	// lerp(pos, target, blend)
+	// Need to review what this code is actually doing to figure out how to apply this
+	// applying it should get us a small speed up on the main thread, probably too small to measure
+	// but it's also cleaner and we should be clean.
+	// It might be easier to unpack what the code is computing and work out the integral
+	// See this video https://www.youtube.com/watch?v=yGhfUcPjXuE&t=502s for starting thoughts on the integration
+
 	// go through this mess here to make sure we're running the loop some integer multiple of the framerate times
 	// (assuming constant framerate that is)
 	// this seems to give nice smooth movement at ALL framerates so we'll

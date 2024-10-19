@@ -83,6 +83,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+VID_FORMAT="video/x-raw,width=${VID_WIDTH},height=${VID_HEIGHT},framerate=${VID_FRAME_RATE}/1"
+
 GST_PLUGIN_PATH=bin/.libs $GDB gst-launch-1.0 $DEBUG_ARGS \
 streamsynchronizer name=s \
 filesrc location=meco_star_wars_disco.mid ! decodebin ! audioconvert  ! rgvolume ! audioconvert ! tee name=t \

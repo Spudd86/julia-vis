@@ -3,6 +3,9 @@
 #include "common.h"
 #include "x86_features.h"
 
+#include <signal.h>
+#include <setjmp.h>
+
 #ifdef _WIN32
 #include <intrin.h>
 int cpuid(unsigned int level, unsigned int *eax, unsigned int *ebx, unsigned int *ecx, unsigned int *edx)
@@ -35,19 +38,9 @@ int cpuid(unsigned int level, unsigned int *eax, unsigned int *ebx, unsigned int
 	return 1;
 }
 
-// static inline unsigned long read_cr0(void)
-// {
-// 	unsigned long val;
-// 	__asm__ volatile ( "mov %%cr0, %0" : "=r"(val) );
-// 	return val;
-// }
+static sigjmp_buf sse_sigjmp_buf;
+static void handle_SIGILL_for_sse_check(int signal) { siglongjmp(sse_sigjmp_buf, 1); }
 
-// static inline unsigned long read_cr4(void)
-// {
-//     unsigned long val;
-//     __asm__ volatile ( "mov %%cr4, %0" : "=r"(val) );
-//     return val;
-// }
 #endif
 
 uint64_t x86feat_get_features(void)
@@ -56,18 +49,44 @@ uint64_t x86feat_get_features(void)
 
 	//TODO: environment variable to force disable detecting various features
 	//TODO: detect OS support for features (mostly newer ones...)
-	bool os_xsave = false;
 	unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
 	if (!cpuid (1, &eax, &ebx, &ecx, &edx)) return 0;
 
 	// check OSFXSR, MP and EM flags, need OSFXSR and MP to be 1 and EM to be 0 or sse instructions will cause illegal instruction
 	// unfortunately there doesn't seem to be a way to get at any of that information outside ring 0
 
-	os_xsave = !!(ecx & (1 << 27)); // os using the XSAVE to save context
+	// Try to run stmxcsr instruction, if OS doesn't support SSE we will get an illegal instruction exception
+	bool os_fxsr = false;
+#if defined(WIN32)
+	__try {
+		uint32_t mxcsr = 0;
+		asm("stmxcsr %0"::"m"(mxcsr) : );
+		os_fxsr = true;
+	}
+	__except(EXCEPTION_EXECUTE_HANDLER)
+	{
+	}
+#else
+	struct sigaction orig_action;
+	struct sigaction new_action = {{0}};
+	new_action.sa_handler = handle_SIGILL_for_sse_check;
+	new_action.sa_flags = 0;
+	sigemptyset(&new_action.sa_mask);
+	sigaction(SIGILL, &new_action, &orig_action);
+	if(!sigsetjmp(sse_sigjmp_buf, 1))
+	{
+		uint32_t mxcsr = 0;
+		asm("stmxcsr %0"::"m"(mxcsr) : );
+		os_fxsr = true;
+	}
+	sigaction(SIGILL, &orig_action, NULL);
+#endif
+
+	bool os_xsave = !!(ecx & (1 << 27)); // os using the XSAVE to save context
 
 	if(edx & (1 << 23)) features |= X86FEAT_MMX;
 	if(edx & (1 << 25)) features |= X86FEAT_MMXEXT; // MMXEXT is a subset of SSE, AMD only though
-	if(edx & (1 << 24)) { // fxsr os support needed
+	if( (edx & (1 << 24)) && os_fxsr ) { // fxsr os support needed
 	    if(edx & (1 << 25)) features |= X86FEAT_SSE;
 	    if(edx & (1 << 26)) features |= X86FEAT_SSE2;
 	    if(ecx & (1 <<  0)) features |= X86FEAT_SSE3;

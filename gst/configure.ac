@@ -1,5 +1,5 @@
 dnl required version of autoconf
-AC_PREREQ(2.60)
+AC_PREREQ([2.71])
 
 AC_INIT([julia-vis-gst],[0.0.0])
 
@@ -18,8 +18,7 @@ AM_INIT_AUTOMAKE([
 ])
 AC_CONFIG_HEADERS([config.h])
 
-dnl check for tools (compiler etc.)
-AC_PROG_CC_STDC
+AC_PROG_CC
 AC_USE_SYSTEM_EXTENSIONS
 
 AC_SYS_LARGEFILE
