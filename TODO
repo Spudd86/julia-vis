@@ -1,6 +1,3 @@
-
-- Make Makefile.in smarter
-
 - switch pallet blit sse2 to use maskmoveu so we can simplify it's alignment code
 
 - add padding to internal image buffer allocations so that vector instructions can run past the end of the image (eg: pallet blit using maskmoveu to do stores might read up to 14 bytes past the end of the image)
@@ -9,3 +6,18 @@
 
 - Maybe make point randomization take an optional low res density map image so for the simple classic Mandelbrot can be used to put extra density near the edges of of the set and thus get more interesting Julia sets more often.
 	- Use simple escape method to calculate the density at every pixel, scale in some non-linear way (sqrt?), fill points that don't escape with some low constant.
+
+- make an SDL2 version, use nuklear as UI and let user switch between visualizer modes.
+   - Also select audio input
+     - refactor audio subsystem to support this
+   - Also let user switch between software and OpenGL visualizer
+       - Should grab existing state images to start up different modes to make things smooth?
+   - Add support for SDL2 Audio backend for recording
+   - Switch to https://github.com/Dav1dde/glad for generating the loader, lets us pass the SDL2 getprocaddr
+   - Vulkan backand?
+      - simplified shaders?
+
+- Use newer audio API on Windows natively. (WASPI)
+   - default to using loopback on default output device.
+
+- Build a release binary of SDL2 version

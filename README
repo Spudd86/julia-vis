@@ -1,9 +1,25 @@
 A Music Visualizer
 ------------------
 
-A beat reactive visualizer that's based around the 
-Julia set fractal.
+A beat reactive visualizer that's based around the Julia set fractal.
 
+## Compiling
+
+Standard autotools build. From a fresh checkout
+
+	./autogen.sh
+	./configure
+	make
+
+### Pre-requisites
+
+On windows you will need mingw or mingw-w64, it's been a long time since I've built on Windows so it may be broken.
+
+Everywhere you will need to have installed and findable by `pkg-config` SDL 1.2 and one of the supported audio libraries.
+
+On Linux I recommend building against pulseaudio, on Windows you will need the portaudio library.
+
+## Notes
 
 Parts of this codebase have been heavily optimized, some of that optimization was done a decade ago, so it may or may not matter for modern
 systems. It was also originally written to run as fast as possible on a computer that was old in 2008. Other parts were written as an 
