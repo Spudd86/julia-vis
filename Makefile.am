@@ -169,6 +169,7 @@ src/software/pixmisc.h \
 src/common.h
 
 src_software_libsoftcore_la_SOURCES = \
+src/software/softcore.c src/software/softcore.h \
 src/software/map.c src/software/map.h \
 src/software/maxsrc.c src/software/maxsrc.h src/software/span_scope2.c src/software/scope_render.h \
 src/software/palletblit.c \

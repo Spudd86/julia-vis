@@ -10,29 +10,18 @@
 
 #include "simple_main.h"
 
+#include "softcore.h"
+
 //TODO: add ability to change audio sample-rate without resetting video
 //TODO: add ability to change output video channel order without reset
 
-struct simple_soft_ctx {
-	soft_map_func map_func;
-	bool rational_julia;
-
-	int im_w, im_h;
-
-	int m;
-	uint16_t *map_surf[2];
-
-	struct maxsrc *maxsrc;
+struct simple_soft_ctx
+{
+	struct softcore_ctx *core;
 	struct pal_ctx *pal_ctx;
-	struct point_data *pd;
-
-	uint32_t maxsrc_rate;
-	uint64_t maxfrms;
 	uint64_t lastpalstep;
 
 	struct beat_ctx *beat;
-	uint64_t beats;
-	uint64_t last_beat_time;
 
 	int sample_rate;
 	uint64_t sample_count;
@@ -51,21 +40,15 @@ void simple_soft_destroy(struct simple_soft_ctx *ctx)
 {
 	if(!ctx) return;
 
-	if(ctx->map_surf[0]) aligned_free(ctx->map_surf[0]);
-	if(ctx->map_surf[1]) aligned_free(ctx->map_surf[1]);
+	if(ctx->core) softcore_destroy(ctx->core);
 	if(ctx->fft_tmp) aligned_free(ctx->fft_tmp);
 	if(ctx->cur_buf) aligned_free(ctx->cur_buf);
 	if(ctx->prev_buf) aligned_free(ctx->prev_buf);
 
-	if(ctx->maxsrc) maxsrc_delete(ctx->maxsrc);
 	if(ctx->pal_ctx) pal_ctx_delete(ctx->pal_ctx);
-	if(ctx->pd) destroy_point_data(ctx->pd);
 	if(ctx->beat) beat_delete(ctx->beat);
 
-	ctx->map_surf[0] = ctx->map_surf[1] = NULL;
-	ctx->maxsrc = NULL;
 	ctx->pal_ctx = NULL;
-	ctx->pd = NULL;
 	ctx->beat = NULL;
 	ctx->cur_buf = ctx->prev_buf = ctx->fft_tmp = NULL;
 	free(ctx);
@@ -76,36 +59,16 @@ struct simple_soft_ctx *simple_soft_init(int w, int h, simple_soft_map_func map_
 	struct simple_soft_ctx *ctx = malloc(sizeof(*ctx));
 	if(!ctx) return NULL;
 
-	ctx->map_surf[0] = ctx->map_surf[1] = NULL;
-	ctx->maxsrc = NULL;
+	if(!(ctx->core = softcore_init(w, h, map_func))) goto fail;
+
 	ctx->pal_ctx = NULL;
-	ctx->pd = NULL;
 	ctx->beat = NULL;
 	ctx->cur_buf = ctx->prev_buf = ctx->fft_tmp = NULL;
 
-	// force divisible by 16
-	ctx->im_w = w - w%16;
-	ctx->im_h = h - h%16;
-
-	simple_soft_change_map_func(ctx, map_func);
-
-	ctx->m = 0;
-	ctx->map_surf[0] = aligned_alloc(64, ctx->im_w * ctx->im_h * sizeof(uint16_t));
-	ctx->map_surf[1] = aligned_alloc(64, ctx->im_w * ctx->im_h * sizeof(uint16_t));
-	if(!ctx->map_surf[0] || !ctx->map_surf[1]) goto fail;
-	memset(ctx->map_surf[0], 0, ctx->im_w * ctx->im_h * sizeof(uint16_t));
-	memset(ctx->map_surf[1], 0, ctx->im_w * ctx->im_h * sizeof(uint16_t));
-
 	ctx->pal_ctx = pal_ctx_pix_format_new(format);
-	ctx->maxsrc_rate = 24; //TODO: add a property that can change this
-	ctx->maxsrc = maxsrc_new(ctx->im_w, ctx->im_h);
-	ctx->pd = new_point_data(ctx->rational_julia?4:2);
-	if(!ctx->maxsrc || !ctx->pal_ctx || !ctx->pd) goto fail;
+	if(!ctx->pal_ctx) goto fail;
 
-	ctx->last_beat_time = 0;
 	ctx->lastpalstep = 0;
-	ctx->maxfrms = 1;
-	ctx->beats = 0;
 
 	ctx->beat = beat_new();
 	if(!ctx->beat) goto fail;
@@ -138,55 +101,15 @@ void simple_soft_set_pixel_format(struct simple_soft_ctx *ctx, julia_vis_pixel_f
 
 void simple_soft_change_map_func(struct simple_soft_ctx *ctx, simple_soft_map_func func)
 {
-	switch(func) {
-		case SOFT_MAP_FUNC_NORMAL:
-			ctx->rational_julia = 0;
-			ctx->map_func = soft_map;
-			break;
-		case SOFT_MAP_FUNC_NORMAL_INTERP:
-			ctx->rational_julia = 0;
-			ctx->map_func = soft_map_interp;
-			break;
-		case SOFT_MAP_FUNC_RATIONAL:
-			ctx->rational_julia = 1;
-			ctx->map_func = soft_map_rational;
-			break;
-		case SOFT_MAP_FUNC_RATIONAL_INTERP:
-			ctx->rational_julia = 1;
-			ctx->map_func = soft_map_rational_interp;
-			break;
-		case SOFT_MAP_FUNC_BUTTERFLY:
-			ctx->rational_julia = 0;
-			ctx->map_func = soft_map_butterfly;
-			break;
-		case SOFT_MAP_FUNC_BUTTERFLY_INTERP:
-			ctx->rational_julia = 0;
-			ctx->map_func = soft_map_butterfly_interp;
-			break;
-		default:
-			break;
-	}
+	softcore_change_map_func(ctx->core, func);
 }
 
 // TODO: need a "now" take it as an argument
 void simple_soft_render(struct simple_soft_ctx *ctx, Pixbuf *out, int64_t now, int64_t tick0)
 {
-	ctx->m = (ctx->m+1)&0x1;
-
-	if(tick0+(ctx->maxfrms*1000)/ctx->maxsrc_rate - now > 1000/ctx->maxsrc_rate) {
-		maxsrc_update(ctx->maxsrc, ctx->prev_buf, ctx->nr_samp/2);
-		ctx->maxfrms++;
-	}
-
-	if(!ctx->rational_julia) {
-		ctx->map_func(ctx->map_surf[ctx->m], ctx->map_surf[(ctx->m+1)&0x1], ctx->im_w, ctx->im_h, ctx->pd);
-		maxblend(ctx->map_surf[ctx->m], maxsrc_get(ctx->maxsrc), ctx->im_w, ctx->im_h);
-	}
-
-	if(ctx->rational_julia) {
-		maxblend(ctx->map_surf[(ctx->m+1)&0x1], maxsrc_get(ctx->maxsrc), ctx->im_w, ctx->im_h);
-		ctx->map_func(ctx->map_surf[ctx->m], ctx->map_surf[(ctx->m+1)&0x1], ctx->im_w, ctx->im_h, ctx->pd);
-	}
+	int newbeat = beat_ctx_count(ctx->beat);
+	int oldbeat = softcore_get_last_beat_count(ctx->core);
+	const uint16_t *imbuf = softcore_render(ctx->core, now, tick0, newbeat, ctx->prev_buf, ctx->nr_samp/2);
 
 	// rather than just audio clock
 	if((now - ctx->lastpalstep)*256/1024 >= 1) { // want pallet switch to take ~2 seconds
@@ -194,17 +117,12 @@ void simple_soft_render(struct simple_soft_ctx *ctx, Pixbuf *out, int64_t now, i
 		ctx->lastpalstep = now;
 	}
 
-	pallet_blit_Pixbuf(out, ctx->map_surf[ctx->m], ctx->im_w, ctx->im_h, pal_ctx_get_active(ctx->pal_ctx));
+	int im_w, im_h;
+	softcore_get_buffer_dims(ctx->core, &im_w, &im_h);
+	pallet_blit_Pixbuf(out, imbuf, im_w, im_h, pal_ctx_get_active(ctx->pal_ctx));
 	//pallet_blit_Pixbuf(out, maxsrc_get(ctx->maxsrc), ctx->im_w, ctx->im_h, pal_ctx_get_active(ctx->pal_ctx));
 
-	int newbeat = beat_ctx_count(ctx->beat);
-	if(newbeat != ctx->beats) pal_ctx_start_switch(ctx->pal_ctx, newbeat);
-
-	if(newbeat != ctx->beats && now - ctx->last_beat_time > 1000) {
-		ctx->last_beat_time = now;
-		update_points(ctx->pd, (now - tick0), 1);
-	} else update_points(ctx->pd, (now - tick0), 0);
-	ctx->beats = newbeat;
+	if(newbeat != oldbeat) pal_ctx_start_switch(ctx->pal_ctx, newbeat);
 }
 
 

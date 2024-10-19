@@ -120,4 +120,8 @@ extern pallet_blit32_fn pallet_blit32;
 
 void pallet_blit_Pixbuf(Pixbuf* dst, const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal);
 
+// TODO: add src_pitch
+void pallet_blit_raw(uint8_t* restrict dst, julia_vis_pixel_format dst_fmt, int dst_pitch,
+                     const uint16_t* restrict src, int w, int h, const uint32_t *restrict pal);
+
 #endif

@@ -3,14 +3,7 @@
 
 #include "software/pixformat.h"
 
-typedef enum {
-	SOFT_MAP_FUNC_NORMAL,
-	SOFT_MAP_FUNC_NORMAL_INTERP,
-	SOFT_MAP_FUNC_RATIONAL,
-	SOFT_MAP_FUNC_RATIONAL_INTERP,
-	SOFT_MAP_FUNC_BUTTERFLY,
-	SOFT_MAP_FUNC_BUTTERFLY_INTERP,
-} simple_soft_map_func;
+#include "softcore.h"
 
 struct simple_soft_ctx;
 
