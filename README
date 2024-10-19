@@ -38,6 +38,7 @@ You will also need autotools installed.
 	git clone https://github.com/Spudd86/julia-vis.git
 	cd julia-vis
  5. compile and run
+	MSYSTEM=UCRT64 /bin/bash -l
 	NOCONFIGURE=1 ./autogen.sh
 	./configure --host=mingw-w64-ucrt-x86_64
 	make
